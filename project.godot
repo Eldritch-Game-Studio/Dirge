@@ -1,0 +1,13 @@
+; Engine configuration file.
+config_version=5
+
+[application]
+config/name="Dirge Demo"
+run/main_scene="res://demo/demo.tscn"
+config/features=PackedStringArray("4.7", "C#", "Forward Plus")
+
+[dotnet]
+project/assembly_name="Dirge.Demo"
+
+[editor_plugins]
+enabled=PackedStringArray("res://addons/dirge/plugin.cfg")

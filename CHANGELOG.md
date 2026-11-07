@@ -4,9 +4,9 @@ All notable changes to Dirge. The format follows [Keep a Changelog](https://keep
 
 ## 1.0.0 — 2026-11-07
 
-First release: adaptive-audio authoring and runtime for stock Godot 4.7.2 .NET, MIT licensed. Tool UI through NecronomiDOM ≥ 1.1.4; native effects are an optional GDExtension built for Linux x64, Windows x64 and macOS. Verified on this release: `dotnet build Dirge.slnx` (0 errors), `dotnet test tests/Dirge.Model.Tests` (212 passed), `scripts/smoke.sh` (demo and sandbox PASS) and the native send/return test scene `native/tests/sendreturn.tscn`. Documentation: `README.md`, `docs/getting-started.md`, `docs/capabilities.md` (feature matrix with per-row status and runtime API reference), `THIRD_PARTY_NOTICES.md`.
+First release: adaptive-audio authoring and runtime for stock Godot 4.7.2 .NET, MIT licensed. Tool UI through NecronomiDOM ≥ 1.1.4; native effects are an optional GDExtension built for Linux x64, Windows x64 and macOS. Verified on this release: `dotnet build Dirge.slnx` (0 errors), `dotnet test tests/Dirge.Model.Tests` (257 passed), `scripts/smoke.sh` (demo and sandbox PASS) and the native send/return test scene `native/tests/sendreturn.tscn`. Documentation: `README.md`, `docs/getting-started.md`, `docs/capabilities.md` (feature matrix with per-row status and runtime API reference), `THIRD_PARTY_NOTICES.md`.
 
-### M1 — Model and driver
+### Model and driver
 
 - `Dirge.Model` (net8.0, no Godot reference): `AudioProject` graph — banks, mixer graph (buses, effects, VCAs), snapshots, global parameters, events with tracks, instruments, automation lanes, modulators, logic markers and tempo markers. Identity by `DirgeId` GUIDs plus stable paths.
 - Instruments: Clip, Multi (random/sequential/shuffle, avoid-repeat, weights), Scatterer, Silence, Event (nested, depth limit 8), Programmer, Command, Snapshot. Instrument properties: volume, pitch, start offset, loop, fade in/out, cut mode, polyphony, trigger delay, playback percentage, conditions.
@@ -24,7 +24,7 @@ First release: adaptive-audio authoring and runtime for stock Godot 4.7.2 .NET, 
 - Godot glue (`addons/dirge/runtime`): `DirgeServer` autoload (project from `ProjectPath` or the `dirge/project_path` setting; handle-based GDScript surface), `AudioDriver` over `AudioServer` with a pooled `AudioStreamPlayer`/`AudioStreamPlayer3D` set, `AssetCatalog`, `DirgePlugin` editor plugin registering the autoloads and the Dirge main screen.
 - Demo project (`demo/`) with headless `--smoke` run; `scripts/smoke.sh`, `scripts/fetch-deps.sh`, `scripts/gen-demo-audio.py`.
 
-### M2 — Mixer
+### Mixer
 
 - Editor main screen "Dirge" with menu bar (New/Open/Save/Save As/Validate/Build Banks/Connect), left browser, center event editor, bottom Mixer/Profiler tabs, top transport, validation panel and status bar; shared dark theme; undo/redo, save, play/stop and delete routed to the focused pane.
 - Mixer pane: bus strips with faders, peak meters, mute/solo/bypass, routing picker, effect chain with per-effect parameter popovers, add/remove/reparent buses, VCAs, snapshot list and editor (scoped values, capture, intensity scrub, mode, priority).
@@ -33,14 +33,14 @@ First release: adaptive-audio authoring and runtime for stock Godot 4.7.2 .NET, 
 - Per-bus `LFO` button in the effect-section footer of every strip opens a popover listing the bus-volume LFOs (waveform picker, rate 0.05–20 Hz, depth 0–24 dB sliders with text fields, remove) with `+ LFO` adding a 4 Hz / 3 dB sine tremolo.
 - In-game overlay (`DirgeOverlay` autoload, debug builds, F9 / `dirge_overlay` action) mounting the Mixer and Profiler panes over a running game.
 
-### M3 — Events
+### Events
 
 - Event editor pane: header (path, bus, macros), timeline canvas with tracks, instrument blocks, markers, playhead, zoom/scroll, drag/resize, snap-to-grid, multi-select, copy/paste; parameter-sheet tabs; instrument inspector for all eight instrument types; automation lanes with curve editor; modulators; local parameters.
 - Modulator forms offer Random, AHDSR, LFO and Autopitch; the autopitch item has a parameter picker (locals then `G:` globals), reference value and pitch-at-minimum/maximum fields (seeded with the default parameter at its default value, 0.5×…2×).
 - Browser pane: events tree by path (folders, rename, new, delete, drag), assets tree from `res://` audio files with length readout, snapshots/parameters/banks lists, search, event tags (`AudioEvent.Tags`; filter chips under the search box, add/remove on the selected event in the Events footer).
 - Transport pane: play/stop/stop-all, loop toggle, global and per-event parameter sliders, 3D preview panner driving the built-in parameters, voice/instance/ms readouts.
 
-### M4 — Music
+### Music
 
 - Transition timelines: `TransitionMarker.TransitionLength` with transition-track instruments played between source and destination.
 - Quantized event start (`EventMacros.StartQuantization`) against the conductor event (`AudioEvent.IsConductor`).
@@ -48,7 +48,7 @@ First release: adaptive-audio authoring and runtime for stock Godot 4.7.2 .NET, 
 - Sample-locked multi-layer starts through `AudioStreamSynchronized` for instruments sharing `Instrument.SyncGroup`; transitions stay on the model clock (no `AudioStreamInteractive`).
 - Parameter velocity (`EventInstance.GetParameterVelocity`).
 
-### M5 — Live
+### Live
 
 - Profiler pane: live instance list, voice counts, update-time graph, per-bus level bars, recording start/stop/save/load/replay.
 - `Dirge.Profiling`: `Recorder`, `RecordingJson`, `Replayer` with `Compare` returning the first divergent command — recordings double as deterministic test fixtures.
@@ -62,15 +62,16 @@ First release: adaptive-audio authoring and runtime for stock Godot 4.7.2 .NET, 
 - `tools/dirge-validate` CLI: `dotnet run --project tools/dirge-validate -- file.dirge.json [--json]`; exit 1 on errors, 2 on parse failure.
 - CI: unit tests, demo validation, stock-Godot headless smoke, native builds for Linux/Windows/macOS and the addon ZIP (`scripts/package.sh`, `scripts/ci-local.sh` for act).
 
-### M6 — Native
+### Native
 
 - Optional GDExtension (`native/`, godot-cpp `10.0.0-stable` against engine API 4.7): `DirgeAudioEffectSend`/`DirgeAudioEffectReturn` pre/post-fader sends into return buses and `DirgeAudioEffectConvolutionReverb` (partitioned FFT). Registered through `addons/dirge/dirge_native.gdextension`; binaries under `addons/dirge/bin/<platform>/`. The mixer pane exposes sends and returns when the classes are present.
 
-### Fixed — integrated editor proof
+### Fixed before release
 
 - `DirgeServer`: `--dirge-live[=port]`/`LiveUpdatePort` binds when the server loads a project, so the plugin's idle autoload no longer takes the port from a scene-local server (previously the scene server failed with `AlreadyInUse` and the editor connected to an empty server).
 - Profiler "Game" source shares the shell's live connection instead of opening a second socket; the game keeps one editor connection, so the second socket used to drop the shell's and silently stop mixer pushes.
 - `EditorAudition`: while Dirge owns the engine bus layout the editor's Audio Buses dock stops polling `AudioServer.is_edited()`, which otherwise saved the audition layout to `res://default_bus_layout.tres` and `audio/buses/default_bus_layout`; restoring the editor layout now also emits `bus_layout_changed` so the dock drops stale strips (no per-frame "Index p_bus out of bounds" errors after disabling the plugin).
+- Model: one-shot instruments whose region is shorter than a tick are no longer swallowed — flash regions are swept in one segment and unplayed one-shot voices survive a same-tick exit.
 
 ### Known gaps (see `docs/capabilities.md`)
 

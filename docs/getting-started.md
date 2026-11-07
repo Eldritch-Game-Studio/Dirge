@@ -4,7 +4,7 @@ A ten-minute walkthrough: install the addon, author a bus, an event with a clip,
 
 ## 1. Install (2 minutes)
 
-1. Copy `addons/dirge/` from the release ZIP into your project, and NecronomiDOM ≥ 1.1.4 into `addons/necronomidom/`.
+1. Copy `addons/dirge/` from the [release ZIP](https://github.com/Eldritch-Game-Studio/Dirge/releases/latest) into your project, and NecronomiDOM ≥ 1.1.4 into `addons/necronomidom/` from [its release ZIP](https://github.com/Eldritch-Game-Studio/NecronomiDOM/releases/latest).
 2. Add to your `.csproj`, before `</Project>`:
    ```xml
    <Import Project="addons/necronomidom/NecronomiDom.targets" />
@@ -62,7 +62,7 @@ Global parameters (**Browser → Parameters**, **+ Parameter**) work the same wa
 **Project → Validate** (or the **Validation** tab) lists diagnostics with stable codes — missing master bus, routing cycles, duplicate names, missing assets, dangling references, unreachable instruments, unassigned parameters. The same check runs headless in CI:
 
 ```sh
-dotnet run --project tools/dirge-validate -- res_path/audio/game.dirge.json
+dotnet run --project tools/dirge-validate -- path/to/audio/game.dirge.json
 ```
 
 `Ctrl+S` saves. **Build Banks** saves and reports what each bank preloads (banks are preload groups edited under **Browser → Banks**).

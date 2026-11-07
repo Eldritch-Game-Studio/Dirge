@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Headless smoke: import the project, build, run the demo scene and the sandbox scene in smoke mode with the Dummy audio driver.
-# Usage: scripts/smoke.sh            (GODOT env var overrides the editor binary)
+# Usage: GODOT=/path/to/Godot_v4.7.2-stable_mono_linux.x86_64 scripts/smoke.sh   (or have `godot` on PATH)
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-GODOT="${GODOT:-$HOME/.local/opt/godot-stock/Godot_v4.7.2-stable_mono_linux_x86_64/Godot_v4.7.2-stable_mono_linux.x86_64}"
-if [[ ! -x "$GODOT" ]]; then
-  echo "smoke: Godot binary not found at $GODOT (set GODOT=/path/to/Godot_v4.7.2-stable_mono_linux.x86_64)" >&2
+GODOT="${GODOT:-$(command -v godot || true)}"
+if [[ -z "$GODOT" || ! -x "$GODOT" ]]; then
+  echo "smoke: Godot .NET editor binary not found (set GODOT=/path/to/Godot_v4.7.2-stable_mono_linux.x86_64 or put 'godot' on PATH)" >&2
   exit 2
 fi
 

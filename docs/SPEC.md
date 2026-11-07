@@ -4,7 +4,7 @@ Named Dirge. Standalone MIT addon for stock Godot 4.7.2 .NET. UI via NecronomiDO
 
 ## 1. Principles
 
-- **Pure model.** `Dirge.Model` has no Godot reference. Events, parameters, snapshots, mixer graph, evaluation and serialization are plain C#, unit-tested headless. The game (`src/`) may reference it directly.
+- **Pure model.** `Dirge.Model` has no Godot reference. Events, parameters, snapshots, mixer graph, evaluation and serialization are plain C#, unit-tested headless. Game code may reference it directly.
 - **One DSP path.** Playback is Godot's `AudioServer`. The tool auditions through the same path the game ships. No second engine, no browser audio.
 - **Resources are config, not state.** Authored data is Godot `Resource`s (`.tres`, text, diffable). Runtime state lives in C# objects owned by the runtime service.
 - **Native only when Godot can't.** GDExtension effects are a separate optional package (`Dirge.Native`), added per concrete missing effect. The addon is fully usable without it.
@@ -180,7 +180,6 @@ All identity by GUID + stable path; renames don't break references.
 4. **M4 Music** — tempo map, logic markers, quantized transitions, `AudioStreamInteractive`/`Synchronized` stitching, beat callbacks.
 5. **M5 Live** — profiler, recordings, live update, in-game overlay, LUFS. v1.0.
 6. **M6 Native** — send/return, convolution reverb. v1.1.
-7. **KK integration** — `AudioSettingsService`/`AudioBuses` consume `Dirge.Runtime`; ambience/music/rhythm chart authored in tool.
 
 ## 7. Acceptance (v1.0)
 

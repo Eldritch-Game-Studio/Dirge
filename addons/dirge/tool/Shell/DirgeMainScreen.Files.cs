@@ -1,6 +1,7 @@
 #nullable enable
 #if TOOLS
 using System;
+using System.Collections.Generic;
 using Dirge.Project;
 using Dirge.Tool.Core;
 using Godot;
@@ -258,19 +259,77 @@ public partial class DirgeMainScreen
         EditorInterface.Singleton.GetEditorSettings()?.SetSetting(LastProjectSetting, path);
     }
 
+    /// <summary>
+    /// First-open behaviour: the editor's remembered project, else the <c>dirge/project_path</c> project setting, else the
+    /// single <c>*.dirge.json</c> found under <c>res://</c>. Several candidates leave the tool empty with a hint.
+    /// </summary>
     private void RestoreLastProject()
     {
         EditorSettings? settings = EditorInterface.Singleton.GetEditorSettings();
-        if (settings is null || !settings.HasSetting(LastProjectSetting))
+        if (settings is not null && settings.HasSetting(LastProjectSetting))
+        {
+            string remembered = settings.GetSetting(LastProjectSetting).AsString();
+            if (remembered.Length > 0 && FileAccess.FileExists(remembered) && LoadProjectFile(remembered))
+            {
+                return;
+            }
+        }
+
+        if (ProjectSettings.HasSetting(Driver.DirgeServer.ProjectPathSetting))
+        {
+            string configured = ProjectSettings.GetSetting(Driver.DirgeServer.ProjectPathSetting).AsString();
+            if (configured.Length > 0 && FileAccess.FileExists(configured) && LoadProjectFile(configured))
+            {
+                return;
+            }
+        }
+
+        var found = new List<string>();
+        FindProjectFiles("res://", found);
+        if (found.Count == 1)
+        {
+            LoadProjectFile(found[0]);
+        }
+        else if (found.Count > 1)
+        {
+            SetMessage($"{found.Count} Dirge projects in this project — File › Open… to choose one.", false);
+        }
+        else
+        {
+            SetMessage("No Dirge project yet — File › New, then Save As….", false);
+        }
+    }
+
+    private static void FindProjectFiles(string directory, List<string> results)
+    {
+        using DirAccess? dir = DirAccess.Open(directory);
+        if (dir is null)
         {
             return;
         }
 
-        string path = settings.GetSetting(LastProjectSetting).AsString();
-        if (path.Length > 0 && FileAccess.FileExists(path))
+        dir.ListDirBegin();
+        for (string name = dir.GetNext(); name.Length > 0; name = dir.GetNext())
         {
-            LoadProjectFile(path);
+            if (name.StartsWith('.'))
+            {
+                continue;
+            }
+
+            string path = directory.EndsWith('/') ? directory + name : directory + "/" + name;
+            if (dir.CurrentIsDir())
+            {
+                if (name != "addons" && !FileAccess.FileExists(path + "/.gdignore"))
+                {
+                    FindProjectFiles(path, results);
+                }
+            }
+            else if (name.EndsWith(".dirge.json", StringComparison.Ordinal))
+            {
+                results.Add(path);
+            }
         }
+        dir.ListDirEnd();
     }
 
     private static string SanitizeFileName(string name)

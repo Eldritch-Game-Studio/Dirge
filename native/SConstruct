@@ -24,7 +24,12 @@ else:
     for d in godot_cpp_includes:
         own.Append(CCFLAGS=["-isystem", env.Dir(d).srcnode().abspath])
 
-sources = Glob("src/*.cpp")
+# Compile the owned sources only after libgodot-cpp exists: the godot-cpp headers these sources include are generated
+# during the same SCons run, and with -j the implicit-dependency scan can otherwise run before gen/include is written
+# (observed on the hosted Windows builder as C1083 for a nested include).
+godot_cpp_library = env.File("godot-cpp/bin/libgodot-cpp{}{}".format(env["suffix"], env["LIBSUFFIX"]))
+sources = [own.SharedObject(src) for src in Glob("src/*.cpp")]
+own.Depends(sources, godot_cpp_library)
 
 out_dir = os.path.join("..", "addons", "dirge", "bin")
 if own["platform"] == "macos":

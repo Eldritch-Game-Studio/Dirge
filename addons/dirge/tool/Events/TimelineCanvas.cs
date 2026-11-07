@@ -96,17 +96,9 @@ public sealed partial class TimelineCanvas : Control
     {
         _font = GetThemeDefaultFont();
         _fontSize = Math.Clamp(GetThemeDefaultFontSize() - 3, 10, 14);
-        _scale = EditorScale();
+        _scale = ToolDocuments.EditorScale();
         BuildMenu();
         SetProcess(true);
-    }
-
-    private static float EditorScale()
-    {
-#if TOOLS
-        if (Engine.IsEditorHint() && EditorInterface.Singleton is { } editor) return (float)editor.GetEditorScale();
-#endif
-        return 1f;
     }
 
     /// <summary>Call after any change of the edited event's content or view selection.</summary>
@@ -130,7 +122,7 @@ public sealed partial class TimelineCanvas : Control
 
     private void EnsureLayout()
     {
-        _scale = EditorScale();
+        _scale = ToolDocuments.EditorScale();
         AudioEvent? ev = _state.Event;
         _hasTempo = ev is not null && ev.Tempo.Count > 0;
         if (_viewSheet != _state.Sheet)

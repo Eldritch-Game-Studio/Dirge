@@ -71,11 +71,7 @@ public sealed partial class CurveCanvas : Control
     {
         _font = GetThemeDefaultFont();
         _fontSize = Math.Clamp(GetThemeDefaultFontSize() - 3, 10, 14);
-#if TOOLS
-        _scale = Engine.IsEditorHint() && EditorInterface.Singleton is { } editor ? (float)editor.GetEditorScale() : 1f;
-#else
-        _scale = 1f;
-#endif
+        _scale = ToolDocuments.EditorScale();
         _menu = new PopupMenu();
         _menu.IdPressed += OnMenu;
         AddChild(_menu);

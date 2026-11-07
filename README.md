@@ -1,5 +1,7 @@
 # Dirge
 
+![Dirge — adaptive game audio, authored inside Godot](docs/images/dirge-promo.png)
+
 FMOD-Studio-style adaptive audio for Godot 4 .NET. Author events with timelines and parameter sheets, local and
 global parameters with automation and modulators, snapshots, VCAs and a mixer graph in an editor main screen, then
 play all of it through Godot's own `AudioServer` from GDScript or C#. The authoring tool is built with HTML/CSS

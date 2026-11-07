@@ -9,5 +9,6 @@
   <ItemGroup>
     <Compile Remove="tests/**" />
   </ItemGroup>
+  <Import Project="addons/necronomidom/NecronomiDom.targets" />
   <Import Project="addons/dirge/Dirge.targets" />
 </Project>

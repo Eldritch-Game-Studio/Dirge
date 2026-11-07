@@ -11,6 +11,10 @@ if [[ ! -x "$GODOT" ]]; then
   exit 2
 fi
 
+if [[ ! -d addons/necronomidom ]]; then
+  scripts/fetch-deps.sh
+fi
+
 if [[ ! -f demo/audio/wind.wav || ! -f demo/audio/click.wav ]]; then
   python3 scripts/gen-demo-audio.py
 fi

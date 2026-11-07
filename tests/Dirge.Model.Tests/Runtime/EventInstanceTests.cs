@@ -376,6 +376,19 @@ public sealed class EventInstanceTests
     }
 
     [Test]
+    public void OneShot_ShorterThanTick_StillPlaysFromStart()
+    {
+        var b = ProjectBuilder.Minimal("Test/Click", "res://click.wav", 0.08);
+        var h = new Harness(b.Build());
+        EventInstance instance = h.Create("Test/Click");
+        instance.Start();
+        h.Step(0.15);
+        Assert.That(h.Count<VoicePlay>(), Is.EqualTo(1));
+        VoicePlay play = h.All<VoicePlay>()[0];
+        Assert.That(play.StartSeconds, Is.EqualTo(0.0).Within(Tolerance));
+    }
+
+    [Test]
     public void OneShot_UnknownLength_WaitsForVoiceFinished()
     {
         var b = new ProjectBuilder();

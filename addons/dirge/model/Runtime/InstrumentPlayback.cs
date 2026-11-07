@@ -430,7 +430,23 @@ internal sealed class InstrumentState
         Active = false;
         if (Info.Instrument.Async) return;
         _delayRemaining = -1;
+        if (Info.Instrument.CutMode == CutMode.Cut && AllVoicesUnplayedOneShots())
+        {
+            // The region was entered and left within the same tick (shorter than dt). Cutting now would drop the
+            // sound before the driver ever hears it; let these one-shots play their natural length instead.
+            return;
+        }
         Cut(Info.Instrument.CutMode == CutMode.Cut ? StopMode.Immediate : StopMode.AllowFadeout, Info.Instrument.FadeOut);
+    }
+
+    private bool AllVoicesUnplayedOneShots()
+    {
+        if (Head is null) return false;
+        for (Voice? v = Head; v is not null; v = v.NextInOwner)
+        {
+            if (v.HasPlayed || v.Loop) return false;
+        }
+        return true;
     }
 
     /// <summary>Timeline jumped to <paramref name="position"/> inside this (synchronous, active) instrument: re-seek its voices.</summary>

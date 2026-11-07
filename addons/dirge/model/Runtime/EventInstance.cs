@@ -525,6 +525,14 @@ public sealed class EventInstance
                 : to >= s.Info.RegionStart && to < s.Info.RegionEnd;
             if (inRegion && !s.Active) s.OnEnter(to - s.Info.RegionStart);
             else if (!inRegion && s.Active) s.OnExit();
+            else if (!inRegion && !s.Active && !loopingHere
+                     && (inclusiveStart ? s.Info.RegionStart >= from : s.Info.RegionStart > from)
+                     && s.Info.RegionEnd <= to)
+            {
+                // Entered and left within one tick (region shorter than dt): fire once like a point so short
+                // one-shots are never swallowed by a long frame; the voice plays its natural length.
+                s.OnPoint();
+            }
         }
     }
 

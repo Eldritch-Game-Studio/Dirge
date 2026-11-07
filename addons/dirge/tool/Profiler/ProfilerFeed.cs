@@ -189,7 +189,11 @@ public sealed class EditorFeed : ProfilerFeed
     }
 }
 
-/// <summary>A game reached through <see cref="LiveUpdateClient"/>; stats arrive at 10 Hz, instances at 5 Hz.</summary>
+/// <summary>
+/// A game reached through <see cref="LiveUpdateClient"/>; stats arrive at 10 Hz, instances at 5 Hz. The client is either the
+/// pane's own (connected here) or the editor shell's shared one, adopted in whatever state it is in — the game accepts a
+/// single editor connection, so the profiler must never open a second socket next to the shell's.
+/// </summary>
 public sealed class GameFeed : ProfilerFeed
 {
     private readonly LiveUpdateClient _client;
@@ -201,14 +205,28 @@ public sealed class GameFeed : ProfilerFeed
     private LiveStats? _lastStats;
     private IReadOnlyList<LiveInstance>? _lastInstances;
 
-    public GameFeed(LiveUpdateClient client, string host, int port)
+    /// <param name="connect">False to adopt <paramref name="client"/> as is (already connected or connecting by its owner).</param>
+    public GameFeed(LiveUpdateClient client, string host, int port, bool connect = true)
     {
         _client = client;
         _endpoint = host + ":" + port.ToString(System.Globalization.CultureInfo.InvariantCulture);
         _client.Hello += OnHello;
         _client.Stats += OnStats;
         _client.Instances += OnInstances;
-        _client.Connect(host, port);
+        if (connect)
+        {
+            _client.Connect(host, port);
+        }
+        else if (_client.IsConnected)
+        {
+            // The hello already happened; seed what the events would have delivered.
+            _sawHello = true;
+            _projectName = _client.HelloInfo?.ProjectName ?? "";
+            _lastStats = _client.LastStats;
+            _statsDirty = _lastStats is not null;
+            _lastInstances = _client.LastInstances;
+            _instancesDirty = true;
+        }
     }
 
     public override string Status

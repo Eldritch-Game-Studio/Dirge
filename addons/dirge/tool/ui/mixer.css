@@ -156,6 +156,8 @@ button.fx-add {
 .fx-item.drop-before { border-top: 2px solid var(--accent, #4fa3ff); }
 .fx-item.drop-after { border-bottom: 2px solid var(--accent, #4fa3ff); }
 .fx-item.dragging { opacity: 0.5; }
+.fx-item.fx-fader { background-color: transparent; border-color: var(--accent, #4fa3ff); justify-content: center; }
+.fx-name.fx-fader-name { flex-grow: 0; font-size: 9px; letter-spacing: 1px; color: var(--accent, #4fa3ff); text-align: center; cursor: pointer; }
 button.fx-en {
     appearance: none; width: 10px; height: 10px; flex-shrink: 0; padding: 0; border-radius: 5px; border: 1px solid #000000;
     background-color: #4a4d58; cursor: pointer;
@@ -168,6 +170,20 @@ button.fx-x {
     background-color: transparent; color: var(--muted, #8b8e99); font-size: 9px; line-height: 12px; text-align: center; cursor: pointer;
 }
 button.fx-x:hover { color: var(--danger, #ff6b6b); }
+
+/* Effect-section footer: per-bus LFO (tremolo) entry point. */
+.fx-foot { height: 18px; display: flex; flex-direction: row; align-items: center; justify-content: flex-end; padding-top: 2px; }
+button.fx-lfo {
+    appearance: none; height: 14px; padding: 0 5px; border: 1px solid var(--border, #33353c); border-radius: 3px;
+    background-color: var(--control, #2a2b32); color: var(--muted, #8b8e99); font-size: 9px; letter-spacing: 1px; line-height: 12px; cursor: pointer;
+}
+button.fx-lfo:hover { border-color: var(--accent, #4fa3ff); }
+button.fx-lfo.on { color: var(--accent, #4fa3ff); border-color: var(--accent, #4fa3ff); }
+.lfo-popover { width: 300px; }
+.lfo-row { display: flex; flex-direction: column; row-gap: 3px; padding: 4px; border: 1px solid var(--border, #33353c); border-radius: 3px; background-color: var(--control, #2a2b32); }
+.lfo-row-head { height: 18px; display: flex; flex-direction: row; align-items: center; column-gap: 6px; }
+.lfo-row-head .field-label { flex-grow: 1; color: var(--fg, #d8d9de); }
+.lfo-popover .param-row .field-label { width: 56px; }
 
 .voices-row { height: 20px; display: flex; flex-direction: row; align-items: center; column-gap: 4px; padding-top: 4px; }
 .voices-row .field-label { flex-grow: 1; }

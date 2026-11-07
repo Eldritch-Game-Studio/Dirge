@@ -22,10 +22,16 @@
         <button id="add-folder" type="button">+ Folder</button>
         <button id="import-lengths" type="button" hidden>Import lengths</button>
     </div>
+    <div id="tag-filter" class="tag-filter" aria-label="Filter by tag" hidden></div>
     <div id="tree" class="tree" aria-label="Browser tree"></div>
     <div id="members" class="members" hidden>
         <p class="members-heading">Events in bank</p>
         <div id="member-list" class="member-list"></div>
+    </div>
+    <div id="tag-editor" class="tag-editor" hidden>
+        <p class="tag-label">Tags</p>
+        <div id="tag-chips" class="tag-chips"></div>
+        <input id="tag-input" type="text" aria-label="Add tag" value="">
     </div>
     <p id="status" class="status"></p>
 </main>

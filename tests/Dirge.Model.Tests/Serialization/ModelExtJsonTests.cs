@@ -18,6 +18,8 @@ public sealed class ModelExtJsonTests
         ev.IsConductor = true;
         ev.Macros.StartQuantization = Quantization.Bar;
         ev.Macros.ScheduleLookahead = 0.25f;
+        ev.Tags.Add("music");
+        ev.Tags.Add("Adaptive");
         Track track = b.AddTrack(ev);
         ClipInstrument layer = b.AddClip(track, "res://layer.ogg");
         layer.SyncGroup = 2;
@@ -103,5 +105,23 @@ public sealed class ModelExtJsonTests
         AudioProject copy = ProjectJson.Deserialize(json);
         Assert.That(copy.AudioTables, Is.Empty);
         Assert.That(copy.Events[0].Tracks[0].Instruments[0].SyncGroup, Is.EqualTo(0));
+    }
+
+    [Test]
+    public void RoundTrip_PreservesEventTags_InOrder()
+    {
+        string json = ProjectJson.Serialize(ExtendedProject());
+        Assert.That(json, Does.Contain("\"tags\": ["), "tags are written as a plain string array");
+        Assert.That(json.IndexOf("\"music\"", System.StringComparison.Ordinal), Is.LessThan(json.IndexOf("\"Adaptive\"", System.StringComparison.Ordinal)), "authored order is preserved, not sorted");
+        AudioProject copy = ProjectJson.Deserialize(json);
+        Assert.That(copy.Events[0].Tags, Is.EqualTo(new[] { "music", "Adaptive" }));
+    }
+
+    [Test]
+    public void Deserialize_OldDocumentWithoutTags_LeavesTagsEmpty()
+    {
+        string json = ProjectJson.Serialize(ProjectBuilder.Minimal().Build()).Replace("\"tags\": [],", "");
+        Assert.That(json, Does.Not.Contain("\"tags\""));
+        Assert.That(ProjectJson.Deserialize(json).Events[0].Tags, Is.Empty);
     }
 }

@@ -13,7 +13,9 @@ namespace Dirge.Tool.Shell;
 /// Editor playback: owns an <see cref="AudioDriver"/>, an <see cref="AssetCatalog"/> and the auditioned <see cref="DirgeSystem"/>.
 /// Players live in a private <see cref="SubViewport"/> that is a 3D audio listener, so spatial events are audible in the editor
 /// with the preview listener/emitter. The editor's own bus layout is captured before the first <see cref="AudioDriver.LoadMixer"/>
-/// and restored on <see cref="Dispose"/>.
+/// and restored on <see cref="Dispose"/>. While Dirge owns the layout the editor's Audio Buses dock stops processing: its
+/// per-frame <c>AudioServer.is_edited()</c> poll would otherwise persist Dirge's audition layout (every <c>add_bus</c>/
+/// <c>set_bus_volume_db</c> marks the server edited) to <c>res://default_bus_layout.tres</c> and the project settings.
 /// </summary>
 public sealed class EditorAudition : AuditionBase
 {
@@ -26,6 +28,7 @@ public sealed class EditorAudition : AuditionBase
     private AudioBusLayout? _editorLayout;
     private readonly Dictionary<DirgeId, int> _busIndexById = new();
     private bool _busIndexValid;
+    private readonly Node? _busesDock;
 
     public EditorAudition(Node host, ProjectDocument document) : base(document)
     {
@@ -50,6 +53,8 @@ public sealed class EditorAudition : AuditionBase
         _listener.MakeCurrent();
         _driver = new AudioDriver(_players, _assets);
         _driver.VoiceFinished += OnVoiceFinished;
+        _busesDock = FindEditorAudioBuses(EditorInterface.Singleton.GetBaseControl());
+        _busesDock?.SetProcess(false);
         ScheduleRebuild();
     }
 
@@ -140,8 +145,17 @@ public sealed class EditorAudition : AuditionBase
         _driver.StopAll();
         if (_editorLayout is not null)
         {
+            // set_bus_layout clears the server's edited flag, so the dock resumes with nothing pending to save. It does not
+            // emit bus_layout_changed, so the dock would keep strips for buses that no longer exist (and read their channels
+            // every frame); announce the change ourselves.
             AudioServer.SetBusLayout(_editorLayout);
+            AudioServer.Singleton.EmitSignal(AudioServer.SignalName.BusLayoutChanged);
             _editorLayout = null;
+        }
+
+        if (_busesDock is not null && GodotObject.IsInstanceValid(_busesDock))
+        {
+            _busesDock.SetProcess(true);
         }
 
         if (GodotObject.IsInstanceValid(_world))
@@ -149,6 +163,25 @@ public sealed class EditorAudition : AuditionBase
             _world.GetParent()?.RemoveChild(_world);
             _world.QueueFree();
         }
+    }
+
+    /// <summary>The editor's <c>EditorAudioBuses</c> bottom dock (engine class, not exposed to scripts); null when absent.</summary>
+    private static Node? FindEditorAudioBuses(Node root)
+    {
+        if (root.GetClass() == "EditorAudioBuses")
+        {
+            return root;
+        }
+
+        foreach (Node child in root.GetChildren())
+        {
+            if (FindEditorAudioBuses(child) is { } found)
+            {
+                return found;
+            }
+        }
+
+        return null;
     }
 }
 #endif

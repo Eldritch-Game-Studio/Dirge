@@ -65,6 +65,7 @@ public sealed partial class MixerPane : IToolPane, IToolPaneCommands
             case ToolCommand.Escape:
                 if (_popup.IsOpen) { _popup.Hide(); return true; }
                 if (!_popover.Hidden) { ClosePopover(); return true; }
+                if (!_lfoPopover.Hidden) { CloseLfoPopover(); return true; }
                 if (!_editingSnapshotId.IsNone) { LeaveSnapshotEditing(); return true; }
                 return false;
             case ToolCommand.Delete:
@@ -166,6 +167,7 @@ public sealed partial class MixerPane : IToolPane, IToolPaneCommands
         _dom.On(_dom.Required("bus-add"), "click", AddBus);
         BindEffects();
         BindSide();
+        BindModulators();
         _bound = true;
         Refresh(ChangeScope.All);
     }
@@ -176,6 +178,7 @@ public sealed partial class MixerPane : IToolPane, IToolPaneCommands
         _bound = false;
         UnbindEffects();
         UnbindSide();
+        UnbindModulators();
         foreach (BusStrip strip in _strips.Values) strip.Dispose();
         _strips.Clear();
         _stripOrder.Clear();
@@ -217,6 +220,7 @@ public sealed partial class MixerPane : IToolPane, IToolPaneCommands
             RefreshStrips(editing);
             RefreshVcaList();
             RefreshPopover(editing);
+            RefreshLfoPopover();
         }
         _snapBanner.Hidden = editing is null;
         if (editing is not null) Dom.SetText(_snapBanner, "Editing snapshot: " + editing.Name);

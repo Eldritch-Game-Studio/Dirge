@@ -198,7 +198,7 @@ public static class MixerGraphOps
     // ---- effects -----------------------------------------------------------------------------------------------------
 
     /// <summary>Move an effect within a bus chain and remap every snapshot value addressing that chain. Inverse: call with the
-    /// indices swapped.</summary>
+    /// indices swapped. <see cref="Bus.FaderIndex"/> is left alone; the caller decides whether the move crossed the fader.</summary>
     public static void MoveEffect(AudioProject project, DirgeId busId, int from, int to)
     {
         Bus? bus = FindBus(project.Mixer, busId);
@@ -224,21 +224,22 @@ public static class MixerGraphOps
         }
     }
 
-    /// <summary>Memento of an effect removal: the effect, its slot and the snapshot values that addressed it.</summary>
+    /// <summary>Memento of an effect removal: the effect, its slot, the bus fader position and the snapshot values that addressed it.</summary>
     public sealed class EffectRemoval
     {
         public DirgeId Bus { get; }
         public BusEffect Effect { get; }
         public int Index { get; }
+        public int FaderIndex { get; }
         public List<(Snapshot Snapshot, int Index, SnapshotValue Value)> RemovedValues { get; } = new();
-        public EffectRemoval(DirgeId bus, BusEffect effect, int index) { Bus = bus; Effect = effect; Index = index; }
+        public EffectRemoval(DirgeId bus, BusEffect effect, int index, int faderIndex) { Bus = bus; Effect = effect; Index = index; FaderIndex = faderIndex; }
     }
 
     public static EffectRemoval? PlanRemoveEffect(AudioProject project, DirgeId busId, int index)
     {
         Bus? bus = FindBus(project.Mixer, busId);
         if (bus is null || index < 0 || index >= bus.Effects.Count) return null;
-        var plan = new EffectRemoval(busId, bus.Effects[index], index);
+        var plan = new EffectRemoval(busId, bus.Effects[index], index, bus.FaderIndex);
         for (int s = 0; s < project.Snapshots.Count; s++)
         {
             Snapshot snapshot = project.Snapshots[s];
@@ -263,6 +264,8 @@ public static class MixerGraphOps
         }
         bus.Effects.Remove(plan.Effect);
         ShiftEffectValues(project, plan.Bus, plan.Index, -1);
+        // A fader placed after the removed slot moves down with the effects behind it; the default (MaxValue) stays "after all".
+        if (bus.FaderIndex != int.MaxValue && bus.FaderIndex > plan.Index) bus.FaderIndex--;
     }
 
     public static void RevertRemoveEffect(AudioProject project, EffectRemoval plan)
@@ -271,6 +274,7 @@ public static class MixerGraphOps
         if (bus is null) return;
         ShiftEffectValues(project, plan.Bus, plan.Index, +1);
         if (!bus.Effects.Contains(plan.Effect)) bus.Effects.Insert(Math.Min(plan.Index, bus.Effects.Count), plan.Effect);
+        bus.FaderIndex = plan.FaderIndex;
         for (int i = 0; i < plan.RemovedValues.Count; i++)
         {
             (Snapshot snapshot, int index, SnapshotValue value) = plan.RemovedValues[i];
@@ -278,7 +282,7 @@ public static class MixerGraphOps
         }
     }
 
-    /// <summary>Insert an effect at <paramref name="index"/>; snapshot values at or after that slot shift up.</summary>
+    /// <summary>Insert an effect at <paramref name="index"/>; snapshot values and a fader at or after that slot shift up (the new effect lands pre-fader).</summary>
     public static void InsertEffect(AudioProject project, DirgeId busId, BusEffect effect, int index)
     {
         Bus? bus = FindBus(project.Mixer, busId);
@@ -286,6 +290,7 @@ public static class MixerGraphOps
         index = Math.Clamp(index, 0, bus.Effects.Count);
         ShiftEffectValues(project, busId, index, +1);
         bus.Effects.Insert(index, effect);
+        if (bus.FaderIndex != int.MaxValue && bus.FaderIndex >= index) bus.FaderIndex++;
     }
 
     /// <summary>Inverse of <see cref="InsertEffect"/> for an effect that has no snapshot values of its own.</summary>
@@ -297,6 +302,7 @@ public static class MixerGraphOps
         if (index < 0) return;
         bus.Effects.RemoveAt(index);
         ShiftEffectValues(project, busId, index, -1);
+        if (bus.FaderIndex != int.MaxValue && bus.FaderIndex > index) bus.FaderIndex--;
     }
 
     private static void ShiftEffectValues(AudioProject project, DirgeId busId, int fromIndex, int delta)

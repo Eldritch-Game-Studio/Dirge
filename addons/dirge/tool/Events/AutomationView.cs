@@ -8,7 +8,7 @@ using NecronomiDom.Runtime;
 
 namespace Dirge.Tool.Events;
 
-/// <summary>Automation lanes (event + selected instrument) with target/parameter pickers, and modulators (Random/AHDSR/LFO).</summary>
+/// <summary>Automation lanes (event + selected instrument) with target/parameter pickers, and modulators (Random/AHDSR/LFO/Autopitch).</summary>
 internal sealed class AutomationView
 {
     private readonly EventEditorState _state;
@@ -167,12 +167,12 @@ internal sealed class AutomationView
 
     private void RenderModulators(DomForm form, Element root, AudioEvent ev, Instrument? instrument)
     {
-        RenderModulatorList(form, root, "Event modulators", ev.Modulators, PropertyRef.EventVolume(ev.Id), PropertyRef.EventPitch(ev.Id));
+        RenderModulatorList(form, root, "Event modulators", ev, ev.Modulators, PropertyRef.EventVolume(ev.Id), PropertyRef.EventPitch(ev.Id));
         if (instrument is not null)
-            RenderModulatorList(form, root, "Instrument modulators", instrument.Modulators, PropertyRef.InstrumentVolume(instrument.Id), PropertyRef.InstrumentPitch(instrument.Id));
+            RenderModulatorList(form, root, "Instrument modulators", ev, instrument.Modulators, PropertyRef.InstrumentVolume(instrument.Id), PropertyRef.InstrumentPitch(instrument.Id));
     }
 
-    private void RenderModulatorList(DomForm form, Element root, string title, List<Modulator> modulators, PropertyRef volume, PropertyRef pitch)
+    private void RenderModulatorList(DomForm form, Element root, string title, AudioEvent ev, List<Modulator> modulators, PropertyRef volume, PropertyRef pitch)
     {
         Element body = form.Section(root, title);
         Element list = form.Div(body, "list");
@@ -181,8 +181,21 @@ internal sealed class AutomationView
         {
             Modulator mod = modulators[i];
             Element item = form.Div(list, "item grid");
-            form.Span(item, mod switch { RandomModulator => "Random", AhdsrModulator => "AHDSR", LfoModulator => "LFO", _ => "Modulator" }, "type small");
+            item.ClassName += mod switch { RandomModulator => " mod-random", AhdsrModulator => " mod-ahdsr", LfoModulator => " mod-lfo", AutopitchModulator => " mod-autopitch", _ => "" };
+            form.Span(item, mod switch { RandomModulator => "Random", AhdsrModulator => "AHDSR", LfoModulator => "LFO", AutopitchModulator => "Autopitch", _ => "Modulator" }, "type small");
             int selected = mod.Target.Kind is PropertyKind.EventPitch or PropertyKind.InstrumentPitch ? 1 : 0;
+            if (mod is AutopitchModulator autopitch)
+            {
+                // Autopitch is pitch-only: no target picker; Amount scales the deviation from 1.
+                form.Number(item, "Amount", mod.Amount, v => _edits.Set("Modulator amount", mod.Amount, (float)v, x => mod.Amount = x), "x");
+                var (names, ids, index) = ParameterOptions(ev, autopitch.Parameter);
+                form.Choice(item, "Parameter", names, index, k => _edits.Set("Autopitch parameter", autopitch.Parameter, ids[k], x => autopitch.Parameter = x));
+                form.Number(item, "Reference", autopitch.ReferenceValue, v => _edits.Set("Autopitch reference", autopitch.ReferenceValue, (float)v, x => autopitch.ReferenceValue = x));
+                form.Number(item, "Pitch at min", autopitch.PitchAtMinimum, v => _edits.Set("Autopitch pitch at minimum", autopitch.PitchAtMinimum, (float)Math.Max(0.01, v), x => autopitch.PitchAtMinimum = x), "x");
+                form.Number(item, "Pitch at max", autopitch.PitchAtMaximum, v => _edits.Set("Autopitch pitch at maximum", autopitch.PitchAtMaximum, (float)Math.Max(0.01, v), x => autopitch.PitchAtMaximum = x), "x");
+                form.Button(item, "Remove", () => _edits.ListRemove("Remove modulator", modulators, mod), "btn danger");
+                continue;
+            }
             form.Choice(item, "Target", targets, selected, k => _edits.Set("Modulator target", mod.Target, k == 1 ? pitch : volume, x => mod.Target = x));
             form.Number(item, "Amount", mod.Amount, v => _edits.Set("Modulator amount", mod.Amount, (float)v, x => mod.Amount = x), selected == 1 ? "x" : "dB");
             switch (mod)
@@ -205,7 +218,7 @@ internal sealed class AutomationView
             form.Button(item, "Remove", () => _edits.ListRemove("Remove modulator", modulators, mod), "btn danger");
         }
         Element actions = form.Div(body, "actions");
-        string[] kinds = { "Random", "AHDSR", "LFO" };
+        string[] kinds = { "Random", "AHDSR", "LFO", "Autopitch" };
         form.Span(actions, "Add", "label short");
         form.ChoiceButton(actions, kinds, -1, k =>
         {
@@ -213,9 +226,18 @@ internal sealed class AutomationView
             {
                 0 => new RandomModulator { Target = volume, Amount = 3f },
                 1 => new AhdsrModulator { Target = volume, Amount = 0f, Envelope = { Attack = 0.1f, Release = 0.5f } },
-                _ => new LfoModulator { Target = volume, Amount = 3f },
+                2 => new LfoModulator { Target = volume, Amount = 3f },
+                _ => NewAutopitch(ev, pitch),
             };
             _edits.ListAdd("Add modulator", modulators, mod);
         }, "modulator…");
+    }
+
+    /// <summary>Autopitch seeded from the default parameter: reference at its default value, one octave down/up at the ends.</summary>
+    private AutopitchModulator NewAutopitch(AudioEvent ev, PropertyRef pitch)
+    {
+        DirgeId parameter = DefaultParameter(ev);
+        ParameterDefinition? p = _state.FindParameter(parameter);
+        return new AutopitchModulator { Target = pitch, Amount = 1f, Parameter = parameter, ReferenceValue = p?.Default ?? 0f };
     }
 }

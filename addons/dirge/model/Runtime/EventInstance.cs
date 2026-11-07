@@ -106,6 +106,7 @@ public sealed class EventInstance
             _builtInKinds[i] = d.BuiltIn;
         }
         _eventMods = new ModRuntime[description.EventModulators.Length];
+        ModEval.BindParameters(description.EventModulators, _eventMods, this);
         _eventVolumeLaneParams = new ParameterState?[description.EventVolumeLanes.Length];
         _eventPitchLaneParams = new ParameterState?[description.EventPitchLanes.Length];
         for (int i = 0; i < _eventVolumeLaneParams.Length; i++) _eventVolumeLaneParams[i] = ResolveParameter(description.EventVolumeLanes[i].Parameter);

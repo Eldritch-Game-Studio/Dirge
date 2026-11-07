@@ -22,8 +22,12 @@ public readonly record struct Attributes3D(Vector3 Position, Vector3 Velocity, V
 /// </summary>
 public abstract record Command;
 
-/// <summary><paramref name="SyncGroup"/> ≠ 0: the driver starts voices sharing the group (same instance, same track) sample-locked.</summary>
-public sealed record VoicePlay(VoiceId Voice, AssetRef Asset, string Bus, double StartSeconds, bool Loop, float VolumeDb, float Pitch, bool Spatial, Attributes3D Attributes, float MinDistance, float MaxDistance, int SyncGroup = 0) : Command;
+/// <summary>
+/// <paramref name="SyncGroup"/> ≠ 0: the driver starts voices sharing the group (same instance, same track) sample-locked.
+/// <paramref name="Rolloff"/>, <paramref name="Doppler"/> and <paramref name="DopplerScale"/> mirror the event macros and only
+/// matter when <paramref name="Spatial"/>; doppler is active when <c>Doppler &amp;&amp; DopplerScale &gt; 0</c> (the engine has no scale).
+/// </summary>
+public sealed record VoicePlay(VoiceId Voice, AssetRef Asset, string Bus, double StartSeconds, bool Loop, float VolumeDb, float Pitch, bool Spatial, Attributes3D Attributes, float MinDistance, float MaxDistance, int SyncGroup = 0, Rolloff Rolloff = Rolloff.Inverse, bool Doppler = false, float DopplerScale = 1f) : Command;
 public sealed record VoiceStop(VoiceId Voice) : Command;
 public sealed record VoiceSeek(VoiceId Voice, double Seconds) : Command;
 public sealed record VoiceSetVolume(VoiceId Voice, float VolumeDb) : Command;

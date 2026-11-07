@@ -95,10 +95,16 @@ internal sealed class EventHeaderView
         form.Number(body, "Cooldown", m.Cooldown, v => _edits.Set("Cooldown", m.Cooldown, (float)Math.Max(0, v), x => m.Cooldown = x), "s");
         form.Toggle(body, "Persistent", m.Persistent, v => _edits.Set("Persistent", m.Persistent, v, x => m.Persistent = x));
         form.Toggle(body, "3D", m.Is3D, v => _edits.Set("3D", m.Is3D, v, x => m.Is3D = x));
-        form.Number(body, "Min distance", m.MinDistance, v => _edits.Set("Min distance", m.MinDistance, (float)Math.Max(0, v), x => m.MinDistance = x), "m");
-        form.Number(body, "Max distance", m.MaxDistance, v => _edits.Set("Max distance", m.MaxDistance, (float)Math.Max(0, v), x => m.MaxDistance = x), "m");
-        form.Toggle(body, "Doppler", m.Doppler, v => _edits.Set("Doppler", m.Doppler, v, x => m.Doppler = x));
-        form.Number(body, "Doppler scale", m.DopplerScale, v => _edits.Set("Doppler scale", m.DopplerScale, (float)v, x => m.DopplerScale = x));
+        form.Number(body, "Min distance", m.MinDistance, v => _edits.Set("Min distance", m.MinDistance, (float)Math.Max(0, v), x => m.MinDistance = x), "m")
+            .SetAttribute("title", "Distance under which no attenuation applies (engine unit_size).");
+        form.Number(body, "Max distance", m.MaxDistance, v => _edits.Set("Max distance", m.MaxDistance, (float)Math.Max(0, v), x => m.MaxDistance = x), "m")
+            .SetAttribute("title", "Distance beyond which voices are silent (engine max_distance); 0 = never.");
+        form.EnumChoice(body, "Rolloff", m.Rolloff, v => _edits.Set("Rolloff", m.Rolloff, v, x => m.Rolloff = x))
+            .SetAttribute("title", "Distance attenuation model (engine attenuation_model). Custom curve: choose Disabled and automate volume by the built-in Distance parameter.");
+        form.Toggle(body, "Doppler", m.Doppler, v => _edits.Set("Doppler", m.Doppler, v, x => m.Doppler = x))
+            .SetAttribute("title", "Pitch-shift by emitter/listener velocity (engine doppler_tracking = physics step).");
+        form.Number(body, "Doppler scale", m.DopplerScale, v => _edits.Set("Doppler scale", m.DopplerScale, (float)Math.Max(0, v), x => m.DopplerScale = x))
+            .SetAttribute("title", "FMOD doppler scale. Godot has no doppler scale: 0 disables doppler, any positive value enables it at engine strength; the magnitude is kept for parity only.");
         form.Number(body, "Lookahead", m.ScheduleLookahead, v => _edits.Set("Lookahead", m.ScheduleLookahead, (float)Math.Max(0, v), x => m.ScheduleLookahead = x), "s");
         form.EnumChoice(body, "Start quantization", m.StartQuantization, v => _edits.Set("Start quantization", m.StartQuantization, v, x => m.StartQuantization = x));
     }

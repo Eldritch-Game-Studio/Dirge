@@ -18,8 +18,15 @@ public sealed class Bus
     public bool Mute { get; set; }
     public bool Solo { get; set; }
     public bool BypassEffects { get; set; }
-    /// <summary>Effect chain in order. Index is the runtime <c>AudioServer</c> effect index.</summary>
+    /// <summary>Effect chain in authored order. Index is the model's effect index; the driver maps it onto the engine chain (see <see cref="FaderIndex"/>).</summary>
     public List<BusEffect> Effects { get; } = new();
+    /// <summary>
+    /// Position of the bus fader in <see cref="Effects"/>: effects at index &lt; FaderIndex are pre-fader, the rest post-fader.
+    /// <see cref="int.MaxValue"/> (default) = after every effect, which is the engine's native bus volume. Any smaller value makes the
+    /// driver insert an <c>AudioEffectAmplify</c> fader at that engine slot, hold the real bus volume at 0 dB and drive the
+    /// amplify instead; engine indices of effects at or after the fader are shifted by one. Mute/solo/bypass stay on the bus.
+    /// </summary>
+    public int FaderIndex { get; set; } = int.MaxValue;
     /// <summary>VCAs whose volume is summed (in dB) onto this bus.</summary>
     public List<DirgeId> Vcas { get; } = new();
     /// <summary>Hard cap on simultaneous real voices routed here; 0 = unlimited.</summary>

@@ -17,6 +17,11 @@ public sealed class AudioProject
     public List<PlatformOverride> PlatformOverrides { get; } = new();
     /// <summary>Global parameter → mixer property (bus volume/pitch, VCA volume, effect parameter) automation.</summary>
     public List<AutomationLane> MixerAutomation { get; } = new();
+    /// <summary>
+    /// LFO/Random modulators on mixer properties (bus volume/pitch, VCA volume, effect parameter): tremolo, auto-wobble.
+    /// Evaluated by <see cref="Dirge.Runtime.MixerState"/> after automation; AHDSR and autopitch are event-only.
+    /// </summary>
+    public List<Modulator> MixerModulators { get; } = new();
     /// <summary>Known asset lengths in seconds, filled by the tool at import time so the model can schedule one-shots without the engine.</summary>
     public Dictionary<string, double> AssetLengths { get; } = new();
 }

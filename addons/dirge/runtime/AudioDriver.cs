@@ -24,6 +24,11 @@ namespace Dirge.Driver;
 /// id so simultaneous starts of different events never merge.</para>
 /// <para><c>AudioStreamInteractive</c> is deliberately not used: transitions, quantization and loop logic live in the model's
 /// clock so the emitted command stream stays the single oracle.</para>
+/// <para><b>Pre/post-fader.</b> The engine applies bus volume after the whole chain. A bus whose <see cref="Bus.FaderIndex"/> lies
+/// inside its chain gets an <see cref="AudioEffectAmplify"/> "fader" inserted at that engine slot; the real bus volume stays at
+/// 0 dB and <see cref="BusSetVolume"/> drives the amplify instead. Authored effect indices at or after the fader map to engine
+/// slot +1 (<see cref="EngineEffectIndex"/>); <see cref="EffectsOf"/> and <see cref="EffectSetParameter"/> keep authored indices.
+/// While the bus bypasses effects the amplify is bypassed too, so the volume is mirrored onto the bus for that time.</para>
 /// </remarks>
 public sealed class AudioDriver
 {
@@ -44,6 +49,16 @@ public sealed class AudioDriver
         public int LiveMembers;
     }
 
+    /// <summary>In-chain fader of a bus with <see cref="Bus.FaderIndex"/> &lt; effect count.</summary>
+    private sealed class Fader
+    {
+        public AudioEffectAmplify Effect = null!;
+        /// <summary>Authored index the fader occupies; authored effects at or after it sit one engine slot later.</summary>
+        public int Index;
+        /// <summary>Bus currently bypasses effects (fader inactive; volume mirrored onto the bus).</summary>
+        public bool Bypassed;
+    }
+
     /// <summary>When set, sync-group plays and unusual driver decisions are printed (<c>--dirge-verbose</c>).</summary>
     public static bool Verbose { get; set; }
 
@@ -62,6 +77,7 @@ public sealed class AudioDriver
     private readonly Dictionary<string, StringName> _busNames = new();
     private readonly List<string> _busOrder = new();
     private readonly Dictionary<string, AudioEffect[]> _effects = new();
+    private readonly Dictionary<string, Fader> _faders = new();
     private readonly Dictionary<string, StringName> _parameterNames = new();
     private readonly StringName _master = new("Master");
     private LoudnessCapture? _capture;
@@ -108,6 +124,13 @@ public sealed class AudioDriver
     /// <summary>Authored effect chain of a bus as instantiated; empty for unknown buses.</summary>
     public IReadOnlyList<AudioEffect> EffectsOf(string bus) => _effects.TryGetValue(bus, out AudioEffect[]? chain) ? chain : Array.Empty<AudioEffect>();
 
+    /// <summary>The in-chain fader amplify of a bus, or null when its volume is the engine bus volume (default).</summary>
+    public AudioEffectAmplify? FaderOf(string bus) => _faders.TryGetValue(bus, out Fader? fader) ? fader.Effect : null;
+
+    /// <summary>Engine effect slot of an authored effect index (shifted by one past an in-chain fader).</summary>
+    public int EngineEffectIndex(string bus, int authoredIndex)
+        => _faders.TryGetValue(bus, out Fader? fader) && authoredIndex >= fader.Index ? authoredIndex + 1 : authoredIndex;
+
     public bool IsVoicePlaying(VoiceId voice)
     {
         Slot? slot = SlotOf(voice);
@@ -145,6 +168,7 @@ public sealed class AudioDriver
         _busNames.Clear();
         _busOrder.Clear();
         _effects.Clear();
+        _faders.Clear();
 
         try
         {
@@ -236,30 +260,44 @@ public sealed class AudioDriver
         _busIndex[bus.Name] = index;
         _busNames[bus.Name] = new StringName(engineName);
         _busOrder.Add(bus.Name);
-        AudioServer.SetBusVolumeDb(index, bus.VolumeDb);
+        Fader? fader = null;
+        if (bus.FaderIndex < bus.Effects.Count)
+        {
+            fader = new Fader { Effect = new AudioEffectAmplify { VolumeDb = bus.VolumeDb }, Index = bus.FaderIndex, Bypassed = bus.BypassEffects };
+            _faders[bus.Name] = fader;
+        }
+
+        AudioServer.SetBusVolumeDb(index, fader is null || fader.Bypassed ? bus.VolumeDb : 0f);
         AudioServer.SetBusMute(index, bus.Mute);
         AudioServer.SetBusSolo(index, bus.Solo);
         AudioServer.SetBusBypassEffects(index, bus.BypassEffects);
 
         var chain = new AudioEffect[bus.Effects.Count];
+        int slot = 0;
         for (int e = 0; e < bus.Effects.Count; e++)
         {
+            if (fader is not null && e == fader.Index)
+            {
+                AudioServer.AddBusEffect(index, fader.Effect, slot++);
+            }
+
             BusEffect authored = bus.Effects[e];
             AudioEffect? effect = InstantiateEffect(authored);
             if (effect is null)
             {
                 // Keep indices aligned with the authored chain so EffectSet* commands address the right slot.
                 effect = new AudioEffectAmplify();
-                AudioServer.AddBusEffect(index, effect, e);
-                AudioServer.SetBusEffectEnabled(index, e, false);
+                AudioServer.AddBusEffect(index, effect, slot);
+                AudioServer.SetBusEffectEnabled(index, slot, false);
             }
             else
             {
-                AudioServer.AddBusEffect(index, effect, e);
-                AudioServer.SetBusEffectEnabled(index, e, authored.Enabled);
+                AudioServer.AddBusEffect(index, effect, slot);
+                AudioServer.SetBusEffectEnabled(index, slot, authored.Enabled);
             }
 
             chain[e] = effect;
+            slot++;
         }
 
         _effects[bus.Name] = chain;
@@ -555,7 +593,20 @@ public sealed class AudioDriver
             case BusSetVolume busVolume:
             {
                 int index = BusIndex(busVolume.Bus);
-                if (index >= 0)
+                if (index < 0)
+                {
+                    break;
+                }
+
+                if (_faders.TryGetValue(busVolume.Bus, out Fader? fader))
+                {
+                    fader.Effect.VolumeDb = busVolume.VolumeDb;
+                    if (fader.Bypassed)
+                    {
+                        AudioServer.SetBusVolumeDb(index, busVolume.VolumeDb);
+                    }
+                }
+                else
                 {
                     AudioServer.SetBusVolumeDb(index, busVolume.VolumeDb);
                 }
@@ -585,9 +636,17 @@ public sealed class AudioDriver
             case BusSetBypass busBypass:
             {
                 int index = BusIndex(busBypass.Bus);
-                if (index >= 0)
+                if (index < 0)
                 {
-                    AudioServer.SetBusBypassEffects(index, busBypass.Bypass);
+                    break;
+                }
+
+                AudioServer.SetBusBypassEffects(index, busBypass.Bypass);
+                if (_faders.TryGetValue(busBypass.Bus, out Fader? fader))
+                {
+                    // Bypass silences the amplify fader as well; carry its volume on the bus until effects are back.
+                    fader.Bypassed = busBypass.Bypass;
+                    AudioServer.SetBusVolumeDb(index, busBypass.Bypass ? fader.Effect.VolumeDb : 0f);
                 }
 
                 break;
@@ -598,7 +657,7 @@ public sealed class AudioDriver
                 int index = BusIndex(enabled.Bus);
                 if (index >= 0 && _effects.TryGetValue(enabled.Bus, out AudioEffect[]? chain) && enabled.EffectIndex >= 0 && enabled.EffectIndex < chain.Length)
                 {
-                    AudioServer.SetBusEffectEnabled(index, enabled.EffectIndex, enabled.Enabled);
+                    AudioServer.SetBusEffectEnabled(index, EngineEffectIndex(enabled.Bus, enabled.EffectIndex), enabled.Enabled);
                 }
 
                 break;
@@ -649,8 +708,7 @@ public sealed class AudioDriver
             player.Bus = bus;
             player.VolumeDb = play.VolumeDb;
             player.PitchScale = play.Pitch;
-            player.UnitSize = play.MinDistance > 0 ? play.MinDistance : 1f;
-            player.MaxDistance = play.MaxDistance;
+            ApplySpatialMacros(player, play.MinDistance, play.MaxDistance, play.Rolloff, play.Doppler, play.DopplerScale);
             player.GlobalTransform = ToTransform(play.Attributes);
             player.StreamPaused = false;
             player.Play((float)play.StartSeconds);
@@ -743,8 +801,7 @@ public sealed class AudioDriver
             player.Bus = bus;
             player.VolumeDb = 0f;
             player.PitchScale = lead.Pitch;
-            player.UnitSize = lead.MinDistance > 0 ? lead.MinDistance : 1f;
-            player.MaxDistance = lead.MaxDistance;
+            ApplySpatialMacros(player, lead.MinDistance, lead.MaxDistance, lead.Rolloff, lead.Doppler, lead.DopplerScale);
             player.GlobalTransform = ToTransform(lead.Attributes);
             player.StreamPaused = false;
             player.Play((float)lead.StartSeconds);
@@ -963,6 +1020,25 @@ public sealed class AudioDriver
         }
 
         return interned;
+    }
+
+    /// <summary>
+    /// Distance model, range and doppler of a 3D player. <paramref name="minDistance"/> → <c>unit_size</c> (≤ 0 → 1),
+    /// <paramref name="maxDistance"/> → <c>max_distance</c>. Doppler is physics-step tracking when enabled with a positive
+    /// scale; the engine has no doppler scale, so the magnitude is not applied.
+    /// </summary>
+    private static void ApplySpatialMacros(AudioStreamPlayer3D player, float minDistance, float maxDistance, Rolloff rolloff, bool doppler, float dopplerScale)
+    {
+        player.UnitSize = minDistance > 0 ? minDistance : 1f;
+        player.MaxDistance = maxDistance;
+        player.AttenuationModel = rolloff switch
+        {
+            Rolloff.InverseSquare => AudioStreamPlayer3D.AttenuationModelEnum.InverseSquareDistance,
+            Rolloff.Logarithmic => AudioStreamPlayer3D.AttenuationModelEnum.Logarithmic,
+            Rolloff.Disabled => AudioStreamPlayer3D.AttenuationModelEnum.Disabled,
+            _ => AudioStreamPlayer3D.AttenuationModelEnum.InverseDistance,
+        };
+        player.DopplerTracking = doppler && dopplerScale > 0f ? AudioStreamPlayer3D.DopplerTrackingEnum.PhysicsStep : AudioStreamPlayer3D.DopplerTrackingEnum.Disabled;
     }
 
     private static Transform3D ToTransform(Attributes3D attributes)

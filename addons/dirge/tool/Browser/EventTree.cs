@@ -29,13 +29,15 @@ public static class EventTree
     /// <param name="events">Events to place.</param>
     /// <param name="extraFolders">Folders to show even when no event lives under them (freshly created, not yet populated).</param>
     /// <param name="filter">Case-insensitive substring; folders are kept when any descendant matches. Null/empty = no filter.</param>
-    public static EventTreeNode Build(IReadOnlyList<AudioEvent> events, IEnumerable<string>? extraFolders = null, string? filter = null)
+    /// <param name="tag">When non-empty only events carrying this exact tag are placed (and no extra folders).</param>
+    public static EventTreeNode Build(IReadOnlyList<AudioEvent> events, IEnumerable<string>? extraFolders = null, string? filter = null, string? tag = null)
     {
         var root = new EventTreeNode("", "", DirgeId.None);
         bool filtering = !string.IsNullOrWhiteSpace(filter);
         string needle = filtering ? filter!.Trim() : "";
+        bool tagging = !string.IsNullOrEmpty(tag);
 
-        if (extraFolders is not null)
+        if (extraFolders is not null && !tagging)
         {
             foreach (string folder in extraFolders)
             {
@@ -49,6 +51,7 @@ public static class EventTree
         {
             AudioEvent ev = events[i];
             if (filtering && !Matches(ev.Path, needle)) continue;
+            if (tagging && !ev.Tags.Contains(tag!)) continue;
             string path = ev.Path;
             int slash = path.LastIndexOf(Separator);
             EventTreeNode parent = slash < 0 ? root : EnsureFolder(root, path.Substring(0, slash));
@@ -58,6 +61,26 @@ public static class EventTree
 
         Sort(root);
         return root;
+    }
+
+    /// <summary>Distinct tags across <paramref name="events"/>, ordinal-sorted, for the browser's filter chips.</summary>
+    public static List<string> AllTags(IReadOnlyList<AudioEvent> events)
+    {
+        var tags = new List<string>();
+        for (int i = 0; i < events.Count; i++)
+        {
+            List<string> own = events[i].Tags;
+            for (int t = 0; t < own.Count; t++) if (!tags.Contains(own[t])) tags.Add(own[t]);
+        }
+        tags.Sort(StringComparer.Ordinal);
+        return tags;
+    }
+
+    /// <summary>A tag is a trimmed, non-empty single token (no commas; whitespace collapsed to one space).</summary>
+    public static string? NormalizeTag(string raw)
+    {
+        string tag = string.Join(' ', raw.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        return tag.Length == 0 || tag.IndexOf(',') >= 0 ? null : tag;
     }
 
     /// <summary>Folder part of a path ("" for root-level events).</summary>

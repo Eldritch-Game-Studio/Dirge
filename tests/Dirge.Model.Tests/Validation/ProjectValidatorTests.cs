@@ -140,6 +140,27 @@ public sealed class ProjectValidatorTests
         AssertOnly(Validate(b), DiagnosticCodes.EffectTypeNameEmpty, effect.Id);
     }
 
+    [Test]
+    public void BusFaderIndexNegative()
+    {
+        var b = new ProjectBuilder();
+        Bus music = b.AddBus("Music");
+        music.FaderIndex = -1;
+        AssertOnly(Validate(b), DiagnosticCodes.BusFaderIndexNegative, music.Id);
+    }
+
+    [Test]
+    public void BusFaderIndex_ZeroAndPastChainAreValid()
+    {
+        var b = new ProjectBuilder();
+        Bus music = b.AddBus("Music");
+        b.AddEffect(music, "AudioEffectLowPassFilter");
+        music.FaderIndex = 0;
+        Bus sfx = b.AddBus("SFX");
+        sfx.FaderIndex = 7;
+        Assert.That(Validate(b), Is.Empty);
+    }
+
     // ---- parameters --------------------------------------------------------------------------------------------
 
     [Test]

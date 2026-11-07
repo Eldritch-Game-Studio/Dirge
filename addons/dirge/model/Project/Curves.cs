@@ -35,7 +35,10 @@ public abstract class Modulator
 {
     public DirgeId Id { get; set; } = DirgeId.New();
     public PropertyRef Target { get; set; }
-    /// <summary>Peak deviation added to the property, in the property's units (dB for volumes, ratio for pitch).</summary>
+    /// <summary>
+    /// Peak deviation added to the property, in the property's units (dB for volumes, ratio for pitch). For
+    /// <see cref="AutopitchModulator"/> it scales the deviation of the computed pitch ratio from 1 (1 = full autopitch).
+    /// </summary>
     public float Amount { get; set; }
 }
 
@@ -57,4 +60,18 @@ public sealed class LfoModulator : Modulator
     public float Phase { get; set; }
     /// <summary>When true, <see cref="RateHz"/> is interpreted in beats (1 = one beat) using the event tempo map.</summary>
     public bool TempoSync { get; set; }
+}
+
+/// <summary>
+/// FMOD autopitch: the pitch ratio follows <see cref="Parameter"/> piecewise-linearly in ratio space through three points —
+/// (<c>Minimum</c>, <see cref="PitchAtMinimum"/>), (<see cref="ReferenceValue"/>, 1) and (<c>Maximum</c>, <see cref="PitchAtMaximum"/>)
+/// — where Minimum/Maximum are the parameter's range. Valid targets: event pitch and instrument pitch.
+/// </summary>
+public sealed class AutopitchModulator : Modulator
+{
+    public DirgeId Parameter { get; set; }
+    /// <summary>Parameter value at which the pitch ratio is exactly 1.</summary>
+    public float ReferenceValue { get; set; }
+    public float PitchAtMinimum { get; set; } = 0.5f;
+    public float PitchAtMaximum { get; set; } = 2f;
 }

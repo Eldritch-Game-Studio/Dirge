@@ -261,7 +261,11 @@ public sealed partial class ProfilerPane : IToolPane
         ConnectToGame(host, port);
     }
 
-    /// <summary>Switch to a running game's live-update host.</summary>
+    /// <summary>
+    /// Switch to a running game's live-update host. Inside the editor shell the pane reads the shell's shared
+    /// <see cref="LiveUpdateClient"/> (connecting it when idle) because the game keeps one editor connection; without a
+    /// shared client (overlay) it owns one.
+    /// </summary>
     public void ConnectToGame(string host, int port)
     {
         if (_context is null) return;
@@ -269,15 +273,36 @@ public sealed partial class ProfilerPane : IToolPane
         _feed?.Dispose();
         if (_client is not null)
         {
+            // Leave the tree now (not at QueueFree time) so SharedClient() cannot pick the pane's own client.
+            _context.Host.RemoveChild(_client);
             _client.QueueFree();
             _client = null;
         }
-        _client = new LiveUpdateClient { Name = "ProfilerLiveClient" };
-        _context.Host.AddChild(_client);
-        _feed = new GameFeed(_client, host, port);
+        LiveUpdateClient? shared = SharedClient();
+        if (shared is not null)
+        {
+            if (!shared.IsConnected || shared.Host != host || shared.Port != port) shared.Connect(host, port);
+            _feed = new GameFeed(shared, host, port, connect: false);
+        }
+        else
+        {
+            _client = new LiveUpdateClient { Name = "ProfilerLiveClient" };
+            _context.Host.AddChild(_client);
+            _feed = new GameFeed(_client, host, port);
+        }
         _graph.Clear();
         RefreshSourceUi();
         RefreshRecordingUi();
+    }
+
+    /// <summary>The shell's live client: the <see cref="LiveUpdateClient"/> child of the host (the pane's own client is never in the tree here).</summary>
+    private LiveUpdateClient? SharedClient()
+    {
+        foreach (Godot.Node child in _context!.Host.GetChildren())
+        {
+            if (child is LiveUpdateClient client) return client;
+        }
+        return null;
     }
 
     private void RefreshSourceUi()

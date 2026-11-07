@@ -35,6 +35,8 @@ public sealed partial class MixerPane
         public HTMLElement Route { get; }
         public HTMLElement FxList { get; }
         public HTMLElement FxAdd { get; }
+        /// <summary>Effect-section footer: opens the per-bus LFO (tremolo) popover; <c>on</c> while the bus volume has an LFO.</summary>
+        public HTMLElement LfoButton { get; }
         public HTMLInputElement MaxVoices { get; }
         public List<EffectRow> Effects { get; } = new();
         public object FaderToken { get; } = new();
@@ -103,6 +105,9 @@ public sealed partial class MixerPane
             FxAdd = dom.El(fxHead, "button", "fx-add", "+");
             FxAdd.Title = "Add effect";
             FxList = dom.El(Root, "div", "fx-list");
+            HTMLElement fxFoot = dom.El(Root, "div", "fx-foot");
+            LfoButton = dom.El(fxFoot, "button", "fx-lfo", "LFO");
+            LfoButton.Title = "LFO modulators on this bus volume (tremolo)";
 
             HTMLElement voices = dom.El(Root, "div", "voices-row");
             dom.El(voices, "div", "field-label", "Max voices");
@@ -156,6 +161,7 @@ public sealed partial class MixerPane
                 if (editing is not null) signature.Append(HasScopedParameter(editing, bus.Id, i) ? 's' : 'u');
                 signature.Append(i == selectedIndex ? '*' : ' ');
             }
+            signature.Append('F').Append(FaderSlot(bus));
             string next = signature.ToString();
             if (next == _effectSignature) return false;
             _effectSignature = next;
@@ -262,6 +268,7 @@ public sealed partial class MixerPane
             }
             Bus? parent = bus.Parent.IsNone ? null : MixerGraphOps.FindBus(mixer, bus.Parent);
             strip.Refresh(bus, parent, editing, selectedBus && selectedId == bus.Id);
+            RefreshLfoButton(strip, bus);
             int selectedEffect = Selection.Kind == SelectionKind.Effect && Selection.Owner == bus.Id ? Selection.Index : -1;
             if (strip.EffectChainChanged(bus, editing, selectedEffect)) RebuildEffectRows(strip, bus, editing, selectedEffect);
         }
@@ -315,6 +322,7 @@ public sealed partial class MixerPane
         }
 
         dom.On(strip.FxAdd, "click", e => ShowAddEffectPopup(strip, e));
+        dom.On(strip.LfoButton, "click", e => OpenLfoPopover(strip, e));
         dom.On(strip.MaxVoices, "change", () => CommitMaxVoices(strip));
         dom.On(strip.MaxVoices, "keydown", e => { if (e is KeyboardEvent k && k.Key == "Enter") CommitMaxVoices(strip); });
         return strip;

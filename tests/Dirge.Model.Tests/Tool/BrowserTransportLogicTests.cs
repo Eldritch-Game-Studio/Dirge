@@ -52,6 +52,39 @@ public sealed class BrowserTransportLogicTests
     }
 
     [Test]
+    public void EventTree_TagFilter_KeepsOnlyTaggedEvents_AndDropsExtraFolders()
+    {
+        var b = new ProjectBuilder();
+        b.AddEvent("UI/Click").Tags.Add("ui");
+        AudioEvent wind = b.AddEvent("Ambience/Wind");
+        wind.Tags.Add("ambient");
+        wind.Tags.Add("loop");
+        b.AddEvent("Ambience/Birds").Tags.Add("ambient");
+        b.AddEvent("Music/Main");
+
+        EventTreeNode ambient = EventTree.Build(b.Project.Events, new[] { "Empty" }, null, "ambient");
+        Assert.That(Names(ambient.Children), Is.EqualTo(new[] { "Ambience" }));
+        Assert.That(Names(ambient.Children[0].Children), Is.EqualTo(new[] { "Birds", "Wind" }));
+
+        EventTreeNode both = EventTree.Build(b.Project.Events, null, "wi", "ambient");
+        Assert.That(both.Children[0].Children.Count, Is.EqualTo(1), "search and tag filters intersect");
+        Assert.That(both.Children[0].Children[0].Name, Is.EqualTo("Wind"));
+
+        Assert.That(EventTree.Build(b.Project.Events, null, null, "Ambient").Children, Is.Empty, "tags are case-sensitive");
+        Assert.That(EventTree.Build(b.Project.Events, new[] { "Empty" }, null, "").Children.Count, Is.EqualTo(4), "empty tag = no filter");
+        Assert.That(EventTree.AllTags(b.Project.Events), Is.EqualTo(new[] { "ambient", "loop", "ui" }));
+    }
+
+    [Test]
+    public void EventTree_NormalizeTag()
+    {
+        Assert.That(EventTree.NormalizeTag("  ambient "), Is.EqualTo("ambient"));
+        Assert.That(EventTree.NormalizeTag("two   words"), Is.EqualTo("two words"));
+        Assert.That(EventTree.NormalizeTag("   "), Is.Null);
+        Assert.That(EventTree.NormalizeTag("a,b"), Is.Null);
+    }
+
+    [Test]
     public void EventTree_PathHelpers()
     {
         Assert.That(EventTree.FolderOf("A/B/C"), Is.EqualTo("A/B"));

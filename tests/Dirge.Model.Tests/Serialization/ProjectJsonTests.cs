@@ -19,6 +19,7 @@ public sealed class ProjectJsonTests
         comp.Enabled = false;
         music.Mute = true;
         music.MaxVoices = 8;
+        music.FaderIndex = 0;
         Vca vca = b.AddVca("MusicVca", -1.5f, music);
 
         ParameterDefinition intensity = b.AddGlobalParameter("Intensity", 0f, 1f, 0.25f);
@@ -43,7 +44,7 @@ public sealed class ProjectJsonTests
         ev.Macros = new EventMacros
         {
             VolumeDb = -2f, Pitch = 1.1f, Priority = 32, MaxInstances = 3, Stealing = StealingMode.Quietest,
-            Cooldown = 0.5f, Persistent = true, Is3D = true, MinDistance = 2f, MaxDistance = 40f, Doppler = true,
+            Cooldown = 0.5f, Persistent = true, Is3D = true, MinDistance = 2f, MaxDistance = 40f, Rolloff = Rolloff.Logarithmic, Doppler = true,
             DopplerScale = 0.5f, ScheduleLookahead = 0.1f,
         };
         ParameterDefinition local = b.AddLocalParameter(ev, "Danger", 0f, 10f, 1f, ParameterKind.Discrete);
@@ -155,6 +156,11 @@ public sealed class ProjectJsonTests
             Assert.That(ev.Automation[0].Curve.Points[0], Is.EqualTo(new CurvePoint(0f, -20f, CurveShape.Smooth)));
             Assert.That(ev.Automation[0].Target, Is.EqualTo(PropertyRef.EventVolume(ev.Id)));
             Assert.That(ev.Macros.Stealing, Is.EqualTo(StealingMode.Quietest));
+            Assert.That(ev.Macros.Rolloff, Is.EqualTo(Rolloff.Logarithmic));
+            Assert.That(ev.Macros.Doppler, Is.True);
+            Assert.That(ev.Macros.DopplerScale, Is.EqualTo(0.5f));
+            Assert.That(copy.Mixer.Buses[1].FaderIndex, Is.EqualTo(0));
+            Assert.That(copy.Mixer.Buses[0].FaderIndex, Is.EqualTo(int.MaxValue), "default fader position survives the round trip");
             Assert.That(ev.Tempo[1].BeatsPerBar, Is.EqualTo(3));
             Assert.That(copy.Snapshots[0].Values[1].Target, Is.EqualTo(PropertyRef.Effect(copy.Mixer.Buses[1].Id, 0, "threshold")));
             Assert.That(copy.Snapshots[0].Intensity.Sustain, Is.EqualTo(0.8f));
@@ -186,6 +192,8 @@ public sealed class ProjectJsonTests
             Assert.That(json, Does.Contain("{\"kind\":\"EffectParameter\",\"owner\":\"" + project.Mixer.Buses[1].Id + "\",\"effectIndex\":0,\"name\":\"threshold\"}"));
             Assert.That(json, Does.Contain("{\"kind\":\"BusVolumeDb\",\"owner\":\"" + project.Mixer.Buses[1].Id + "\"}"));
             Assert.That(json, Does.Contain("\"stealing\":\"Quietest\""));
+            Assert.That(json, Does.Contain("\"rolloff\":\"Logarithmic\""));
+            Assert.That(json, Does.Contain("\"faderIndex\":0"));
             Assert.That(json, Does.Not.Contain("onTimeline"));
             Assert.That(json, Does.Not.Contain("isNone"));
             Assert.That(json, Does.Not.Contain("isEmpty"));
@@ -198,7 +206,7 @@ public sealed class ProjectJsonTests
         string json = ProjectJson.Serialize(FullProject(), indented: false);
         // Object keys: id, then name/path, then the rest ordinally sorted.
         Assert.That(json, Does.StartWith("{\"name\":\"Full\",\"assetLengths\":{\"res://a.ogg\":4,\"res://child.ogg\":1.5},\"audioTables\":[],\"banks\":["));
-        Assert.That(json, Does.Contain("\"id\":\"00000001000000000000000000000000\",\"name\":\"Master\",\"bypassEffects\":false,\"effects\":[],\"maxVoices\":0,\"mute\":false,\"parent\":\"00000000000000000000000000000000\",\"solo\":false,\"vcas\":[],\"volumeDb\":0}"));
+        Assert.That(json, Does.Contain("\"id\":\"00000001000000000000000000000000\",\"name\":\"Master\",\"bypassEffects\":false,\"effects\":[],\"faderIndex\":2147483647,\"maxVoices\":0,\"mute\":false,\"parent\":\"00000000000000000000000000000000\",\"solo\":false,\"vcas\":[],\"volumeDb\":0}"));
         // Dictionary keys sorted regardless of insertion order.
         Assert.That(json, Does.Contain("\"parameters\":{\"ratio\":4,\"threshold\":-12}"));
     }

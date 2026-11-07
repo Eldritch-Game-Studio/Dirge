@@ -29,7 +29,8 @@ public readonly record struct DirgeStats(
 /// </summary>
 /// <remarks>
 /// Command line (after <c>--</c>): <c>--dirge-live[=port]</c> enables live update (default port 7447) regardless of
-/// <see cref="LiveUpdatePort"/>; <c>--dirge-verbose</c> prints driver decisions such as sync-group plays.
+/// <see cref="LiveUpdatePort"/>; the port is bound when the server loads a project, so an idle autoload never shadows a
+/// scene-local server. <c>--dirge-verbose</c> prints driver decisions such as sync-group plays.
 /// </remarks>
 public partial class DirgeServer : Node
 {
@@ -66,6 +67,28 @@ public partial class DirgeServer : Node
     private LiveUpdateHost? _live;
     private LoudnessCapture? _loudness;
     private int _nextHandle = 1;
+    /// <summary>Port requested by <see cref="LiveUpdatePort"/>/<c>--dirge-live</c>, bound by the first <see cref="Load(AudioProject)"/>; 0 = none.</summary>
+    private int _pendingLivePort;
+    /// <summary>Instance → handle for the signal bridge; one entry per handle in <see cref="_handles"/>.</summary>
+    private readonly Dictionary<EventInstance, int> _handleOf = new(ReferenceEqualityComparer.Instance);
+    /// <summary>Request being answered while <see cref="SignalName.ProgrammerSound"/> is emitted; <see cref="SetProgrammerSound"/> fills it.</summary>
+    private ProgrammerSoundCallback? _programmerRequest;
+    private int _programmerRequestHandle;
+
+    /// <summary>Callbacks every handle-based instance forwards as signals; <see cref="SetCallbackMask"/> narrows per handle.</summary>
+    public const CallbackMask SignalMask = CallbackMask.Started | CallbackMask.Stopped | CallbackMask.TimelineMarker | CallbackMask.TimelineBeat
+        | CallbackMask.SoundPlayed | CallbackMask.Virtualized | CallbackMask.Unvirtualized | CallbackMask.Stolen | CallbackMask.ProgrammerSound;
+
+    [Signal] public delegate void EventStartedEventHandler(int handle);
+    [Signal] public delegate void EventStoppedEventHandler(int handle);
+    [Signal] public delegate void TimelineMarkerEventHandler(int handle, string name, double position);
+    [Signal] public delegate void TimelineBeatEventHandler(int handle, int bar, int beat, float bpm, double position);
+    [Signal] public delegate void SoundPlayedEventHandler(int handle, string asset);
+    [Signal] public delegate void EventVirtualizedEventHandler(int handle);
+    [Signal] public delegate void EventUnvirtualizedEventHandler(int handle);
+    [Signal] public delegate void EventStolenEventHandler(int handle);
+    /// <summary>A programmer instrument of <c>handle</c> needs an asset for <c>key</c>; answer synchronously with <see cref="SetProgrammerSound"/>.</summary>
+    [Signal] public delegate void ProgrammerSoundEventHandler(int handle, string key);
 
     /// <summary>Raised after <see cref="DirgeSystem.Update"/> and before the commands are applied and cleared; read-only inspection hook.</summary>
     public event Action<IReadOnlyList<Command>>? CommandsEmitted;
@@ -128,12 +151,10 @@ public partial class DirgeServer : Node
             _driver.Capture = _loudness;
         }
 
-        int livePort = LiveUpdatePort;
-        ParseUserArgs(ref livePort);
-        if (livePort > 0)
-        {
-            EnableLiveUpdate(livePort);
-        }
+        // The live port belongs to the server that owns a project. A server with nothing to load (the plugin's autoload
+        // without dirge/project_path) must not take it from a scene-local server; it binds when Load() is first called.
+        _pendingLivePort = LiveUpdatePort;
+        ParseUserArgs(ref _pendingLivePort);
 
         string path = ProjectPath;
         if (string.IsNullOrEmpty(path) && ProjectSettings.HasSetting(ProjectPathSetting))
@@ -196,6 +217,7 @@ public partial class DirgeServer : Node
     /// <summary>Starts (or moves) the live-update host on <paramref name="port"/>. Also callable at runtime.</summary>
     public void EnableLiveUpdate(int port)
     {
+        _pendingLivePort = 0;
         if (_live is null)
         {
             _live = new LiveUpdateHost(this);
@@ -230,7 +252,7 @@ public partial class DirgeServer : Node
         }
 
         _driver?.StopAll();
-        _handles.Clear();
+        ClearHandles();
         _snapshots.Clear();
     }
 
@@ -266,6 +288,11 @@ public partial class DirgeServer : Node
         _driver.LoadMixer(project.Mixer);
         _system = new DirgeSystem(project, Seed, _assets, platform: _platform) { Locale = TranslationServer.GetLocale() };
         _loudness?.Reset();
+        if (_pendingLivePort > 0)
+        {
+            EnableLiveUpdate(_pendingLivePort);
+        }
+
         Loaded?.Invoke(_system);
     }
 
@@ -345,7 +372,7 @@ public partial class DirgeServer : Node
             }
 
             EventInstance instance = description.CreateInstance();
-            _handles[handle] = instance;
+            Track(handle, instance);
             instance.Start();
             instance.Release();
             if (position > 0 && position < description.Length)
@@ -408,7 +435,7 @@ public partial class DirgeServer : Node
 
         for (int i = 0; i < _finishedHandles.Count; i++)
         {
-            _handles.Remove(_finishedHandles[i]);
+            Untrack(_finishedHandles[i]);
         }
 
         _finishedHandles.Clear();
@@ -493,7 +520,7 @@ public partial class DirgeServer : Node
 
         EventInstance instance = description.CreateInstance();
         int handle = _nextHandle++;
-        _handles[handle] = instance;
+        Track(handle, instance);
         instance.Start();
         instance.Release();
         return handle;
@@ -560,6 +587,107 @@ public partial class DirgeServer : Node
 
     /// <summary>The instance behind a handle for C# callers; <see langword="null"/> once it has stopped.</summary>
     public EventInstance? GetInstance(int handle) => _handles.TryGetValue(handle, out EventInstance? instance) ? instance : null;
+
+    /// <summary>Restricts which callbacks <paramref name="handle"/> forwards as signals; <paramref name="mask"/> is a <see cref="CallbackMask"/> value, clipped to <see cref="SignalMask"/>.</summary>
+    public void SetCallbackMask(int handle, int mask)
+    {
+        if (_handles.TryGetValue(handle, out EventInstance? instance))
+        {
+            instance.CallbackMask = (CallbackMask)mask & SignalMask;
+        }
+    }
+
+    /// <summary>
+    /// Supplies the asset for <paramref name="handle"/>'s programmer instruments. Called while <see cref="SignalName.ProgrammerSound"/>
+    /// is being emitted it answers that request; otherwise (or additionally) it becomes the instance's fallback asset
+    /// (<see cref="EventInstance.SetProgrammerSound"/>).
+    /// </summary>
+    public void SetProgrammerSound(int handle, string assetPath)
+    {
+        if (!_handles.TryGetValue(handle, out EventInstance? instance))
+        {
+            return;
+        }
+
+        var asset = new AssetRef(assetPath);
+        if (_programmerRequest is not null && _programmerRequestHandle == handle)
+        {
+            _programmerRequest.Asset = asset;
+        }
+
+        instance.SetProgrammerSound(asset);
+    }
+
+    private void Track(int handle, EventInstance instance)
+    {
+        _handles[handle] = instance;
+        _handleOf[instance] = handle;
+        instance.CallbackMask = SignalMask;
+        instance.Callback += OnInstanceCallback;
+    }
+
+    private void Untrack(int handle)
+    {
+        if (_handles.Remove(handle, out EventInstance? instance))
+        {
+            _handleOf.Remove(instance);
+            instance.Callback -= OnInstanceCallback;
+        }
+    }
+
+    private void ClearHandles()
+    {
+        foreach (KeyValuePair<int, EventInstance> pair in _handles)
+        {
+            pair.Value.Callback -= OnInstanceCallback;
+        }
+
+        _handles.Clear();
+        _handleOf.Clear();
+    }
+
+    private void OnInstanceCallback(EventInstance instance, CallbackEvent ev)
+    {
+        if (!_handleOf.TryGetValue(instance, out int handle))
+        {
+            return;
+        }
+
+        switch (ev)
+        {
+            case StartedCallback:
+                EmitSignalEventStarted(handle);
+                break;
+            case StoppedCallback:
+                EmitSignalEventStopped(handle);
+                break;
+            case MarkerCallback marker:
+                EmitSignalTimelineMarker(handle, marker.Name, marker.Position);
+                break;
+            case BeatCallback beat:
+                EmitSignalTimelineBeat(handle, beat.Bar, beat.Beat, beat.Bpm, beat.Position);
+                break;
+            case SoundPlayedCallback played:
+                EmitSignalSoundPlayed(handle, played.Asset.Path);
+                break;
+            case VirtualizedCallback:
+                EmitSignalEventVirtualized(handle);
+                break;
+            case UnvirtualizedCallback:
+                EmitSignalEventUnvirtualized(handle);
+                break;
+            case StolenCallback:
+                EmitSignalEventStolen(handle);
+                break;
+            case ProgrammerSoundCallback request:
+                // Emission is synchronous: a connected GDScript handler answers through SetProgrammerSound before EmitSignal returns.
+                _programmerRequest = request;
+                _programmerRequestHandle = handle;
+                EmitSignalProgrammerSound(handle, request.Key);
+                _programmerRequest = null;
+                break;
+        }
+    }
 
     /// <summary>Begins loading every asset of the bank in the background; <see cref="IsBankLoaded"/> turns true when done. False for unknown banks.</summary>
     public bool LoadBank(string name) => _system is not null && _banks.Load(_system.Project, name);

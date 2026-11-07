@@ -11,7 +11,7 @@ namespace Dirge.Runtime;
 /// <c>Bus*</c>/<c>Effect*</c> commands with change detection (the first call emits the full state).
 /// <para>
 /// Property chain (dB summed, ratios/effect parameters in their own units):
-/// authored → snapshots (<see cref="PropertyBlend"/>, ascending priority) → automation (curve value added) → runtime override;
+/// authored → snapshots (<see cref="PropertyBlend"/>, ascending priority) → automation (curve value added) → modulators (LFO/Random) → runtime override;
 /// bus volume additionally sums the final value of every VCA listed on the bus. The parent bus chain is the engine's job.
 /// </para>
 /// <para>
@@ -48,8 +48,31 @@ public sealed class MixerState
         public AutomationSlot(DirgeId lane, int property, ParameterState parameter, Curve curve) { Lane = lane; Property = property; Parameter = parameter; Curve = curve; }
     }
 
+    /// <summary>One <see cref="AudioProject.MixerModulators"/> entry resolved to its property slot. A class so the LFO phase mutates in place.</summary>
+    private sealed class ModulatorSlot
+    {
+        public readonly Modulator Modulator;
+        public readonly int Property;
+        /// <summary>Bus pitch is a ratio: the contribution multiplies as (1 + x) instead of adding.</summary>
+        public readonly bool Multiply;
+        public readonly LfoModulator? Lfo;
+        public readonly float Random;
+        public LfoState LfoState;
+
+        public ModulatorSlot(Modulator modulator, int property, bool multiply, DirgeRandom random)
+        {
+            Modulator = modulator;
+            Property = property;
+            Multiply = multiply;
+            Lfo = modulator as LfoModulator;
+            if (Lfo is not null) LfoState = new LfoState(Lfo, random);
+            else Random = random.NextSigned();
+        }
+    }
+
     private const string PitchShiftEffectType = "AudioEffectPitchShift";
     private const string PitchScaleParameter = "pitch_scale";
+    private const float MinPitch = 0.01f;
 
     private readonly Bus[] _buses;
     private readonly string[] _busNames;
@@ -95,11 +118,12 @@ public sealed class MixerState
     private readonly List<SnapshotInstance> _active = new();
     private readonly Stack<SnapshotInstance> _pool = new();
     private readonly List<AutomationSlot> _automation = new();
+    private readonly List<ModulatorSlot> _modulators = new();
 
     private readonly ParameterBank _globals;
     private readonly CommandBuffer _commands;
 
-    /// <summary>System random; the M1 mixer has no random sources but keeps the shared generator for determinism of later features.</summary>
+    /// <summary>System random; consumed at construction by Random mixer modulators and Noise LFOs so the stream is seed-deterministic.</summary>
     internal DirgeRandom Random { get; }
     /// <summary>Owning system (set by <see cref="DirgeSystem"/>); reached for the API recorder.</summary>
     internal DirgeSystem? System { get; set; }
@@ -227,6 +251,12 @@ public sealed class MixerState
             if (_propertyByRef.TryGetValue(lane.Target, out int property) && _globals.TryGet(lane.Parameter, out ParameterState parameter))
                 _automation.Add(new AutomationSlot(lane.Id, property, parameter, lane.Curve));
         }
+        for (int i = 0; i < project.MixerModulators.Count; i++)
+        {
+            Modulator m = project.MixerModulators[i];
+            if (m is (LfoModulator or RandomModulator) && _propertyByRef.TryGetValue(m.Target, out int property))
+                _modulators.Add(new ModulatorSlot(m, property, m.Target.Kind == PropertyKind.BusPitch, random));
+        }
     }
 
     private void ApplyPlatformOverrides(AudioProject project, string? platform)
@@ -335,6 +365,28 @@ public sealed class MixerState
         return false;
     }
 
+    /// <summary>
+    /// Add an LFO or Random modulator on a mixer property at runtime (tool live-edit); <see cref="AudioProject.MixerModulators"/>
+    /// entries are registered at construction. The Random offset / Noise seed is drawn from the system generator now.
+    /// </summary>
+    public void AddModulator(Modulator modulator)
+    {
+        if (modulator is not (LfoModulator or RandomModulator))
+            throw new ArgumentException("Mixer modulators must be LFO or Random.", nameof(modulator));
+        if (!_propertyByRef.TryGetValue(modulator.Target, out int property))
+            throw new ArgumentException($"Modulator target {modulator.Target} is not a mixer property of this project.", nameof(modulator));
+        _modulators.Add(new ModulatorSlot(modulator, property, modulator.Target.Kind == PropertyKind.BusPitch, Random));
+    }
+
+    public bool RemoveModulator(DirgeId modulatorId)
+    {
+        for (int i = 0; i < _modulators.Count; i++)
+        {
+            if (_modulators[i].Modulator.Id == modulatorId) { _modulators.RemoveAt(i); return true; }
+        }
+        return false;
+    }
+
     /// <summary>Evaluate the whole mixer and emit changed values. The first call emits everything.</summary>
     public void Update(double dt)
     {
@@ -375,6 +427,17 @@ public sealed class MixerState
         {
             AutomationSlot a = _automation[i];
             _value[a.Property] += CurveMath.Evaluate(a.Curve, a.Parameter.Value);
+        }
+
+        // 4b. Modulators: LFO phase advances with dt (TempoSync has no tempo map here and reads RateHz as Hz); Random is a
+        // fixed offset drawn at construction. dB / effect units add; bus pitch multiplies.
+        for (int i = 0; i < _modulators.Count; i++)
+        {
+            ModulatorSlot m = _modulators[i];
+            float wave = m.Lfo is null ? m.Random : dt > 0 ? m.LfoState.Advance(dt, m.Lfo.RateHz) : m.LfoState.Current;
+            float contribution = m.Modulator.Amount * wave;
+            if (m.Multiply) _value[m.Property] *= MathF.Max(MinPitch, 1f + contribution);
+            else _value[m.Property] += contribution;
         }
 
         // 5. Runtime overrides and VCA sums.

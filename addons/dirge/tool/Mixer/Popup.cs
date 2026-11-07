@@ -43,10 +43,11 @@ internal sealed class Popup
             HTMLElement button = _dom.El(_root, "button", "popup-item", item.Label);
             if (item.Current) button.ClassList.Add("current");
             if (item.On) button.ClassList.Add("on");
+            // Hide first: an action may open a follow-up popup (e.g. the ducking source picker).
             var listener = new DelegateEventListener(_ =>
             {
-                item.Action();
                 if (!_keepOpenOnSelect) Hide();
+                item.Action();
             });
             button.AddEventListener("click", listener);
             _itemListeners.Add((button, listener));

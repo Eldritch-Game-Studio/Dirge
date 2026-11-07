@@ -30,8 +30,9 @@ public sealed partial class BrowserPane : IToolPane, IToolPaneCommands
     private ToolContext? _ctx;
     private DocumentHost? _host;
     private Document? _doc;
-    private Element _tree = null!, _members = null!, _memberList = null!, _status = null!;
-    private HTMLInputElement _search = null!;
+    private Element _tree = null!, _members = null!, _memberList = null!, _status = null!, _tagFilter = null!, _tagChips = null!;
+    private HTMLElement _tagEditor = null!;
+    private HTMLInputElement _search = null!, _tagInput = null!;
     private HTMLElement _addButton = null!, _addFolderButton = null!, _importButton = null!;
     private PopupMenu? _menu;
     private ConfirmationDialog? _confirm;
@@ -39,6 +40,7 @@ public sealed partial class BrowserPane : IToolPane, IToolPaneCommands
     private AssetNode? _assetRoot;
     private Tab _tab = Tab.Events;
     private string _query = "";
+    private string _tagQuery = "";
     private DirgeId _selectedBank;
     private Element? _dropHover;
     private Action? _pendingConfirm;
@@ -115,6 +117,10 @@ public sealed partial class BrowserPane : IToolPane, IToolPaneCommands
         _addButton = (HTMLElement)doc.GetElementById("add")!;
         _addFolderButton = (HTMLElement)doc.GetElementById("add-folder")!;
         _importButton = (HTMLElement)doc.GetElementById("import-lengths")!;
+        _tagFilter = doc.GetElementById("tag-filter")!;
+        _tagEditor = (HTMLElement)doc.GetElementById("tag-editor")!;
+        _tagChips = doc.GetElementById("tag-chips")!;
+        _tagInput = (HTMLInputElement)doc.GetElementById("tag-input")!;
 
         BindTab("tab-events", Tab.Events);
         BindTab("tab-assets", Tab.Assets);
@@ -126,6 +132,10 @@ public sealed partial class BrowserPane : IToolPane, IToolPaneCommands
         Dom.On(_addButton, "click", _ => AddItem());
         Dom.On(_addFolderButton, "click", _ => NewFolder(SelectedFolder()));
         Dom.On(_importButton, "click", _ => ImportLengths());
+        Dom.On(_tagFilter, "click", OnTagFilterClick);
+        Dom.On(_tagChips, "click", OnTagChipClick);
+        Dom.On(_tagInput, "keydown", OnTagInputKey);
+        Dom.On(_tagInput, "change", _ => CommitTagInput());
 
         Dom.On(_tree, "click", OnTreeClick);
         Dom.On(_memberList, "click", OnMemberClick);
@@ -151,6 +161,8 @@ public sealed partial class BrowserPane : IToolPane, IToolPaneCommands
         _importButton.Hidden = tab != Tab.Assets;
         _addFolderButton.Hidden = tab != Tab.Events;
         _addButton.Hidden = tab == Tab.Assets;
+        ((HTMLElement)_tagFilter).Hidden = tab != Tab.Events;
+        if (tab != Tab.Events) _tagEditor.Hidden = true;
         Dom.SetText(_addButton, tab switch
         {
             Tab.Events => "+ Event",
@@ -180,13 +192,14 @@ public sealed partial class BrowserPane : IToolPane, IToolPaneCommands
         ClearChildren(_tree);
         switch (_tab)
         {
-            case Tab.Events: BuildEvents(); break;
+            case Tab.Events: BuildTagFilter(); BuildEvents(); break;
             case Tab.Assets: BuildAssets(); break;
             case Tab.Snapshots: BuildSnapshots(); break;
             case Tab.Parameters: BuildParameters(); break;
             case Tab.Banks: BuildBanks(); break;
         }
         ApplySelection();
+        if (_tab == Tab.Events) BuildTagEditor();
     }
 
     private static void ClearChildren(Element element)
@@ -215,7 +228,11 @@ public sealed partial class BrowserPane : IToolPane, IToolPaneCommands
         if (relevant) Rebuild();
     }
 
-    private void OnSelectionChanged() => ApplySelection();
+    private void OnSelectionChanged()
+    {
+        ApplySelection();
+        if (_tab == Tab.Events) BuildTagEditor();
+    }
 
     private void ApplySelection()
     {
@@ -337,7 +354,7 @@ public sealed partial class BrowserPane : IToolPane, IToolPaneCommands
         AudioProject project = _ctx.Project.Project;
         string text = _tab switch
         {
-            Tab.Events => project.Events.Count + " events",
+            Tab.Events => _tagQuery.Length > 0 ? CountTagged(project, _tagQuery) + " of " + project.Events.Count + " events tagged '" + _tagQuery + "'" : project.Events.Count + " events",
             Tab.Assets => (_assets.Files.Count) + " audio files · " + project.AssetLengths.Count + " lengths imported",
             Tab.Snapshots => project.Snapshots.Count + " snapshots",
             Tab.Parameters => project.GlobalParameters.Count + " global parameters",

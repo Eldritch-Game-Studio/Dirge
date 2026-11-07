@@ -14,13 +14,125 @@ public sealed partial class BrowserPane
     private void BuildEvents()
     {
         AudioProject project = _ctx!.Project.Project;
-        EventTreeNode root = EventTree.Build(project.Events, _emptyFolders, _query);
+        EventTreeNode root = EventTree.Build(project.Events, _emptyFolders, _query, _tagQuery);
         if (root.Children.Count == 0)
         {
-            AddEmptyRow(_query.Length > 0 ? "No events match" : "No events — right click or + Event");
+            AddEmptyRow(_query.Length > 0 || _tagQuery.Length > 0 ? "No events match" : "No events — right click or + Event");
             return;
         }
         BuildEventChildren(root, 0, project);
+    }
+
+    // ---- tags -----------------------------------------------------------------------------------------------------------
+
+    /// <summary>Chip row under the search box: one chip per distinct tag; the active one filters the tree, "All" clears.</summary>
+    private void BuildTagFilter()
+    {
+        AudioProject project = _ctx!.Project.Project;
+        ClearChildren(_tagFilter);
+        List<string> tags = EventTree.AllTags(project.Events);
+        if (_tagQuery.Length > 0 && !tags.Contains(_tagQuery)) _tagQuery = "";
+        if (tags.Count == 0) return;
+        HTMLElement all = Dom.Add(_tagFilter, "button", _tagQuery.Length == 0 ? "chip clear on" : "chip clear", "All");
+        all.SetAttribute("data-tag", "");
+        all.Title = "Show every event";
+        for (int i = 0; i < tags.Count; i++)
+        {
+            HTMLElement chip = Dom.Add(_tagFilter, "button", tags[i] == _tagQuery ? "chip on" : "chip", tags[i]);
+            chip.SetAttribute("data-tag", tags[i]);
+            chip.Title = "Show only events tagged '" + tags[i] + "'";
+        }
+    }
+
+    private void OnTagFilterClick(NecronomiDom.Dom.Event e)
+    {
+        if (Dom.Closest(e, ".chip") is not Element chip) return;
+        string tag = chip.GetAttribute("data-tag") ?? "";
+        SetTagFilter(tag == _tagQuery ? "" : tag);
+    }
+
+    /// <summary>Filters the Events tree to events carrying <paramref name="tag"/>; empty clears the filter.</summary>
+    public void SetTagFilter(string tag)
+    {
+        if (_tagQuery == tag) return;
+        _tagQuery = tag;
+        if (_tab == Tab.Events) Rebuild();
+    }
+
+    public string TagFilter => _tagQuery;
+
+    private static int CountTagged(AudioProject project, string tag)
+    {
+        int count = 0;
+        for (int i = 0; i < project.Events.Count; i++) if (project.Events[i].Tags.Contains(tag)) count++;
+        return count;
+    }
+
+    /// <summary>Footer editor for the selected event: a removable chip per tag plus an input that adds one on Enter.</summary>
+    private void BuildTagEditor()
+    {
+        if (_ctx is null) return;
+        AudioEvent? ev = _ctx.Selection.Kind == SelectionKind.Event ? FindEvent(_ctx.Project.Project, _ctx.Selection.Id) : null;
+        if (ev is null)
+        {
+            _tagEditor.Hidden = true;
+            return;
+        }
+        bool typing = _doc is not null && ReferenceEquals(_doc.FocusedElement, _tagInput);
+        _tagEditor.Hidden = false;
+        ClearChildren(_tagChips);
+        for (int i = 0; i < ev.Tags.Count; i++)
+        {
+            HTMLElement chip = Dom.Add(_tagChips, "button", "chip", ev.Tags[i] + " ×");
+            chip.SetAttribute("data-tag", ev.Tags[i]);
+            chip.Title = "Remove tag '" + ev.Tags[i] + "'";
+        }
+        if (!typing && _tagInput.Value.Length > 0) _tagInput.Value = "";
+    }
+
+    private void OnTagChipClick(NecronomiDom.Dom.Event e)
+    {
+        if (_ctx is null || _ctx.Selection.Kind != SelectionKind.Event || Dom.Closest(e, ".chip") is not Element chip) return;
+        string? tag = chip.GetAttribute("data-tag");
+        if (tag is not null) RemoveTag(_ctx.Selection.Id, tag);
+    }
+
+    private void OnTagInputKey(NecronomiDom.Dom.Event e)
+    {
+        if (e is not KeyboardEvent key) return;
+        if (key.Key == "Enter") { key.PreventDefault(); CommitTagInput(); }
+        else if (key.Key == "Escape") { key.PreventDefault(); key.StopPropagation(); _tagInput.Value = ""; }
+    }
+
+    private void CommitTagInput()
+    {
+        if (_ctx is null || _ctx.Selection.Kind != SelectionKind.Event) return;
+        string raw = _tagInput.Value;
+        if (raw.Trim().Length == 0) return;
+        _tagInput.Value = "";
+        AddTag(_ctx.Selection.Id, raw);
+    }
+
+    /// <summary>Adds a normalized tag once; a duplicate or empty tag is a no-op.</summary>
+    public void AddTag(DirgeId id, string raw)
+    {
+        if (_ctx is null) return;
+        string? tag = EventTree.NormalizeTag(raw);
+        AudioEvent? ev = FindEvent(_ctx.Project.Project, id);
+        if (tag is null || ev is null || ev.Tags.Contains(tag)) return;
+        _ctx.Project.Mutate("Add tag", ChangeScope.Events, () => { if (!ev.Tags.Contains(tag)) ev.Tags.Add(tag); }, () => ev.Tags.Remove(tag), id);
+    }
+
+    public void RemoveTag(DirgeId id, string tag)
+    {
+        if (_ctx is null) return;
+        AudioEvent? ev = FindEvent(_ctx.Project.Project, id);
+        if (ev is null) return;
+        int index = ev.Tags.IndexOf(tag);
+        if (index < 0) return;
+        _ctx.Project.Mutate("Remove tag", ChangeScope.Events,
+            () => ev.Tags.Remove(tag),
+            () => { if (!ev.Tags.Contains(tag)) ev.Tags.Insert(Math.Min(index, ev.Tags.Count), tag); }, id);
     }
 
     private void BuildEventChildren(EventTreeNode node, int depth, AudioProject project)
@@ -30,7 +142,7 @@ public sealed partial class BrowserPane
             EventTreeNode child = node.Children[i];
             if (child.IsFolder)
             {
-                bool collapsed = _query.Length == 0 && _collapsedEventFolders.Contains(child.FullPath);
+                bool collapsed = _query.Length == 0 && _tagQuery.Length == 0 && _collapsedEventFolders.Contains(child.FullPath);
                 HTMLElement row = AddRow(_tree, "folder", depth, child.Name, CountEvents(child) + "", collapsed ? "+" : "−");
                 row.SetAttribute("data-path", child.FullPath);
                 if (!collapsed) BuildEventChildren(child, depth + 1, project);

@@ -156,5 +156,43 @@ public sealed class MixerGraphOpsTests
         Assert.That(_project.Mixer.Buses[3], Is.SameAs(_ui));
     }
 
+    [Test]
+    public void RemoveEffect_ShiftsFaderBehindIt_AndRevertRestores()
+    {
+        _music.FaderIndex = 2; // [LowPass, Reverb, FADER, Compressor]
+        MixerGraphOps.EffectRemoval plan = MixerGraphOps.PlanRemoveEffect(_project, _music.Id, 0)!;
+        MixerGraphOps.ApplyRemoveEffect(_project, plan);
+        Assert.That(_music.FaderIndex, Is.EqualTo(1), "fader stays between Reverb and Compressor");
+        MixerGraphOps.RevertRemoveEffect(_project, plan);
+        Assert.That(_music.FaderIndex, Is.EqualTo(2));
+
+        plan = MixerGraphOps.PlanRemoveEffect(_project, _music.Id, 2)!;
+        MixerGraphOps.ApplyRemoveEffect(_project, plan);
+        Assert.That(_music.FaderIndex, Is.EqualTo(2), "removing a post-fader effect leaves the fader");
+        MixerGraphOps.RevertRemoveEffect(_project, plan);
+        Assert.That(_music.FaderIndex, Is.EqualTo(2));
+    }
+
+    [Test]
+    public void InsertEffect_ShiftsFaderAtOrAfterSlot_DefaultStaysAtEnd()
+    {
+        var added = new BusEffect { TypeName = "AudioEffectDelay" };
+        MixerGraphOps.InsertEffect(_project, _music.Id, added, 3);
+        Assert.That(_music.FaderIndex, Is.EqualTo(int.MaxValue), "default fader keeps 'after everything'");
+        MixerGraphOps.UninsertEffect(_project, _music.Id, added);
+
+        _music.FaderIndex = 1; // [LowPass, FADER, Reverb, Compressor]
+        MixerGraphOps.InsertEffect(_project, _music.Id, added, 1);
+        Assert.That(_music.FaderIndex, Is.EqualTo(2), "new effect lands pre-fader");
+        Assert.That(_music.Effects[1], Is.SameAs(added));
+        MixerGraphOps.UninsertEffect(_project, _music.Id, added);
+        Assert.That(_music.FaderIndex, Is.EqualTo(1));
+
+        MixerGraphOps.InsertEffect(_project, _music.Id, added, 2);
+        Assert.That(_music.FaderIndex, Is.EqualTo(1), "insert after the fader leaves it");
+        MixerGraphOps.UninsertEffect(_project, _music.Id, added);
+        Assert.That(_music.FaderIndex, Is.EqualTo(1));
+    }
+
     private SnapshotValue ValueFor(string parameter) => _snapshot.Values.Find(v => v.Target.Name == parameter)!;
 }

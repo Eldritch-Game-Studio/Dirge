@@ -9,6 +9,19 @@ main.browser { width: 100%; height: 100%; display: flex; flex-direction: column;
 #search { flex-grow: 1; flex-shrink: 1; min-width: 40px; width: 40px; }
 .tools button { flex-shrink: 0; font-size: 11px; }
 
+/* Tag chips: filter row under the search box; editor row in the Events footer. Chips are buttons toggled with .on. */
+.tag-filter { display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; column-gap: 4px; row-gap: 3px; flex-shrink: 0; padding: 3px 6px; background-color: var(--panel); border-bottom: 1px solid var(--border); }
+.chip { display: block; height: 18px; padding: 1px 7px; font-size: 11px; line-height: 14px; color: var(--muted); background-color: var(--panel-2); border: 1px solid var(--border); border-radius: 9px; text-wrap-mode: nowrap; cursor: pointer; }
+.chip:hover { color: var(--fg); border-color: var(--muted); }
+.chip.on { color: var(--accent-fg); background-color: var(--accent); border-color: var(--accent); }
+.chip.clear { color: var(--fg); background-color: transparent; border-color: var(--muted); }
+.tag-editor { display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; column-gap: 4px; row-gap: 3px; flex-shrink: 0; padding: 3px 6px; background-color: var(--panel); border-top: 1px solid var(--border); }
+.tag-label { color: var(--muted); font-size: 11px; flex-shrink: 0; }
+.tag-chips { display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; column-gap: 4px; row-gap: 3px; }
+.tag-chips .chip { color: var(--fg); }
+.tag-chips .chip:hover { color: var(--danger); border-color: var(--danger); }
+#tag-input { flex-grow: 1; flex-shrink: 1; min-width: 60px; width: 60px; height: 20px; padding: 1px 4px; }
+
 .tree { flex-grow: 1; flex-shrink: 1; min-height: 40px; overflow-y: auto; overflow-x: hidden; background-color: var(--bg); padding: 2px 0; }
 .members { flex-shrink: 0; height: 45%; display: flex; flex-direction: column; border-top: 1px solid var(--border); background-color: var(--panel); }
 .members-heading { color: var(--muted); font-size: 11px; padding: 3px 8px; border-bottom: 1px solid var(--border); flex-shrink: 0; overflow-x: hidden; overflow-y: hidden; text-wrap-mode: nowrap; text-overflow: ellipsis; }

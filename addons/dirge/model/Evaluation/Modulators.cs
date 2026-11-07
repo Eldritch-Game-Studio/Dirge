@@ -112,3 +112,32 @@ public struct LfoState
         }
     }
 }
+
+/// <summary>Pure autopitch evaluation: pitch ratio for a parameter value (see <see cref="AutopitchModulator"/>).</summary>
+public static class AutopitchMath
+{
+    /// <summary>
+    /// Piecewise-linear ratio through (min, PitchAtMinimum) → (reference, 1) → (max, PitchAtMaximum); <paramref name="value"/>
+    /// is clamped to [min, max]. A reference equal to an endpoint collapses that side to 1.
+    /// </summary>
+    public static float Ratio(AutopitchModulator modulator, float minimum, float maximum, float value)
+    {
+        float reference = Math.Clamp(modulator.ReferenceValue, Math.Min(minimum, maximum), Math.Max(minimum, maximum));
+        value = Math.Clamp(value, Math.Min(minimum, maximum), Math.Max(minimum, maximum));
+        if (value == reference) return 1f;
+        if (value < reference)
+        {
+            float span = reference - minimum;
+            return span <= 0f ? 1f : modulator.PitchAtMinimum + (1f - modulator.PitchAtMinimum) * ((value - minimum) / span);
+        }
+        else
+        {
+            float span = maximum - reference;
+            return span <= 0f ? 1f : 1f + (modulator.PitchAtMaximum - 1f) * ((value - reference) / span);
+        }
+    }
+
+    /// <summary>Ratio with <see cref="Modulator.Amount"/> applied to the deviation from 1.</summary>
+    public static float Evaluate(AutopitchModulator modulator, float minimum, float maximum, float value)
+        => 1f + modulator.Amount * (Ratio(modulator, minimum, maximum, value) - 1f);
+}

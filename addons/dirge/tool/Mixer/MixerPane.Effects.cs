@@ -10,29 +10,45 @@ namespace Dirge.Tool.Mixer;
 
 public sealed partial class MixerPane
 {
-    /// <summary>One row of a strip's effect chain.</summary>
+    /// <summary>One row of a strip's effect chain: an authored effect, or the bus fader marker (<see cref="IsFader"/>).</summary>
     private sealed class EffectRow
     {
-        public HTMLElement Root { get; }
-        public HTMLElement Enable { get; }
-        public HTMLElement Name { get; }
-        public HTMLElement Remove { get; }
-        public int Index { get; }
-        public DirgeId EffectId { get; }
+        public const string FaderTitle = "Bus fader. Effects above are pre-fader, effects below post-fader (the engine inserts an Amplify fader here). Drag to move.";
 
-        public EffectRow(Dom dom, HTMLElement list, BusEffect effect, int index, bool selected, bool scoped)
+        public HTMLElement Root { get; }
+        public HTMLElement? Enable { get; }
+        public HTMLElement Name { get; }
+        public HTMLElement? Remove { get; }
+        /// <summary>Authored effect index; -1 for the fader row.</summary>
+        public int Index { get; }
+        /// <summary>Display position in the chain list (effects and the fader share one sequence).</summary>
+        public int Slot { get; }
+        public DirgeId EffectId { get; }
+        public bool IsFader => Index < 0;
+
+        public EffectRow(Dom dom, HTMLElement list, BusEffect effect, int index, int slot, bool selected, bool scoped)
         {
-            Index = index; EffectId = effect.Id;
+            Index = index; Slot = slot; EffectId = effect.Id;
             Root = dom.El(list, "div", "fx-item");
-            Root.Dataset["index"] = index.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            Root.Dataset["slot"] = slot.ToString(System.Globalization.CultureInfo.InvariantCulture);
             if (selected) Root.ClassList.Add("selected");
             if (scoped) Root.ClassList.Add("scoped");
             Enable = dom.El(Root, "button", effect.Enabled ? "fx-en on" : "fx-en", "");
             Enable.Title = effect.Enabled ? "Disable effect" : "Enable effect";
-            Name = dom.El(Root, "div", effect.Enabled ? "fx-name" : "fx-name disabled", EffectCatalog.DisplayName(effect.TypeName));
+            Name = dom.El(Root, "div", effect.Enabled ? "fx-name" : "fx-name disabled", EffectCatalog.DisplayName(effect));
             Name.Title = effect.TypeName + " — click for parameters, drag to reorder";
             Remove = dom.El(Root, "button", "fx-x", "x");
             Remove.Title = "Remove effect";
+        }
+
+        /// <summary>Fader marker row.</summary>
+        public EffectRow(Dom dom, HTMLElement list, int slot)
+        {
+            Index = -1; Slot = slot; EffectId = DirgeId.None;
+            Root = dom.El(list, "div", "fx-item fx-fader");
+            Root.Dataset["slot"] = slot.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            Name = dom.El(Root, "div", "fx-name fx-fader-name", "FADER");
+            Name.Title = FaderTitle;
         }
     }
 
@@ -87,24 +103,34 @@ public sealed partial class MixerPane
         ClosePopover();
     }
 
+    /// <summary>Display slot of the bus fader in the chain list: 0..Effects.Count (Count = after every effect, the default).</summary>
+    private static int FaderSlot(Bus bus) => Math.Clamp(bus.FaderIndex, 0, bus.Effects.Count);
+
     private void RebuildEffectRows(BusStrip strip, Bus bus, Snapshot? editing, int selectedIndex)
     {
         Dom dom = _dom!;
         strip.FxList.TextContent = "";
         strip.Effects.Clear();
-        for (int i = 0; i < bus.Effects.Count; i++)
+        int faderSlot = FaderSlot(bus);
+        for (int slot = 0; slot <= bus.Effects.Count; slot++)
         {
+            if (slot == faderSlot)
+            {
+                var fader = new EffectRow(dom, strip.FxList, slot);
+                strip.Effects.Add(fader);
+                BindChainDrag(strip, fader);
+                continue;
+            }
+
+            int i = slot < faderSlot ? slot : slot - 1;
             BusEffect effect = bus.Effects[i];
             bool scoped = editing is not null && HasScopedParameter(editing, bus.Id, i);
-            var row = new EffectRow(dom, strip.FxList, effect, i, i == selectedIndex, scoped);
+            var row = new EffectRow(dom, strip.FxList, effect, i, slot, i == selectedIndex, scoped);
             strip.Effects.Add(row);
             int index = i;
-            dom.On(row.Enable, "click", e => { e.StopPropagation(); ToggleEffectEnabled(strip.Id, index); });
-            dom.On(row.Remove, "click", e => { e.StopPropagation(); RemoveEffect(strip.Id, index); });
-            dom.On(row.Name, "pointerdown", e => OnEffectPointerDown(strip, row, e));
-            dom.On(row.Name, "pointermove", e => OnEffectPointerMove(strip, row, e));
-            dom.On(row.Name, "pointerup", e => OnEffectPointerUp(strip, row, e));
-            dom.On(row.Name, "pointercancel", e => OnEffectPointerUp(strip, row, e));
+            dom.On(row.Enable!, "click", e => { e.StopPropagation(); ToggleEffectEnabled(strip.Id, index); });
+            dom.On(row.Remove!, "click", e => { e.StopPropagation(); RemoveEffect(strip.Id, index); });
+            BindChainDrag(strip, row);
             dom.On(row.Name, "click", e =>
             {
                 if (_suppressFxClick) { _suppressFxClick = false; return; }
@@ -112,6 +138,15 @@ public sealed partial class MixerPane
                 OpenPopover(strip.Id, index, e);
             });
         }
+    }
+
+    private void BindChainDrag(BusStrip strip, EffectRow row)
+    {
+        Dom dom = _dom!;
+        dom.On(row.Name, "pointerdown", e => OnEffectPointerDown(strip, row, e));
+        dom.On(row.Name, "pointermove", e => OnEffectPointerMove(strip, row, e));
+        dom.On(row.Name, "pointerup", e => OnEffectPointerUp(strip, row, e));
+        dom.On(row.Name, "pointercancel", e => OnEffectPointerUp(strip, row, e));
     }
 
     private static bool HasScopedParameter(Snapshot snapshot, DirgeId bus, int effectIndex)
@@ -147,30 +182,59 @@ public sealed partial class MixerPane
             () => MixerGraphOps.RevertRemoveEffect(project, plan), busId);
     }
 
-    private void AddEffect(DirgeId busId, string typeName)
+    private void AddEffect(DirgeId busId, string typeName) => AddEffect(busId, new BusEffect { TypeName = typeName }, "Add effect");
+
+    private void AddEffect(DirgeId busId, BusEffect effect, string label)
     {
         AudioProject project = Model;
         Bus? bus = MixerGraphOps.FindBus(project.Mixer, busId);
         if (bus is null) return;
-        var effect = new BusEffect { TypeName = typeName };
         int index = bus.Effects.Count;
-        Project.Mutate("Add effect", ChangeScope.Mixer,
+        Project.Mutate(label, ChangeScope.Mixer,
             () => { if (!bus.Effects.Contains(effect)) MixerGraphOps.InsertEffect(project, busId, effect, index); },
             () => MixerGraphOps.UninsertEffect(project, busId, effect), busId);
         Selection.Select(SelectionKind.Effect, effect.Id, busId, index);
     }
 
-    private void MoveEffect(DirgeId busId, int from, int to)
+    /// <summary>
+    /// Drop of chain row <paramref name="row"/> at display slot <paramref name="targetSlot"/> (position after the row is taken out).
+    /// An effect crossing the fader changes <see cref="Bus.FaderIndex"/> along with its order; dragging the fader row only moves the fader.
+    /// </summary>
+    private void MoveChainRow(DirgeId busId, EffectRow row, int targetSlot)
     {
         AudioProject project = Model;
         Bus? bus = MixerGraphOps.FindBus(project.Mixer, busId);
-        if (bus is null || from == to || from < 0 || to < 0 || from >= bus.Effects.Count || to >= bus.Effects.Count) return;
-        BusEffect effect = bus.Effects[from];
-        Project.Mutate("Reorder effects", ChangeScope.Mixer | ChangeScope.Snapshots,
-            () => MixerGraphOps.MoveEffect(project, busId, from, to),
-            () => MixerGraphOps.MoveEffect(project, busId, to, from), busId);
-        if (Selection.Kind == SelectionKind.Effect && Selection.Id == effect.Id) Selection.Select(SelectionKind.Effect, effect.Id, busId, to);
-        if (_popoverBus == busId && _popoverEffect == effect.Id) RefreshPopover(EditingSnapshot());
+        if (bus is null) return;
+        int count = bus.Effects.Count;
+        if (targetSlot < 0 || targetSlot > count || row.Slot < 0 || row.Slot > count || targetSlot == row.Slot) return;
+        int faderSlot = FaderSlot(bus);
+
+        // Chain as displayed: authored effect indices with -1 for the fader; then the list move.
+        var display = new List<int>(count + 1);
+        for (int slot = 0; slot <= count; slot++) display.Add(slot == faderSlot ? -1 : slot < faderSlot ? slot : slot - 1);
+        int moved = display[row.Slot];
+        display.RemoveAt(row.Slot);
+        display.Insert(targetSlot, moved);
+
+        int newFaderSlot = display.IndexOf(-1);
+        int from = moved, to = -1;
+        if (moved >= 0)
+        {
+            to = 0;
+            for (int s = 0; s < display.Count && display[s] != moved; s++) if (display[s] >= 0) to++;
+        }
+        bool reorder = moved >= 0 && from != to;
+        bool faderMoved = newFaderSlot != faderSlot;
+        if (!reorder && !faderMoved) return;
+        int oldFader = bus.FaderIndex;
+        int newFader = newFaderSlot >= count ? int.MaxValue : newFaderSlot;
+
+        Project.Mutate(moved >= 0 ? "Reorder effects" : "Move fader", ChangeScope.Mixer | (reorder ? ChangeScope.Snapshots : ChangeScope.None),
+            () => { if (reorder) MixerGraphOps.MoveEffect(project, busId, from, to); if (faderMoved) bus.FaderIndex = newFader; },
+            () => { if (faderMoved) bus.FaderIndex = oldFader; if (reorder) MixerGraphOps.MoveEffect(project, busId, to, from); }, busId);
+        if (!reorder) return;
+        if (Selection.Kind == SelectionKind.Effect && Selection.Id == row.EffectId) Selection.Select(SelectionKind.Effect, row.EffectId, busId, to);
+        if (_popoverBus == busId && _popoverEffect == row.EffectId) RefreshPopover(EditingSnapshot());
     }
 
     private void ShowAddEffectPopup(BusStrip strip, Event e)
@@ -178,13 +242,29 @@ public sealed partial class MixerPane
         _effectTypes.Clear();
         _effectTypes.AddRange(EffectCatalog.AvailableTypes());
         _popupItems.Clear();
+        (double x, double y) = PopupAnchor(strip.FxAdd, e);
+        _popupItems.Add(new Popup.Item("Ducking preset…", () => ShowDuckingSourcePicker(strip, x, y)));
         for (int i = 0; i < _effectTypes.Count; i++)
         {
             string type = _effectTypes[i];
             _popupItems.Add(new Popup.Item(EffectCatalog.DisplayName(type), () => AddEffect(strip.Id, type)));
         }
-        (double x, double y) = PopupAnchor(strip.FxAdd, e);
         _popup.Show("ADD EFFECT", _popupItems, x, y);
+    }
+
+    /// <summary>Second step of the ducking preset: pick the bus whose level keys the compressor (any bus but this one).</summary>
+    private void ShowDuckingSourcePicker(BusStrip strip, double x, double y)
+    {
+        MixerGraph mixer = Model.Mixer;
+        _popupItems.Clear();
+        for (int i = 0; i < mixer.Buses.Count; i++)
+        {
+            Bus source = mixer.Buses[i];
+            if (source.Id == strip.Id) continue;
+            string name = source.Name;
+            _popupItems.Add(new Popup.Item(name, () => AddEffect(strip.Id, EffectCatalog.DuckingPreset(name), "Add ducking")));
+        }
+        _popup.Show("DUCK FROM", _popupItems, x, y);
     }
 
     // ---- drag reorder ----------------------------------------------------------------------------------------------------
@@ -212,12 +292,12 @@ public sealed partial class MixerPane
         _dragFxTargetIndex = -1;
         HTMLElement? under = Dom.Closest(_dom!.HitTest(p.ClientX, p.ClientY), "fx-item");
         if (under is null || !ReferenceEquals(under.ParentNode, strip.FxList)) return;
-        string? text = under.Dataset["index"];
-        if (text is null || !int.TryParse(text, out int hoverIndex) || hoverIndex == row.Index) return;
+        string? text = under.Dataset["slot"];
+        if (text is null || !int.TryParse(text, out int hoverSlot) || hoverSlot == row.Slot) return;
         bool after = _dom.TryGetBounds(under, out Rect bounds) && p.ClientY > bounds.Y + bounds.Height / 2;
-        int target = after ? hoverIndex + 1 : hoverIndex;
-        if (target > row.Index) target--;
-        if (target == row.Index) return;
+        int target = after ? hoverSlot + 1 : hoverSlot;
+        if (target > row.Slot) target--;
+        if (target == row.Slot) return;
         _dragFxTargetIndex = target;
         Dom.SetClass(under, after ? "drop-after" : "drop-before", true);
     }
@@ -232,8 +312,8 @@ public sealed partial class MixerPane
         int target = _dragFxTargetIndex;
         _dragFxRow = null; _dragFxStrip = null; _dragFxActive = false; _dragFxTargetIndex = -1;
         if (!active) return;
-        _suppressFxClick = true;
-        if (target >= 0) MoveEffect(strip.Id, row.Index, target);
+        _suppressFxClick = !row.IsFader; // the fader row has no click handler to consume the flag
+        if (target >= 0) MoveChainRow(strip.Id, row, target);
     }
 
     private static void ClearEffectDropMarks(BusStrip strip)
@@ -304,7 +384,7 @@ public sealed partial class MixerPane
         var dom = new Dom(_dom!.Host);
         _popoverDom = dom;
         BusEffect effect = bus.Effects[index];
-        Dom.SetText(_popoverTitle, bus.Name + " / " + EffectCatalog.DisplayName(effect.TypeName) + (editing is not null ? "  [snapshot " + editing.Name + "]" : ""));
+        Dom.SetText(_popoverTitle, bus.Name + " / " + EffectCatalog.DisplayName(effect) + (editing is not null ? "  [snapshot " + editing.Name + "]" : ""));
 
         EffectParameter[] parameters = EffectCatalog.Parameters(effect.TypeName);
         if (parameters.Length == 0)

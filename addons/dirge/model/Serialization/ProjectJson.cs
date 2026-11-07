@@ -20,7 +20,7 @@ namespace Dirge.Serialization;
 /// Instrument:   ClipInstrument → Clip, MultiInstrument → Multi, ScattererInstrument → Scatterer,
 ///               SilenceInstrument → Silence, EventInstrument → Event, ProgrammerInstrument → Programmer,
 ///               CommandInstrument → Command, SnapshotInstrument → Snapshot
-/// Modulator:    RandomModulator → Random, AhdsrModulator → Ahdsr, LfoModulator → Lfo
+/// Modulator:    RandomModulator → Random, AhdsrModulator → Ahdsr, LfoModulator → Lfo, AutopitchModulator → Autopitch
 /// LogicMarker:  DestinationMarker → Destination, LoopRegion → Loop, TransitionMarker → Transition,
 ///               TransitionRegion → TransitionRegion (stripping "Region" would collide with TransitionMarker),
 ///               SustainPoint → SustainPoint (no suffix to strip), MagnetRegion → Magnet
@@ -138,7 +138,8 @@ public static class ProjectJson
             polymorphism = Polymorphism(
                 (typeof(RandomModulator), "Random"),
                 (typeof(AhdsrModulator), "Ahdsr"),
-                (typeof(LfoModulator), "Lfo"));
+                (typeof(LfoModulator), "Lfo"),
+                (typeof(AutopitchModulator), "Autopitch"));
         }
         else if (info.Type == typeof(LogicMarker))
         {

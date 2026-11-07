@@ -73,6 +73,35 @@ internal static class EffectCatalog
         return text.ToString();
     }
 
+    /// <summary>Chain-row name: a compressor keyed to another bus reads "Ducking (from Bus)"; everything else by type.</summary>
+    public static string DisplayName(Dirge.Project.BusEffect effect)
+    {
+        if (effect.TypeName == nameof(AudioEffectCompressor)
+            && effect.StringParameters.TryGetValue(DuckingSidechainParameter, out string? source) && source.Length > 0)
+        {
+            return "Ducking (from " + source + ")";
+        }
+        return DisplayName(effect.TypeName);
+    }
+
+    public const string DuckingSidechainParameter = "sidechain";
+
+    /// <summary>
+    /// Ducking template: a compressor on the target bus keyed from <paramref name="sourceBus"/> (engine
+    /// <c>AudioEffectCompressor.sidechain</c>) — threshold −24 dB, ratio 8:1, 20 ms attack, 250 ms release, no make-up gain.
+    /// </summary>
+    public static Dirge.Project.BusEffect DuckingPreset(string sourceBus)
+    {
+        var effect = new Dirge.Project.BusEffect { TypeName = nameof(AudioEffectCompressor) };
+        effect.Parameters["threshold"] = -24f;
+        effect.Parameters["ratio"] = 8f;
+        effect.Parameters["attack_us"] = 20000f;
+        effect.Parameters["release_ms"] = 250f;
+        effect.Parameters["gain"] = 0f;
+        effect.StringParameters[DuckingSidechainParameter] = sourceBus;
+        return effect;
+    }
+
     public static EffectParameter[] Parameters(string typeName)
     {
         if (Cache.TryGetValue(typeName, out EffectParameter[]? cached)) return cached;

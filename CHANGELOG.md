@@ -2,11 +2,9 @@
 
 All notable changes to Dirge. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
-Items marked `(pending integration)` describe sibling milestone slices that were still landing when this entry was written; the integrator removes the marker once each item is verified on `main`.
+## 1.0.0 — 2026-11-07
 
-## 1.0.0 — unreleased
-
-First release: adaptive-audio authoring and runtime for stock Godot 4.7.2 .NET, MIT licensed. Tool UI through NecronomiDOM ≥ 1.1.4; native effects are an optional GDExtension.
+First release: adaptive-audio authoring and runtime for stock Godot 4.7.2 .NET, MIT licensed. Tool UI through NecronomiDOM ≥ 1.1.4; native effects are an optional GDExtension built for Linux x64, Windows x64 and macOS. Verified on this release: `dotnet build Dirge.slnx` (0 errors), `dotnet test tests/Dirge.Model.Tests` (212 passed), `scripts/smoke.sh` (demo and sandbox PASS) and the native send/return test scene `native/tests/sendreturn.tscn`. Documentation: `README.md`, `docs/getting-started.md`, `docs/capabilities.md` (feature matrix with per-row status and runtime API reference), `THIRD_PARTY_NOTICES.md`.
 
 ### M1 — Model and driver
 
@@ -14,48 +12,68 @@ First release: adaptive-audio authoring and runtime for stock Godot 4.7.2 .NET, 
 - Instruments: Clip, Multi (random/sequential/shuffle, avoid-repeat, weights), Scatterer, Silence, Event (nested, depth limit 8), Programmer, Command, Snapshot. Instrument properties: volume, pitch, start offset, loop, fade in/out, cut mode, polyphony, trigger delay, playback percentage, conditions.
 - Parameters: continuous, discrete, labeled; local and global; seek speed (asymmetric) and hold; built-ins computed from listener and 3D attributes (distance, normalized distance, direction, elevation, cone angle, orientation, speed).
 - Evaluation: curves (linear, smooth, stepped), automation of any mixer or instrument property, modulators (random, AHDSR, LFO sine/square/triangle/saw/noise with tempo sync), snapshot blending by intensity with priority ordering and override mode, VCA summation.
-- Runtime core: `DirgeSystem`, `EventDescription`, `EventInstance` with FMOD-equivalent lifecycle (start, stop immediate/fade-out, key-off, pause, release), macros (priority, max instances, stealing oldest/quietest/furthest/virtualize/none, cooldown, persistent, min/max distance, doppler), global real-voice cap with virtualization, up to 8 weighted listeners, callbacks (started, stopped, marker, beat, sound played, virtualized, stolen).
+- `AutopitchModulator` (FMOD autopitch): pitch ratio follows a local or global parameter piecewise-linearly in ratio space through (Minimum, `PitchAtMinimum`), (`ReferenceValue`, 1) and (Maximum, `PitchAtMaximum`); `Amount` scales the deviation from 1. Event-pitch and instrument-pitch targets only; `$type: "Autopitch"`; `ProjectValidator` checks the parameter resolves, Minimum ≤ Reference ≤ Maximum and both pitches are > 0 (`autopitch-invalid`).
+- `AudioProject.MixerModulators`: LFO and Random modulators on mixer properties (bus volume/pitch, VCA volume, effect parameters) evaluated by `MixerState` every tick after automation — tremolo on a bus volume, auto-wobble on an effect parameter. Random offsets and Noise LFOs draw from the seeded system generator at construction; `MixerState.AddModulator`/`RemoveModulator` for live edits; validator rejects AHDSR/autopitch here (`mixer-modulator-invalid`).
+- Runtime core: `DirgeSystem`, `EventDescription`, `EventInstance` with FMOD-equivalent lifecycle (start, stop immediate/fade-out, key-off, pause, release), macros (priority, max instances, stealing oldest/quietest/furthest/virtualize/none, cooldown, persistent, min/max distance, rolloff, doppler), global real-voice cap with virtualization, up to 8 weighted listeners, callbacks (started, stopped, marker, beat, sound played, virtualized, stolen).
+- Spatial macros reach the engine: `EventMacros.Rolloff` (`Inverse`, `InverseSquare`, `Logarithmic`, `Disabled`; custom curve = `Disabled` + `Distance` automation) and `Doppler`/`DopplerScale` travel on `VoicePlay` and `AudioDriver` sets `attenuation_model`, `unit_size`, `max_distance` and `doppler_tracking` (physics step when doppler is on with a positive scale; Godot has no doppler scale, the magnitude is authored only) on every `AudioStreamPlayer3D`.
+- Pre/post-fader effects: `Bus.FaderIndex` (default `int.MaxValue` = after the whole chain, the engine's bus volume). A smaller index makes `AudioDriver` insert an `AudioEffectAmplify` fader at that engine slot, hold the bus volume at 0 dB and route `BusSetVolume` to the amplify; authored effect indices stay model-side (`AudioDriver.EngineEffectIndex`, `FaderOf`), bypass mirrors the fader volume onto the bus while active. `ProjectValidator` rejects negative indices (`bus-fader-index-negative`). The mixer pane shows a draggable `FADER` row in each effect chain; dragging it or dragging an effect across it updates `FaderIndex`.
 - Timeline: loop regions, transition markers and regions with beat/bar/marker quantization over the tempo map, sustain points, destination markers.
 - Deterministic command stream (`VoicePlay/Seek/Stop/SetVolume/SetPitch/Set3D`, `BusSetVolume/Mute/Solo`, `EffectSetParameter`) emitted per `Update(dt)` with change detection; seeded RNG; zero steady-state allocation.
 - `ProjectJson`: System.Text.Json text format (`*.dirge.json`) with deterministic key order and `$type` discriminators.
 - `ProjectValidator`: structural diagnostics with stable codes (master bus, routing, cycles, duplicate names, missing assets, dangling references, unreachable instruments, unassigned parameters).
-- Godot glue (`addons/dirge/runtime`): `DirgeServer` autoload, `AudioDriver` over `AudioServer` with a pooled `AudioStreamPlayer`/`AudioStreamPlayer3D` set, `AssetCatalog`, `DirgePlugin` editor plugin.
+- Godot glue (`addons/dirge/runtime`): `DirgeServer` autoload (project from `ProjectPath` or the `dirge/project_path` setting; handle-based GDScript surface), `AudioDriver` over `AudioServer` with a pooled `AudioStreamPlayer`/`AudioStreamPlayer3D` set, `AssetCatalog`, `DirgePlugin` editor plugin registering the autoloads and the Dirge main screen.
 - Demo project (`demo/`) with headless `--smoke` run; `scripts/smoke.sh`, `scripts/fetch-deps.sh`, `scripts/gen-demo-audio.py`.
 
 ### M2 — Mixer
 
-- Editor main screen "Dirge" with menu bar (New/Open/Save/Save As/Validate/Build Banks/Connect), left browser, center event editor, bottom Mixer/Profiler tabs, top transport, validation panel and status bar; shared dark theme; undo/redo, save, play/stop and delete routed to the focused pane. (pending integration)
-- Mixer pane: bus strips with faders, peak meters, mute/solo/bypass, routing picker, effect chain with per-effect parameter popovers, add/remove/reparent buses, VCAs, snapshot list and editor (scoped values, capture, intensity scrub, mode, priority). (pending integration)
-- Live value push for volume and effect parameters without system rebuild; structural changes rebuild the audition system (debounced). (pending integration)
-- In-game overlay (`DirgeOverlay`) mounting the same panes over a running game. (pending integration)
+- Editor main screen "Dirge" with menu bar (New/Open/Save/Save As/Validate/Build Banks/Connect), left browser, center event editor, bottom Mixer/Profiler tabs, top transport, validation panel and status bar; shared dark theme; undo/redo, save, play/stop and delete routed to the focused pane.
+- Mixer pane: bus strips with faders, peak meters, mute/solo/bypass, routing picker, effect chain with per-effect parameter popovers, add/remove/reparent buses, VCAs, snapshot list and editor (scoped values, capture, intensity scrub, mode, priority).
+- Ducking preset in the add-effect popup: pick a source bus and the chain gets an `AudioEffectCompressor` keyed from it (`sidechain` = source bus; threshold −24 dB, ratio 8:1, attack 20 ms, release 250 ms, gain 0), shown as "Ducking (from <bus>)".
+- Live value push for volume and effect parameters without system rebuild; structural changes rebuild the audition system (debounced).
+- Per-bus `LFO` button in the effect-section footer of every strip opens a popover listing the bus-volume LFOs (waveform picker, rate 0.05–20 Hz, depth 0–24 dB sliders with text fields, remove) with `+ LFO` adding a 4 Hz / 3 dB sine tremolo.
+- In-game overlay (`DirgeOverlay` autoload, debug builds, F9 / `dirge_overlay` action) mounting the Mixer and Profiler panes over a running game.
 
 ### M3 — Events
 
-- Event editor pane: header (path, bus, macros), timeline canvas with tracks, instrument blocks, markers, playhead, zoom/scroll, drag/resize, snap-to-grid, multi-select, copy/paste; parameter-sheet tabs; instrument inspector for all eight instrument types; automation lanes with curve editor; modulators; local parameters. (pending integration)
-- Browser pane: events tree by path (folders, rename, new, delete, drag), assets tree from `res://` audio files with length readout, snapshots/parameters/banks lists, search. (pending integration)
-- Transport pane: play/stop/stop-all, loop toggle, global and per-event parameter sliders, 3D preview panner driving the built-in parameters, voice/instance/ms readouts. (pending integration)
+- Event editor pane: header (path, bus, macros), timeline canvas with tracks, instrument blocks, markers, playhead, zoom/scroll, drag/resize, snap-to-grid, multi-select, copy/paste; parameter-sheet tabs; instrument inspector for all eight instrument types; automation lanes with curve editor; modulators; local parameters.
+- Modulator forms offer Random, AHDSR, LFO and Autopitch; the autopitch item has a parameter picker (locals then `G:` globals), reference value and pitch-at-minimum/maximum fields (seeded with the default parameter at its default value, 0.5×…2×).
+- Browser pane: events tree by path (folders, rename, new, delete, drag), assets tree from `res://` audio files with length readout, snapshots/parameters/banks lists, search, event tags (`AudioEvent.Tags`; filter chips under the search box, add/remove on the selected event in the Events footer).
+- Transport pane: play/stop/stop-all, loop toggle, global and per-event parameter sliders, 3D preview panner driving the built-in parameters, voice/instance/ms readouts.
 
 ### M4 — Music
 
-- Transition timelines: `TransitionMarker.TransitionLength` with transition-track instruments played between source and destination. (pending integration)
-- Quantized event start (`EventMacros.StartQuantization`) against the conductor event (`AudioEvent.IsConductor`). (pending integration)
-- Magnet regions snapping seeks to their position. (pending integration)
-- Sample-locked multi-layer starts through `AudioStreamSynchronized` for instruments sharing `Instrument.SyncGroup`; transitions stay on the model clock (no `AudioStreamInteractive`). (pending integration)
-- Parameter velocity (`EventInstance.GetParameterVelocity`). (pending integration)
+- Transition timelines: `TransitionMarker.TransitionLength` with transition-track instruments played between source and destination.
+- Quantized event start (`EventMacros.StartQuantization`) against the conductor event (`AudioEvent.IsConductor`).
+- Magnet regions snapping seeks to their position.
+- Sample-locked multi-layer starts through `AudioStreamSynchronized` for instruments sharing `Instrument.SyncGroup`; transitions stay on the model clock (no `AudioStreamInteractive`).
+- Parameter velocity (`EventInstance.GetParameterVelocity`).
 
-### M5 — Live (v1.0)
+### M5 — Live
 
-- Profiler pane: live instance list, voice counts, update-time graph, per-bus level bars, recording start/stop/save/load/replay. (pending integration)
-- `Dirge.Profiling`: `Recorder`, `RecordingJson`, `Replayer` with `Compare` returning the first divergent command — recordings double as deterministic test fixtures. (pending integration)
-- Live update over localhost TCP (newline-delimited JSON, protocol 1): stats and instance feeds, full project replace, live mixer value push, remote start/stop/parameter/snapshot; `--dirge-live[=port]`. (pending integration)
-- `Dirge.Metering.LoudnessMeter`: ITU-R BS.1770-4 momentary/short-term/integrated LUFS with gating and 4× oversampled true peak; runtime meter on Master via `AudioEffectCapture`. (pending integration)
-- Audio tables (key × locale → asset) resolved by the programmer instrument; `DirgeSystem.Locale`. (pending integration)
-- Per-platform mixer overrides applied as the authored baseline; project-level mixer automation from global parameters. (pending integration)
-- Banks: `LoadBank`/`UnloadBank`/`IsBankLoaded` preloading streams through threaded `ResourceLoader`. (pending integration)
-- 3D sandbox scene (`demo/sandbox`): ambience scatterer, two-layer adaptive music with beat-quantized Calm/Combat transition, ducking snapshot, two-locale programmer dialogue, UI click; headless smoke records, replays and compares a recording. (pending integration)
+- Profiler pane: live instance list, voice counts, update-time graph, per-bus level bars, recording start/stop/save/load/replay.
+- `Dirge.Profiling`: `Recorder`, `RecordingJson`, `Replayer` with `Compare` returning the first divergent command — recordings double as deterministic test fixtures.
+- Live update over localhost TCP (newline-delimited JSON, protocol 1, default port 7447): stats and instance feeds, full project replace (`DirgeServer.HotReload` keeps global parameter values, running snapshots and handles), live mixer value push, remote start/stop/parameter/snapshot; `--dirge-live[=port]` or `DirgeServer.LiveUpdatePort`; `--dirge-verbose` driver logging.
+- `Dirge.Metering.LoudnessMeter`: ITU-R BS.1770-4 momentary/short-term/integrated LUFS with gating and 4× oversampled true peak; runtime meter on Master via `AudioEffectCapture`.
+- Audio tables (key × locale → asset) resolved by the programmer instrument; `DirgeSystem.Locale`.
+- Per-platform mixer overrides applied as the authored baseline; project-level mixer automation from global parameters.
+- Banks: `LoadBank`/`UnloadBank`/`IsBankLoaded` preloading streams through threaded `ResourceLoader`.
+- GDScript signal bridge on `DirgeServer` for handle-based instances: `EventStarted`, `EventStopped`, `TimelineMarker`, `TimelineBeat`, `SoundPlayed`, `EventVirtualized`, `EventUnvirtualized`, `EventStolen`, `ProgrammerSound` (answered synchronously with `SetProgrammerSound(handle, assetPath)`); `SetCallbackMask(handle, mask)` narrows a handle's traffic.
+- 3D sandbox scene (`demo/sandbox`): ambience scatterer, two-layer adaptive music with beat-quantized Calm/Combat transition, ducking snapshot, two-locale programmer dialogue, UI click; headless smoke records, replays and compares a recording.
 - `tools/dirge-validate` CLI: `dotnet run --project tools/dirge-validate -- file.dirge.json [--json]`; exit 1 on errors, 2 on parse failure.
 - CI: unit tests, demo validation, stock-Godot headless smoke, native builds for Linux/Windows/macOS and the addon ZIP (`scripts/package.sh`, `scripts/ci-local.sh` for act).
 
-### M6 — Native (v1.1 preview)
+### M6 — Native
 
-- Optional GDExtension (`native/`, godot-cpp pinned to 4.7.2): `DirgeAudioEffectSend`/`DirgeAudioEffectReturn` pre/post-fader sends into return buses and `DirgeAudioEffectConvolutionReverb` (partitioned FFT). Registered through `addons/dirge/dirge_native.gdextension`; binaries under `addons/dirge/bin/<platform>/`. The mixer pane exposes sends and returns when the classes are present. (pending integration)
+- Optional GDExtension (`native/`, godot-cpp `10.0.0-stable` against engine API 4.7): `DirgeAudioEffectSend`/`DirgeAudioEffectReturn` pre/post-fader sends into return buses and `DirgeAudioEffectConvolutionReverb` (partitioned FFT). Registered through `addons/dirge/dirge_native.gdextension`; binaries under `addons/dirge/bin/<platform>/`. The mixer pane exposes sends and returns when the classes are present.
+
+### Fixed — integrated editor proof
+
+- `DirgeServer`: `--dirge-live[=port]`/`LiveUpdatePort` binds when the server loads a project, so the plugin's idle autoload no longer takes the port from a scene-local server (previously the scene server failed with `AlreadyInUse` and the editor connected to an empty server).
+- Profiler "Game" source shares the shell's live connection instead of opening a second socket; the game keeps one editor connection, so the second socket used to drop the shell's and silently stop mixer pushes.
+- `EditorAudition`: while Dirge owns the engine bus layout the editor's Audio Buses dock stops polling `AudioServer.is_edited()`, which otherwise saved the audition layout to `res://default_bus_layout.tres` and `audio/buses/default_bus_layout`; restoring the editor layout now also emits `bus_layout_changed` so the dock drops stale strips (no per-frame "Index p_bus out of bounds" errors after disabling the plugin).
+
+### Known gaps (see `docs/capabilities.md`)
+
+- `SoundStopped` has no GDScript signal (C# `EventInstance.Callback` only); no instance `SetProperty`.
+- Transitions run on the model clock (`AudioStreamInteractive` not used); playlists are `MultiInstrument` modes; no plugin/generator instrument; no sidechain modulator (P2).
+- Send/return requires the native extension (no degraded fallback); tool UI is English only. FMOD's doppler scale magnitude and its linear / linear-squared / inverse-tapered rolloff shapes have no engine equivalent (use `Disabled` + `Distance` automation).

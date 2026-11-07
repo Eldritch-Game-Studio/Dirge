@@ -37,12 +37,15 @@ public static class DiagnosticCodes
     public const string TempoBpmInvalid = "tempo-bpm-invalid";
     public const string VcaRefMissing = "vca-ref-missing";
     public const string EffectTypeNameEmpty = "effect-type-name-empty";
+    public const string BusFaderIndexNegative = "bus-fader-index-negative";
     public const string AudioTableEmptyLocales = "audio-table-empty-locales";
     public const string DuplicateAudioTableName = "duplicate-audio-table-name";
     public const string PlatformOverrideTargetMissing = "platform-override-target-missing";
     public const string PlatformOverrideEmpty = "platform-override-empty";
     public const string MixerAutomationInvalid = "mixer-automation-invalid";
     public const string TransitionInstrumentInvalid = "transition-instrument-invalid";
+    public const string MixerModulatorInvalid = "mixer-modulator-invalid";
+    public const string AutopitchInvalid = "autopitch-invalid";
 }
 
 /// <summary>Structural checks over an <see cref="AudioProject"/>. Pure; safe to run on every edit in the tool and in CI.</summary>
@@ -57,6 +60,7 @@ public static class ProjectValidator
         ValidateSnapshots(context);
         ValidatePlatformOverrides(context);
         ValidateMixerAutomation(context);
+        ValidateMixerModulators(context);
         ValidateAudioTables(context);
         ValidateEvents(context);
         ValidateEventInstrumentCycles(context);
@@ -150,6 +154,9 @@ public static class ProjectValidator
                 if (!c.Vcas.ContainsKey(vca))
                     c.Error(DiagnosticCodes.VcaRefMissing, bus.Id, $"Bus \"{bus.Name}\" references a VCA that does not exist.");
 
+            if (bus.FaderIndex < 0)
+                c.Error(DiagnosticCodes.BusFaderIndexNegative, bus.Id, $"Bus \"{bus.Name}\" has a negative FaderIndex; use 0 (all effects post-fader) or larger.");
+
             foreach (BusEffect effect in bus.Effects)
                 if (string.IsNullOrWhiteSpace(effect.TypeName))
                     c.Error(DiagnosticCodes.EffectTypeNameEmpty, effect.Id, $"An effect on bus \"{bus.Name}\" has no TypeName.");
@@ -202,6 +209,16 @@ public static class ProjectValidator
             c.Error(DiagnosticCodes.ParameterRefMissing, subject, $"{where} references a parameter that is neither local to \"{scope.Path}\" nor global.");
     }
 
+    private static ParameterDefinition? FindParameter(Context c, AudioEvent? scope, DirgeId parameter)
+    {
+        if (scope is not null)
+            foreach (ParameterDefinition p in scope.LocalParameters)
+                if (p.Id == parameter) return p;
+        foreach (ParameterDefinition p in c.Project.GlobalParameters)
+            if (p.Id == parameter) return p;
+        return null;
+    }
+
     // ---- snapshots ---------------------------------------------------------------------------------------------
 
     private static void ValidateSnapshots(Context c)
@@ -233,6 +250,18 @@ public static class ProjectValidator
             if (!c.GlobalParameters.Contains(lane.Parameter))
                 c.Error(DiagnosticCodes.MixerAutomationInvalid, lane.Id, "Mixer automation lane must be driven by a global parameter.");
             ValidateCurve(c, lane.Curve, lane.Id, "Mixer automation lane");
+        }
+    }
+
+    /// <summary>Mixer modulators are LFO or Random on an existing mixer property; AHDSR/autopitch need an instance lifetime or parameter scope.</summary>
+    private static void ValidateMixerModulators(Context c)
+    {
+        foreach (Modulator m in c.Project.MixerModulators)
+        {
+            if (m is not (LfoModulator or RandomModulator))
+                c.Error(DiagnosticCodes.MixerModulatorInvalid, m.Id, $"Mixer modulator of type {m.GetType().Name} is not allowed; only LFO and Random modulators can drive mixer properties.");
+            if (!c.MixerTargetExists(m.Target))
+                c.Error(DiagnosticCodes.MixerModulatorInvalid, m.Id, $"Mixer modulator targets a {m.Target.Kind} property whose owner does not exist (only mixer properties can be modulated here).");
         }
     }
 
@@ -274,6 +303,7 @@ public static class ProjectValidator
                 RequireParameter(c, ev, lane.Parameter, lane.Id, "Automation lane");
                 ValidateCurve(c, lane.Curve, lane.Id, $"Automation lane in \"{ev.Path}\"");
             }
+            ValidateModulators(c, ev, ev.Modulators, PropertyKind.EventPitch, $"Event modulator in \"{ev.Path}\"");
 
             foreach (LogicMarker marker in ev.Markers) ValidateMarker(c, ev, marker);
 
@@ -297,6 +327,24 @@ public static class ProjectValidator
                 c.Error(DiagnosticCodes.CurveUnsorted, subject, $"{where} has curve points out of X order (point {i}: {points[i].X} after {points[i - 1].X}).");
                 break;
             }
+        }
+    }
+
+    /// <summary>Autopitch: driving parameter resolves, Minimum ≤ Reference ≤ Maximum, both pitch endpoints &gt; 0, target is the scope's pitch.</summary>
+    private static void ValidateModulators(Context c, AudioEvent ev, List<Modulator> modulators, PropertyKind pitchKind, string where)
+    {
+        foreach (Modulator m in modulators)
+        {
+            if (m is not AutopitchModulator autopitch) continue;
+            if (autopitch.Target.Kind != pitchKind)
+                c.Error(DiagnosticCodes.AutopitchInvalid, m.Id, $"{where}: autopitch must target {pitchKind}, not {autopitch.Target.Kind}.");
+            ParameterDefinition? p = FindParameter(c, ev, autopitch.Parameter);
+            if (p is null)
+                c.Error(DiagnosticCodes.ParameterRefMissing, m.Id, $"{where} (autopitch) references a parameter that is neither local to \"{ev.Path}\" nor global.");
+            else if (!(p.Minimum <= autopitch.ReferenceValue && autopitch.ReferenceValue <= p.Maximum))
+                c.Error(DiagnosticCodes.AutopitchInvalid, m.Id, $"{where}: autopitch reference {autopitch.ReferenceValue} lies outside parameter \"{p.Name}\" range [{p.Minimum}, {p.Maximum}].");
+            if (!(autopitch.PitchAtMinimum > 0f) || !(autopitch.PitchAtMaximum > 0f))
+                c.Error(DiagnosticCodes.AutopitchInvalid, m.Id, $"{where}: autopitch pitch ratios must be > 0 (minimum {autopitch.PitchAtMinimum}, maximum {autopitch.PitchAtMaximum}).");
         }
     }
 
@@ -364,6 +412,7 @@ public static class ProjectValidator
             RequireParameter(c, ev, instrument.Placement.Parameter, instrument.Id, $"{where} (parameter sheet)");
         foreach (TriggerCondition condition in instrument.Conditions)
             RequireParameter(c, ev, condition.Parameter, instrument.Id, $"{where} (condition)");
+        ValidateModulators(c, ev, instrument.Modulators, PropertyKind.InstrumentPitch, where);
 
         switch (instrument)
         {

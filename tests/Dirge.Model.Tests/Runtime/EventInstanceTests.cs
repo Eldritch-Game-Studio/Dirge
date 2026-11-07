@@ -501,6 +501,52 @@ public sealed class EventInstanceTests
     }
 
     [Test]
+    public void SpatialVoicePlay_CarriesRolloffAndDopplerMacros()
+    {
+        var b = new ProjectBuilder();
+        AudioEvent ev = b.AddEvent("Test/Rolloff");
+        ev.Macros.Is3D = true;
+        ev.Macros.MinDistance = 3f;
+        ev.Macros.MaxDistance = 60f;
+        ev.Macros.Rolloff = Rolloff.InverseSquare;
+        ev.Macros.Doppler = true;
+        ev.Macros.DopplerScale = 0.5f;
+        b.AddClip(b.AddTrack(ev), "res://a.wav", 0f, 1f);
+
+        var h = new Harness(b.Build());
+        h.Create("Test/Rolloff").Start();
+        h.Step(0.1);
+        List<VoicePlay> plays = h.All<VoicePlay>();
+        Assert.That(plays, Has.Count.EqualTo(1));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(plays[0].Spatial, Is.True);
+            Assert.That(plays[0].MinDistance, Is.EqualTo(3f));
+            Assert.That(plays[0].MaxDistance, Is.EqualTo(60f));
+            Assert.That(plays[0].Rolloff, Is.EqualTo(Rolloff.InverseSquare));
+            Assert.That(plays[0].Doppler, Is.True);
+            Assert.That(plays[0].DopplerScale, Is.EqualTo(0.5f));
+        }
+    }
+
+    [Test]
+    public void VoicePlay_DefaultsToInverseRolloffWithoutDoppler()
+    {
+        var b = new ProjectBuilder();
+        AudioEvent ev = b.AddEvent("Test/Plain");
+        b.AddClip(b.AddTrack(ev), "res://a.wav", 0f, 1f);
+
+        var h = new Harness(b.Build());
+        h.Create("Test/Plain").Start();
+        h.Step(0.1);
+        List<VoicePlay> plays = h.All<VoicePlay>();
+        Assert.That(plays, Has.Count.EqualTo(1));
+        Assert.That(plays[0].Rolloff, Is.EqualTo(Rolloff.Inverse));
+        Assert.That(plays[0].Doppler, Is.False);
+        Assert.That(plays[0].DopplerScale, Is.EqualTo(1f));
+    }
+
+    [Test]
     public void SameSeed_ProducesIdenticalCommandSequence()
     {
         static AudioProject Build()

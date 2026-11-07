@@ -4,6 +4,12 @@ namespace Dirge.Project;
 
 public enum StealingMode { Oldest, Quietest, Furthest, Virtualize, None }
 
+/// <summary>
+/// Distance attenuation model of a 3D event's voices (engine <c>AudioStreamPlayer3D.attenuation_model</c>). FMOD's custom
+/// rolloff curve = <see cref="Disabled"/> plus a volume automation driven by the built-in <c>Distance</c> parameter.
+/// </summary>
+public enum Rolloff { Inverse, InverseSquare, Logarithmic, Disabled }
+
 public sealed class EventMacros
 {
     public float VolumeDb { get; set; }
@@ -18,9 +24,17 @@ public sealed class EventMacros
     /// <summary>Instance stays alive after its timeline ends until Stop is called.</summary>
     public bool Persistent { get; set; }
     public bool Is3D { get; set; }
+    /// <summary>Distance (engine <c>unit_size</c>) under which no attenuation is applied.</summary>
     public float MinDistance { get; set; } = 1f;
+    /// <summary>Distance (engine <c>max_distance</c>) beyond which the voice is silent; 0 = never.</summary>
     public float MaxDistance { get; set; } = 20f;
+    public Rolloff Rolloff { get; set; } = Rolloff.Inverse;
+    /// <summary>Pitch-shift voices by emitter/listener velocity (engine <c>doppler_tracking</c> = physics step).</summary>
     public bool Doppler { get; set; }
+    /// <summary>
+    /// FMOD doppler scale. The engine has no equivalent: doppler is on when <see cref="Doppler"/> is set and the scale is
+    /// &gt; 0, off otherwise; the magnitude is authored for parity but not applied.
+    /// </summary>
     public float DopplerScale { get; set; } = 1f;
     /// <summary>
     /// Seconds the scheduler is allowed to look ahead when quantizing starts. With <see cref="StartQuantization"/> set, a grid
@@ -46,6 +60,8 @@ public sealed class AudioEvent
     /// playhead define the grid that <see cref="EventMacros.StartQuantization"/> starts of other events wait for.
     /// </summary>
     public bool IsConductor { get; set; }
+    /// <summary>Free-form browser tags ("ambient", "ui"); case-sensitive, order preserved, no duplicates.</summary>
+    public List<string> Tags { get; } = new();
     public EventMacros Macros { get; set; } = new();
     public List<ParameterDefinition> LocalParameters { get; } = new();
     public List<Track> Tracks { get; } = new();

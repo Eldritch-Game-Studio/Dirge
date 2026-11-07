@@ -8,7 +8,7 @@ namespace Dirge.Runtime;
 
 internal enum InstrumentKind { Clip, Multi, Scatterer, Silence, Event, Programmer, Command, Snapshot }
 
-internal enum ModKind { Random, Ahdsr, Lfo }
+internal enum ModKind { Random, Ahdsr, Lfo, Autopitch }
 
 /// <summary>A modulator resolved to its kind and whether it drives volume (dB) or pitch (ratio).</summary>
 internal readonly struct ModInfo
@@ -31,6 +31,8 @@ internal struct ModRuntime
     public float Random;
     public AhdsrState Ahdsr;
     public LfoState Lfo;
+    /// <summary>Autopitch: the driving parameter resolved against the owning instance (local, then global); null = unmodulated.</summary>
+    public ParameterState? Parameter;
 }
 
 /// <summary>
@@ -38,6 +40,7 @@ internal struct ModRuntime
 /// Volume contributions are dB added to the chain; pitch contributions are ratios multiplied into it.
 /// Random: ±Amount. LFO: Amount × waveform. AHDSR: Amount × (level − 1), i.e. <c>Amount</c> is the depth below the
 /// authored value at level 0 so a release fades towards silence (80 dB) rather than towards full volume.
+/// Autopitch (pitch only): Amount × (<see cref="AutopitchMath.Ratio"/> − 1).
 /// </summary>
 internal static class ModEval
 {
@@ -58,6 +61,7 @@ internal static class ModEval
                 case RandomModulator: kind = ModKind.Random; break;
                 case AhdsrModulator: kind = ModKind.Ahdsr; break;
                 case LfoModulator: kind = ModKind.Lfo; break;
+                case AutopitchModulator when t.Kind == pitchKind: kind = ModKind.Autopitch; break;
                 default: continue;
             }
             list.Add(new ModInfo(m, kind, t.Kind == volumeKind));
@@ -76,6 +80,14 @@ internal static class ModEval
             list.Add(lane);
         }
         return list.ToArray();
+    }
+
+    /// <summary>Resolve autopitch parameters once per instance; the binding survives pooled reuse of the instance.</summary>
+    public static void BindParameters(ModInfo[] infos, ModRuntime[] runtime, EventInstance instance)
+    {
+        for (int i = 0; i < infos.Length; i++)
+            if (infos[i].Kind == ModKind.Autopitch)
+                runtime[i].Parameter = instance.ResolveParameter(((AutopitchModulator)infos[i].Modulator).Parameter);
     }
 
     public static void Init(ModInfo[] infos, ModRuntime[] runtime, DirgeRandom random)
@@ -125,6 +137,14 @@ internal static class ModEval
                     if (lfo.TempoSync && bpm > 0f) rate = rate <= 0f ? 0f : bpm / 60f / rate;
                     float wave = dt > 0 ? runtime[i].Lfo.Advance(dt, rate) : runtime[i].Lfo.Current;
                     contribution = amount * wave;
+                    break;
+                }
+                case ModKind.Autopitch:
+                {
+                    ParameterState? p = runtime[i].Parameter;
+                    if (p is null) { contribution = 0f; break; }
+                    ParameterDefinition d = p.Definition;
+                    contribution = amount * (AutopitchMath.Ratio((AutopitchModulator)info.Modulator, d.Minimum, d.Maximum, p.Value) - 1f);
                     break;
                 }
                 default:
@@ -340,6 +360,7 @@ internal sealed class InstrumentState
         _instance = instance;
         _system = system;
         _mods = new ModRuntime[info.Modulators.Length];
+        ModEval.BindParameters(info.Modulators, _mods, instance);
         _volumeLaneParams = new ParameterState?[info.VolumeLanes.Length];
         _pitchLaneParams = new ParameterState?[info.PitchLanes.Length];
         for (int i = 0; i < info.VolumeLanes.Length; i++) _volumeLaneParams[i] = instance.ResolveParameter(info.VolumeLanes[i].Parameter);
@@ -854,7 +875,8 @@ internal sealed class InstrumentState
             anyReal = true;
             if (v.WantsPlay)
             {
-                commands.Add(new VoicePlay(v.Id, v.Asset, v.Bus, v.Position, v.Loop, v.VolumeDb, v.Pitch, v.Spatial, v.Attributes, v.MinDistance, v.MaxDistance, Info.Instrument.SyncGroup));
+                EventMacros macros = _instance.Description.Event.Macros;
+                commands.Add(new VoicePlay(v.Id, v.Asset, v.Bus, v.Position, v.Loop, v.VolumeDb, v.Pitch, v.Spatial, v.Attributes, v.MinDistance, v.MaxDistance, Info.Instrument.SyncGroup, macros.Rolloff, macros.Doppler, macros.DopplerScale));
                 v.WantsPlay = false;
                 v.HasPlayed = true;
                 v.LastVolumeDb = v.VolumeDb;

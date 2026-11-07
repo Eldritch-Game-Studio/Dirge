@@ -2,6 +2,12 @@
 
 All notable changes to Dirge. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
+## 1.0.1 — 2026-11-07
+
+### Fixed
+- Timeline instruments whose region is shorter than one update tick (short one-shots under a long frame) were silently dropped; they now fire once and play their natural length.
+- Export builds: editor-only API uses in the tool (`EditorInterface`, `EditorFileDialog`) are guarded with `TOOLS`; the in-game overlay keeps the runtime `FileDialog` path and scale 1.
+
 ## 1.0.0 — 2026-11-07
 
 First release: adaptive-audio authoring and runtime for stock Godot 4.7.2 .NET, MIT licensed. Tool UI through NecronomiDOM ≥ 1.1.4; native effects are an optional GDExtension built for Linux x64, Windows x64 and macOS. Verified on this release: `dotnet build Dirge.slnx` (0 errors), `dotnet test tests/Dirge.Model.Tests` (257 passed), `scripts/smoke.sh` (demo and sandbox PASS) and the native send/return test scene `native/tests/sendreturn.tscn`. Documentation: `README.md`, `docs/getting-started.md`, `docs/capabilities.md` (feature matrix with per-row status and runtime API reference), `THIRD_PARTY_NOTICES.md`.

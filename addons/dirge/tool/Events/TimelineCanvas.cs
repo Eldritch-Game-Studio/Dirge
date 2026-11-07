@@ -103,7 +103,9 @@ public sealed partial class TimelineCanvas : Control
 
     private static float EditorScale()
     {
+#if TOOLS
         if (Engine.IsEditorHint() && EditorInterface.Singleton is { } editor) return (float)editor.GetEditorScale();
+#endif
         return 1f;
     }
 

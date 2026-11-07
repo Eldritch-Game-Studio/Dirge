@@ -20,6 +20,7 @@ internal sealed class AssetPicker
         _pending = picked;
         if (_dialog is null)
         {
+#if TOOLS
             if (Engine.IsEditorHint())
             {
                 var editorDialog = new EditorFileDialog { FileMode = EditorFileDialog.FileModeEnum.OpenFile, Access = EditorFileDialog.AccessEnum.Resources, Filters = Filters, Title = "Pick audio asset" };
@@ -27,6 +28,7 @@ internal sealed class AssetPicker
                 _dialog = editorDialog;
             }
             else
+#endif
             {
                 var dialog = new FileDialog { FileMode = FileDialog.FileModeEnum.OpenFile, Access = FileDialog.AccessEnum.Resources, Filters = Filters, Title = "Pick audio asset" };
                 dialog.FileSelected += OnFile;
@@ -36,8 +38,11 @@ internal sealed class AssetPicker
         }
         if (current.Length > 0)
         {
+#if TOOLS
             if (_dialog is EditorFileDialog e) e.CurrentPath = current;
-            else if (_dialog is FileDialog f) f.CurrentPath = current;
+            else
+#endif
+            if (_dialog is FileDialog f) f.CurrentPath = current;
         }
         _dialog.PopupCenteredRatio(0.6f);
     }

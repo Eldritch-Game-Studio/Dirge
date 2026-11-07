@@ -10,3 +10,11 @@ TestResults/
 
 # Dependency installed by scripts/fetch-deps.sh (NecronomiDOM release ZIP); not vendored.
 /addons/necronomidom/
+
+# Native GDExtension binaries built by native/build.sh.
+/addons/dirge/bin/
+/native/.sconsign.dblite
+/native/src/*.os
+/native/src/*.obj
+/proof/
+/proof-*/

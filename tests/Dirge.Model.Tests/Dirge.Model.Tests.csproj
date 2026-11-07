@@ -16,4 +16,11 @@
   <ItemGroup>
     <ProjectReference Include="../../addons/dirge/model/Dirge.Model.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- Godot-free logic of the tool's Browser/Transport panes, tested here without the engine. -->
+    <Compile Include="../../addons/dirge/tool/Browser/EventTree.cs" Link="Tool/EventTree.cs" />
+    <Compile Include="../../addons/dirge/tool/Browser/EventCloner.cs" Link="Tool/EventCloner.cs" />
+    <Compile Include="../../addons/dirge/tool/Transport/PreviewMath.cs" Link="Tool/PreviewMath.cs" />
+    <Compile Include="../../addons/dirge/tool/Mixer/MixerGraphOps.cs" Link="Tool/MixerGraphOps.cs" />
+  </ItemGroup>
 </Project>

@@ -1,0 +1,38 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Dirge · Transport</title>
+    <link rel="stylesheet" href="theme.css">
+    <link rel="stylesheet" href="transport.css">
+</head>
+<body>
+<main class="transport">
+    <div class="bar">
+        <button id="play" type="button" class="primary">Play</button>
+        <button id="stop" type="button">Stop</button>
+        <button id="stop-all" type="button">Stop All</button>
+        <button id="loop" type="button" class="toggle">Loop</button>
+        <p id="event-name" class="event-name">No event selected</p>
+        <div class="readouts">
+            <p class="readout"><span class="ro-label">Instances </span><span id="ro-instances">0</span></p>
+            <p class="readout"><span class="ro-label">Voices </span><span id="ro-voices">0</span></p>
+            <p class="readout"><span class="ro-label">Update </span><span id="ro-ms">0.00 ms</span></p>
+        </div>
+    </div>
+    <div class="columns">
+        <section class="params" aria-label="Parameters">
+            <p class="heading">Global parameters</p>
+            <div id="global-params" class="param-list"></div>
+            <p class="heading" id="local-heading">Event parameters</p>
+            <div id="local-params" class="param-list"></div>
+        </section>
+        <section class="instances" aria-label="Running instances">
+            <p class="heading">Instances</p>
+            <div id="instance-list" class="instance-list"></div>
+        </section>
+    </div>
+    <div id="dd-popup" class="dd-popup" hidden></div>
+</main>
+</body>
+</html>

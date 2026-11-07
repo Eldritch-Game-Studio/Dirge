@@ -1,0 +1,135 @@
+/* Dirge tool theme — shared by every pane document. Dark, dense, FMOD-Studio-like.
+   Stay inside the NecronomiDOM profile (addons/necronomidom/core/Css/Data/runtime-capabilities.json):
+   flex/absolute layout only, solid borders, background-color, no shadows/grid/z-index. */
+:root {
+    --bg: #1b1d21;
+    --panel: #24272c;
+    --panel-2: #2c3036;
+    --fg: #d8dbe0;
+    --muted: #8a9099;
+    --accent: #e8a33d;
+    --accent-fg: #1b1d21;
+    --border: #3a3f47;
+    --selection: #3b4b63;
+    --hover: #30353c;
+    --danger: #e0584f;
+    --warning: #e3b341;
+    --meter-bg: #15171a;
+    --meter-low: #4caf50;
+    --meter-mid: #e3b341;
+    --meter-high: #e0584f;
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --radius: 3px;
+    --row-h: 22px;
+    --font-size: 12px;
+    --font-size-small: 11px;
+    --font: "Noto Sans";
+}
+html, body, main, section, div, p, span, a, button, input, textarea, img {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+html, body, main, section, div, p, button, input, textarea {
+    display: block;
+    font-family: "Noto Sans";
+    font-size: 12px;
+    line-height: 16px;
+    color: var(--fg);
+    font-weight: normal;
+}
+html { width: 100%; height: 100%; background-color: var(--bg); }
+body { width: 100%; height: 100%; overflow: hidden; background-color: var(--bg); }
+[hidden] { display: none !important; }
+
+/* Layout helpers */
+.row { display: flex; flex-direction: row; align-items: center; column-gap: var(--space-1); }
+.col { display: flex; flex-direction: column; row-gap: var(--space-1); }
+.grow { flex-grow: 1; flex-shrink: 1; min-width: 0; }
+.panel { background-color: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--space-2); }
+.toolbar { display: flex; flex-direction: row; align-items: center; column-gap: var(--space-1); height: 28px; padding: 0 var(--space-2); background-color: var(--panel); border-bottom: 1px solid var(--border); }
+.toolbar .sep { width: 1px; height: 16px; background-color: var(--border); margin: 0 var(--space-1); }
+
+/* Text */
+.label { color: var(--muted); font-size: 11px; line-height: 14px; text-wrap-mode: nowrap; }
+.value { color: var(--fg); font-size: 12px; text-wrap-mode: nowrap; }
+.muted { color: var(--muted); }
+.accent { color: var(--accent); }
+.danger { color: var(--danger); }
+.warning { color: var(--warning); }
+.small { font-size: 11px; line-height: 14px; }
+.ellipsis { overflow-x: hidden; overflow-y: hidden; text-wrap-mode: nowrap; text-overflow: ellipsis; }
+
+/* Buttons */
+.btn, button {
+    appearance: none;
+    display: block;
+    height: 22px;
+    padding: 2px 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background-color: var(--panel-2);
+    color: var(--fg);
+    font-size: 12px;
+    line-height: 16px;
+    text-align: center;
+    text-wrap-mode: nowrap;
+    cursor: pointer;
+}
+.btn:hover, button:hover { background-color: var(--hover); border-color: var(--muted); }
+.btn:active, button:active { background-color: var(--selection); }
+.btn:focus-visible, button:focus-visible, input:focus, textarea:focus { outline: 1px solid var(--accent); outline-offset: 0px; }
+.btn:disabled, button:disabled, .btn.disabled { color: var(--muted); background-color: var(--panel); border-color: var(--border); cursor: default; }
+.btn.primary, button.primary { background-color: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.btn.primary:hover, button.primary:hover { background-color: #f0b355; }
+.btn.flat, button.flat { background-color: var(--panel); border-color: var(--panel); }
+.btn.flat:hover, button.flat:hover { background-color: var(--hover); border-color: var(--hover); }
+.btn.toggle.active, button.toggle.active { background-color: var(--selection); border-color: var(--accent); color: var(--accent); }
+
+/* Inputs */
+input, textarea {
+    appearance: none;
+    height: 22px;
+    padding: 2px 6px;
+    background-color: var(--meter-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--fg);
+    caret-color: var(--accent);
+}
+textarea { height: auto; min-height: 44px; }
+
+/* Lists */
+.list { display: flex; flex-direction: column; overflow-y: auto; overflow-x: hidden; background-color: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); }
+.list-item { display: flex; flex-direction: row; align-items: center; column-gap: var(--space-2); height: var(--row-h); padding: 0 var(--space-2); cursor: pointer; text-wrap-mode: nowrap; }
+.list-item:hover { background-color: var(--hover); }
+.list-item.selected, .selected { background-color: var(--selection); }
+
+/* Faders and meters: divs driven from C# via pointer events; the fill is an absolutely positioned child. */
+.fader { position: relative; width: 14px; height: 120px; background-color: var(--meter-bg); border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; }
+.fader .fill { position: absolute; left: 0; right: 0; bottom: 0; height: 50%; background-color: var(--accent); }
+.fader .handle { position: absolute; left: -3px; right: -3px; height: 6px; bottom: 50%; background-color: var(--fg); border-radius: 2px; }
+.meter { position: relative; width: 6px; height: 120px; background-color: var(--meter-bg); border: 1px solid var(--border); overflow-x: hidden; overflow-y: hidden; }
+.meter .fill { position: absolute; left: 0; right: 0; bottom: 0; height: 0%; background-color: var(--meter-low); }
+.meter .fill.mid { background-color: var(--meter-mid); }
+.meter .fill.high { background-color: var(--meter-high); }
+.meter.horizontal { width: 100%; height: 6px; }
+.meter.horizontal .fill { left: 0; top: 0; bottom: 0; right: auto; width: 0%; height: auto; }
+
+/* Popups: absolutely positioned div menus toggled with [hidden]. */
+.popup { position: absolute; display: flex; flex-direction: column; min-width: 140px; padding: var(--space-1) 0; background-color: var(--panel-2); border: 1px solid var(--border); border-radius: var(--radius); }
+.popup .item { display: block; height: var(--row-h); padding: 3px var(--space-3); text-align: left; text-wrap-mode: nowrap; background-color: var(--panel-2); border: 1px solid var(--panel-2); border-radius: 0; }
+.popup .item:hover { background-color: var(--selection); border-color: var(--selection); }
+
+/* Tabs */
+.tabs { display: flex; flex-direction: row; align-items: flex-end; column-gap: 2px; border-bottom: 1px solid var(--border); padding: 0 var(--space-1); }
+.tab { display: block; height: 24px; padding: 4px var(--space-3); color: var(--muted); background-color: var(--panel); border: 1px solid var(--border); border-bottom-width: 0; border-top-left-radius: var(--radius); border-top-right-radius: var(--radius); cursor: pointer; text-wrap-mode: nowrap; }
+.tab:hover { color: var(--fg); background-color: var(--hover); }
+.tab.active { color: var(--fg); background-color: var(--panel-2); border-color: var(--accent); }
+
+/* Status chips */
+.badge { display: block; height: 16px; padding: 0 6px; font-size: 11px; line-height: 14px; border: 1px solid var(--border); border-radius: 8px; color: var(--muted); text-wrap-mode: nowrap; }
+.badge.error { color: var(--danger); border-color: var(--danger); }
+.badge.warning { color: var(--warning); border-color: var(--warning); }

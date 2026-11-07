@@ -1,0 +1,42 @@
+/* Dirge transport pane: play/stop, loop, parameter sliders, running instances. Base reset, colors and buttons come from theme.css. */
+main.transport { position: relative; width: 100%; height: 100%; display: flex; flex-direction: column; background-color: var(--bg); }
+
+.bar { display: flex; flex-direction: row; flex-shrink: 0; align-items: center; column-gap: 6px; height: 34px; padding: 0 8px; border-bottom: 1px solid var(--border); background-color: var(--panel); }
+.bar button { flex-shrink: 0; padding-left: 12px; padding-right: 12px; }
+.bar button.toggle.on { background-color: var(--selection); border-color: var(--accent); color: var(--accent); }
+.event-name { flex-grow: 1; flex-shrink: 1; min-width: 40px; padding-left: 6px; overflow-x: hidden; overflow-y: hidden; text-wrap-mode: nowrap; text-overflow: ellipsis; color: var(--fg); }
+.event-name.none { color: var(--muted); }
+.readouts { display: flex; flex-direction: row; flex-shrink: 0; column-gap: 12px; }
+.readout { font-size: 11px; text-wrap-mode: nowrap; }
+.ro-label { color: var(--muted); }
+
+.columns { display: flex; flex-direction: row; flex-grow: 1; flex-shrink: 1; min-height: 0; }
+.params { width: 58%; flex-shrink: 0; display: flex; flex-direction: column; overflow-y: auto; overflow-x: hidden; border-right: 1px solid var(--border); }
+.instances { flex-grow: 1; flex-shrink: 1; min-width: 0; display: flex; flex-direction: column; overflow-y: auto; overflow-x: hidden; }
+.heading { flex-shrink: 0; height: 20px; padding: 2px 8px; font-size: 11px; line-height: 14px; color: var(--muted); background-color: var(--panel); border-bottom: 1px solid var(--border); overflow-x: hidden; overflow-y: hidden; text-wrap-mode: nowrap; text-overflow: ellipsis; }
+.param-list, .instance-list { flex-shrink: 0; padding: 2px 0; }
+
+.param { display: flex; flex-direction: row; align-items: center; height: var(--row-h); column-gap: 6px; padding: 0 8px; }
+.param:hover { background-color: var(--hover); }
+.param .name { width: 34%; flex-shrink: 0; overflow-x: hidden; overflow-y: hidden; text-wrap-mode: nowrap; text-overflow: ellipsis; }
+.param .name.builtin { color: var(--muted); }
+.slider { flex-grow: 1; flex-shrink: 1; min-width: 40px; height: 12px; padding: 0; border: 1px solid var(--border); border-radius: 2px; background-color: var(--meter-bg); cursor: pointer; }
+.slider .fill { height: 10px; width: 0%; background-color: var(--accent); border-radius: 1px; }
+.slider.readonly { cursor: default; }
+.slider.readonly .fill { background-color: var(--muted); }
+.param .pval { width: 56px; flex-shrink: 0; text-align: right; font-size: 11px; color: var(--fg); text-wrap-mode: nowrap; }
+.param .dd { flex-grow: 1; flex-shrink: 1; min-width: 40px; height: 20px; padding: 1px 8px; text-align: left; font-size: 11px; overflow-x: hidden; overflow-y: hidden; text-overflow: ellipsis; }
+.empty { padding: 2px 8px; color: var(--muted); font-size: 11px; text-wrap-mode: nowrap; }
+
+.inst { display: flex; flex-direction: row; align-items: center; height: var(--row-h); column-gap: 6px; padding: 0 8px; }
+.inst:hover { background-color: var(--hover); }
+.inst .iname { flex-grow: 1; flex-shrink: 1; min-width: 20px; overflow-x: hidden; overflow-y: hidden; text-wrap-mode: nowrap; text-overflow: ellipsis; }
+.inst .istate { width: 76px; flex-shrink: 0; color: var(--muted); font-size: 11px; text-wrap-mode: nowrap; overflow-x: hidden; overflow-y: hidden; text-overflow: ellipsis; }
+.inst .istate.playing { color: var(--meter-low); }
+.inst .ipos { width: 44px; flex-shrink: 0; text-align: right; font-size: 11px; text-wrap-mode: nowrap; }
+.inst .istop { flex-shrink: 0; height: 18px; padding: 0 8px; font-size: 11px; line-height: 14px; }
+
+.dd-popup { position: absolute; left: 0; top: 0; min-width: 120px; display: flex; flex-direction: column; border: 1px solid var(--accent); border-radius: var(--radius); background-color: var(--panel-2); padding: 2px 0; }
+.dd-popup button { text-align: left; height: 20px; padding: 2px 10px; border-style: none; border-radius: 0; background-color: var(--panel-2); font-size: 11px; line-height: 14px; }
+.dd-popup button:hover { background-color: var(--selection); }
+.dd-popup button.current { color: var(--accent); }

@@ -1,0 +1,49 @@
+#!/usr/bin/env python
+# Dirge native GDExtension build.
+#
+#   scons platform=linux target=template_debug|template_release [arch=x86_64]
+#
+# godot-cpp (submodule, pinned in README.md) targets the Godot 4.7 extension API.
+# Owned sources compile with -Wall -Wextra -Werror; godot-cpp headers are system
+# includes so their warnings never fail the build.
+import os
+
+env = SConscript("godot-cpp/SConstruct", {"api_version": "4.7"})
+
+own = env.Clone()
+
+# Move godot-cpp include directories from -I to -isystem (or /external:I on MSVC).
+godot_cpp_includes = [d for d in own["CPPPATH"] if "godot-cpp" in str(env.Dir(d).srcnode().abspath)]
+own["CPPPATH"] = [d for d in own["CPPPATH"] if d not in godot_cpp_includes] + ["src"]
+if own.get("is_msvc", False):
+    own.Append(CCFLAGS=["/W4", "/WX", "/external:W0"])
+    for d in godot_cpp_includes:
+        own.Append(CCFLAGS=["/external:I", env.Dir(d).srcnode().abspath])
+else:
+    own.Append(CCFLAGS=["-Wall", "-Wextra", "-Werror"])
+    for d in godot_cpp_includes:
+        own.Append(CCFLAGS=["-isystem", env.Dir(d).srcnode().abspath])
+
+sources = Glob("src/*.cpp")
+
+out_dir = os.path.join("..", "addons", "dirge", "bin")
+if own["platform"] == "macos":
+    library = own.SharedLibrary(
+        os.path.join(
+            out_dir,
+            "macos",
+            "libdirge_native.{}.{}.framework".format(own["platform"], own["target"]),
+            "libdirge_native.{}.{}".format(own["platform"], own["target"]),
+        ),
+        source=sources,
+    )
+else:
+    platform_dir = {"linux": "linux", "windows": "windows"}.get(own["platform"], own["platform"])
+    arch_dir = {"x86_64": "x64", "arm64": "arm64", "x86_32": "x86"}.get(own["arch"], own["arch"])
+    library = own.SharedLibrary(
+        os.path.join(out_dir, "{}-{}".format(platform_dir, arch_dir), "libdirge_native{}{}".format(own["suffix"], own["SHLIBSUFFIX"])),
+        source=sources,
+    )
+
+own.NoCache(library)
+Default(library)

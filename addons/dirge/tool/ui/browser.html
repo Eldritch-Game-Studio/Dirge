@@ -1,0 +1,33 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Dirge · Browser</title>
+    <link rel="stylesheet" href="theme.css">
+    <link rel="stylesheet" href="browser.css">
+</head>
+<body>
+<main class="browser">
+    <div class="tabs" role="tablist">
+        <button id="tab-events" class="tab active" type="button">Events</button>
+        <button id="tab-assets" class="tab" type="button">Assets</button>
+        <button id="tab-snapshots" class="tab" type="button">Snapshots</button>
+        <button id="tab-parameters" class="tab" type="button">Parameters</button>
+        <button id="tab-banks" class="tab" type="button">Banks</button>
+    </div>
+    <div class="tools">
+        <p class="search-label">Search</p>
+        <input id="search" type="text" aria-label="Search" value="">
+        <button id="add" type="button">+ Event</button>
+        <button id="add-folder" type="button">+ Folder</button>
+        <button id="import-lengths" type="button" hidden>Import lengths</button>
+    </div>
+    <div id="tree" class="tree" aria-label="Browser tree"></div>
+    <div id="members" class="members" hidden>
+        <p class="members-heading">Events in bank</p>
+        <div id="member-list" class="member-list"></div>
+    </div>
+    <p id="status" class="status"></p>
+</main>
+</body>
+</html>

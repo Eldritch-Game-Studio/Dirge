@@ -197,7 +197,7 @@ public sealed class ProjectJsonTests
     {
         string json = ProjectJson.Serialize(FullProject(), indented: false);
         // Object keys: id, then name/path, then the rest ordinally sorted.
-        Assert.That(json, Does.StartWith("{\"name\":\"Full\",\"assetLengths\":{\"res://a.ogg\":4,\"res://child.ogg\":1.5},\"banks\":["));
+        Assert.That(json, Does.StartWith("{\"name\":\"Full\",\"assetLengths\":{\"res://a.ogg\":4,\"res://child.ogg\":1.5},\"audioTables\":[],\"banks\":["));
         Assert.That(json, Does.Contain("\"id\":\"00000001000000000000000000000000\",\"name\":\"Master\",\"bypassEffects\":false,\"effects\":[],\"maxVoices\":0,\"mute\":false,\"parent\":\"00000000000000000000000000000000\",\"solo\":false,\"vcas\":[],\"volumeDb\":0}"));
         // Dictionary keys sorted regardless of insertion order.
         Assert.That(json, Does.Contain("\"parameters\":{\"ratio\":4,\"threshold\":-12}"));

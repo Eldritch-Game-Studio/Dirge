@@ -24,6 +24,12 @@ internal readonly struct TimelinePoint
 /// One instance's playhead. Advances in segments between logic points so loops, quantized transitions, sustain points
 /// and beats are processed in order within a tick; the owning <see cref="EventInstance"/> is told about every segment
 /// and jump so instruments can trigger, cut or re-seek.
+/// <para>
+/// A transition with <c>TransitionLength</c> &gt; 0 runs a transition timeline: <see cref="Position"/> freezes at the point
+/// the transition fired, the instance is told to cut the source instruments and run the transition instruments on a local
+/// clock (<see cref="TransitionElapsed"/>), and once the clock reaches the length the destination is entered as a normal jump.
+/// Beats are not reported while the transition clock runs; a seek cancels it.
+/// </para>
 /// </summary>
 internal sealed class Timeline
 {
@@ -36,11 +42,18 @@ internal sealed class Timeline
     public double Position;
     /// <summary>Held at a <see cref="SustainPoint"/> until <see cref="KeyOff"/>.</summary>
     public bool Holding;
+    /// <summary>Marker whose transition timeline is running, or null.</summary>
+    public LogicMarker? Transition;
+    /// <summary>Seconds elapsed on the running transition timeline.</summary>
+    public double TransitionElapsed;
 
+    private double _transitionLength;
+    private double _transitionDestination;
     private bool _inclusive;
     private bool _pendingJump;
     private double _pendingJumpAt;
     private double _pendingJumpTo;
+    private TransitionMarker? _pendingJumpMarker;
     private TransitionRegion? _armed;
     private double _armedAt;
     private double _lastBeat;
@@ -53,15 +66,24 @@ internal sealed class Timeline
         _description = description;
     }
 
-    /// <summary>Place the playhead without evaluating anything (stopped instances, seeks applied at the next update).</summary>
+    /// <summary>
+    /// Place the playhead without evaluating anything (stopped instances, seeks applied at the next update). Magnet regions
+    /// snap the target; a running transition timeline is cancelled (its instruments are cut by the instance).
+    /// </summary>
     public void Reset(double position)
     {
-        Position = position;
+        if (Transition is not null)
+        {
+            LogicMarker marker = Transition;
+            Transition = null;
+            _instance.OnTransitionEnd(marker);
+        }
+        Position = _description.Magnetize(position);
         Holding = false;
         _inclusive = true;
         _pendingJump = false;
         _armed = null;
-        _lastBeat = position;
+        _lastBeat = Position;
         _beatInclusive = true;
         _jumps = 0;
     }
@@ -91,32 +113,55 @@ internal sealed class Timeline
         int guard = 0;
         while (remaining > 0 && guard++ < 4096)
         {
+            if (Transition is not null)
+            {
+                double left = _transitionLength - TransitionElapsed;
+                double step = Math.Min(remaining, left);
+                double from = TransitionElapsed;
+                TransitionElapsed += step;
+                remaining -= step;
+                _instance.OnTransitionSegment(Transition, from, TransitionElapsed);
+                if (TransitionElapsed < _transitionLength - Epsilon) return;
+                LogicMarker marker = Transition;
+                Transition = null;
+                _instance.OnTransitionEnd(marker);
+                Jump(_transitionDestination);
+                if (Holding) return;
+                continue;
+            }
             double target = Position + remaining;
             int pi = NextPointIndex(points, Position, _inclusive);
             double next = pi >= 0 ? points[pi].Position : double.PositiveInfinity;
             int kind = 0; // 0 = logic point, 1 = pending quantized jump, 2 = armed transition region check
             if (_pendingJump && _pendingJumpAt <= next) { next = _pendingJumpAt; kind = 1; }
             if (_armed is not null && _armedAt <= next) { next = _armedAt; kind = 2; }
-            if (next > target)
+            // Snap onto a point within epsilon of the tick end: accumulated dt rounding must not leave the playhead a
+            // hair short of a loop end, which the next (exclusive) search would then skip.
+            if (next > target + Epsilon)
             {
-                MoveTo(target);
+                MoveTo(target, false);
                 return;
             }
             bool arrivedByJump = _inclusive && next <= Position + Epsilon;
+            bool pointsHere = pi >= 0 && points[pi].Position <= next + Epsilon;
+            bool loopingHere = !arrivedByJump && pointsHere && LoopFiresAt(points, pi, next);
             remaining -= Math.Max(0, next - Position);
-            MoveTo(next);
+            MoveTo(next, loopingHere);
+            bool transitioned = false;
             switch (kind)
             {
                 case 1:
                     _pendingJump = false;
-                    Jump(_pendingJumpTo);
+                    BeginTransition(_pendingJumpMarker!, _pendingJumpTo, _pendingJumpMarker!.TransitionLength);
+                    transitioned = true;
                     break;
                 case 2:
                 {
                     TransitionRegion region = _armed!;
                     if (_instance.MarkerPasses(region) && _description.TryGetMarkerPosition(region.Destination, out double dest))
                     {
-                        Jump(dest);
+                        BeginTransition(region, dest, region.TransitionLength);
+                        transitioned = true;
                     }
                     else if (!_description.NextGrid(Position, region.Quantization, false, out _armedAt))
                     {
@@ -124,13 +169,49 @@ internal sealed class Timeline
                     }
                     break;
                 }
-                default:
-                    for (int j = pi; j < points.Length && points[j].Position <= next + Epsilon; j++)
-                        if (HandlePoint(points[j], arrivedByJump)) break;
-                    break;
+            }
+            // Logic points sharing the position of a quantization check still run when the check did not jump away.
+            if (!transitioned && pointsHere)
+            {
+                for (int j = pi; j < points.Length && points[j].Position <= next + Epsilon; j++)
+                    if (HandlePoint(points[j], arrivedByJump)) break;
             }
             if (Holding) return;
         }
+    }
+
+    /// <summary>
+    /// True when a <see cref="LoopRegion"/> end at the points' position will certainly fire (conditions pass, no probability
+    /// roll): the segment ending there is then reported with (start, end] region semantics so instruments ending exactly at
+    /// the loop end stay active and get re-seeked by the jump instead of being cut and restarted. No RNG is consumed.
+    /// </summary>
+    private bool LoopFiresAt(TimelinePoint[] points, int first, double position)
+    {
+        for (int j = first; j < points.Length && points[j].Position <= position + Epsilon; j++)
+        {
+            if (points[j].Kind != PointKind.LoopEnd) continue;
+            LogicMarker loop = points[j].Marker;
+            if (loop.Probability >= 1f && _instance.ConditionsPass(loop.Conditions)) return true;
+        }
+        return false;
+    }
+
+    /// <summary>A transition fired: jump now, or start its transition timeline when it has a length.</summary>
+    private void BeginTransition(LogicMarker marker, double destination, float length)
+    {
+        if (length <= 0f)
+        {
+            Jump(destination);
+            return;
+        }
+        if (++_jumps > MaxJumpsPerTick) return;
+        Transition = marker;
+        TransitionElapsed = 0;
+        _transitionLength = length;
+        _transitionDestination = destination;
+        _pendingJump = false;
+        _armed = null;
+        _instance.OnTransitionBegin(marker);
     }
 
     private static int NextPointIndex(TimelinePoint[] points, double position, bool inclusive)
@@ -143,14 +224,14 @@ internal sealed class Timeline
         return -1;
     }
 
-    private void MoveTo(double position)
+    private void MoveTo(double position, bool loopingHere)
     {
         double from = Position;
         bool inclusive = _inclusive;
         Position = position;
         _inclusive = false;
         ProcessBeats(position);
-        _instance.OnTimelineSegment(from, position, inclusive);
+        _instance.OnTimelineSegment(from, position, inclusive, loopingHere);
     }
 
     private void ProcessBeats(double upTo)
@@ -181,12 +262,13 @@ internal sealed class Timeline
                         if (!_description.TryGetMarkerPosition(transition.Destination, out double dest)) return false;
                         if (transition.Quantization == Quantization.None || !_description.NextGrid(Position, transition.Quantization, true, out double at) || at <= Position + Epsilon)
                         {
-                            Jump(dest);
+                            BeginTransition(transition, dest, transition.TransitionLength);
                             return true;
                         }
                         _pendingJump = true;
                         _pendingJumpAt = at;
                         _pendingJumpTo = dest;
+                        _pendingJumpMarker = transition;
                         return false;
                     case SustainPoint sustain:
                         if (!_instance.MarkerPasses(sustain)) return false;
@@ -219,7 +301,7 @@ internal sealed class Timeline
         {
             if (_instance.MarkerPasses(region) && _description.TryGetMarkerPosition(region.Destination, out double dest))
             {
-                Jump(dest);
+                BeginTransition(region, dest, region.TransitionLength);
                 return true;
             }
             return false;

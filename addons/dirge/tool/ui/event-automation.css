@@ -1,0 +1,5 @@
+/* Automation lanes and modulators list. */
+#event-automation .lane-pick { text-align: left; min-width: 140px; }
+#event-automation .lane-pick.on { border-color: var(--accent, #e8a33d); color: var(--accent, #e8a33d); }
+#event-automation .item.grid .row { width: 190px; }
+#event-automation .item.grid .row .label { width: 70px; }

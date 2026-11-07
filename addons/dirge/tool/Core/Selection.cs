@@ -4,7 +4,7 @@ using Dirge.Project;
 
 namespace Dirge.Tool.Core;
 
-public enum SelectionKind { None, Event, Instrument, Track, Marker, Bus, Effect, Vca, Snapshot, Parameter, Asset }
+public enum SelectionKind { None, Event, Instrument, Track, Marker, Bus, Effect, Vca, Snapshot, Parameter, Asset, Bank }
 
 /// <summary>Tool-wide selection. One primary selection; panes react to <see cref="Changed"/>.</summary>
 public sealed class Selection

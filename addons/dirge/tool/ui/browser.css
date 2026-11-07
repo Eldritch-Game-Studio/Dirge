@@ -1,0 +1,44 @@
+/* Dirge browser pane: events / assets / snapshots / parameters / banks. Base reset, colors and buttons come from theme.css. */
+main.browser { width: 100%; height: 100%; display: flex; flex-direction: column; background-color: var(--bg); }
+
+.tabs { flex-shrink: 0; background-color: var(--panel); padding-top: 2px; }
+.tabs .tab { flex-grow: 1; flex-shrink: 1; min-width: 0; padding-left: 4px; padding-right: 4px; text-align: center; overflow-x: hidden; overflow-y: hidden; text-overflow: ellipsis; }
+
+.tools { display: flex; flex-direction: row; align-items: center; column-gap: 4px; flex-shrink: 0; height: 30px; padding: 0 6px; background-color: var(--panel); border-bottom: 1px solid var(--border); }
+.search-label { color: var(--muted); font-size: 11px; flex-shrink: 0; }
+#search { flex-grow: 1; flex-shrink: 1; min-width: 40px; width: 40px; }
+.tools button { flex-shrink: 0; font-size: 11px; }
+
+.tree { flex-grow: 1; flex-shrink: 1; min-height: 40px; overflow-y: auto; overflow-x: hidden; background-color: var(--bg); padding: 2px 0; }
+.members { flex-shrink: 0; height: 45%; display: flex; flex-direction: column; border-top: 1px solid var(--border); background-color: var(--panel); }
+.members-heading { color: var(--muted); font-size: 11px; padding: 3px 8px; border-bottom: 1px solid var(--border); flex-shrink: 0; overflow-x: hidden; overflow-y: hidden; text-wrap-mode: nowrap; text-overflow: ellipsis; }
+.member-list { flex-grow: 1; flex-shrink: 1; overflow-y: auto; overflow-x: hidden; padding: 2px 0; }
+
+.node { display: flex; flex-direction: row; align-items: center; height: var(--row-h); padding-right: 6px; column-gap: 4px; cursor: pointer; border: 1px solid transparent; border-left-width: 0; border-right-width: 0; }
+.node:hover { background-color: var(--hover); }
+.node.selected { background-color: var(--selection); }
+.node.drop-target { border-color: var(--accent); background-color: var(--hover); }
+.node.empty { cursor: default; }
+.node.empty:hover { background-color: transparent; }
+.node.empty .name { color: var(--muted); }
+
+.d0 { padding-left: 6px; } .d1 { padding-left: 20px; } .d2 { padding-left: 34px; } .d3 { padding-left: 48px; }
+.d4 { padding-left: 62px; } .d5 { padding-left: 76px; } .d6 { padding-left: 90px; } .d7 { padding-left: 104px; } .d8 { padding-left: 118px; }
+
+.twisty { width: 14px; flex-shrink: 0; text-align: center; color: var(--muted); font-size: 11px; }
+.icon { width: 10px; height: 10px; flex-shrink: 0; border-radius: 2px; background-color: var(--muted); }
+.node.folder .icon, .node.afolder .icon { background-color: var(--border); border-radius: 1px; height: 8px; }
+.node.event .icon { background-color: var(--accent); }
+.node.asset .icon { background-color: var(--meter-low); border-radius: 5px; }
+.node.snapshot .icon { border-radius: 5px; background-color: var(--meter-mid); }
+.node.parameter .icon { height: 4px; background-color: var(--fg); }
+.node.bank .icon { height: 6px; background-color: var(--meter-high); }
+
+.name { flex-grow: 1; flex-shrink: 1; min-width: 0; overflow-x: hidden; overflow-y: hidden; text-wrap-mode: nowrap; text-overflow: ellipsis; color: var(--fg); }
+.meta { flex-shrink: 0; color: var(--muted); font-size: 11px; text-wrap-mode: nowrap; }
+.rename { flex-grow: 1; flex-shrink: 1; min-width: 20px; width: 20px; height: 20px; padding: 1px 4px; border-color: var(--accent); }
+
+.check { width: 12px; height: 12px; flex-shrink: 0; border: 1px solid var(--muted); border-radius: 2px; background-color: var(--meter-bg); }
+.check.on { background-color: var(--accent); border-color: var(--accent); }
+
+.status { flex-shrink: 0; height: 18px; padding: 1px 8px; color: var(--muted); font-size: 11px; line-height: 14px; border-top: 1px solid var(--border); background-color: var(--panel); overflow-x: hidden; overflow-y: hidden; text-wrap-mode: nowrap; text-overflow: ellipsis; }

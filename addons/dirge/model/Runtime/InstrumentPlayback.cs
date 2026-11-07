@@ -178,6 +178,9 @@ internal static class ModEval
 /// <summary>Immutable per-description view of one instrument: kind, region, resolved lanes and modulators.</summary>
 internal sealed class InstrumentInfo
 {
+    /// <summary>Track stand-in for transition-timeline instruments, which belong to a marker rather than a track.</summary>
+    public static readonly Track NoTrack = new() { Name = "(transition)" };
+
     public readonly Instrument Instrument;
     public readonly Track Track;
     public readonly InstrumentKind Kind;
@@ -188,6 +191,11 @@ internal sealed class InstrumentInfo
     public readonly double RegionEnd;
     /// <summary>Zero-length timeline trigger (command instruments): fires when the playhead crosses <see cref="RegionStart"/>.</summary>
     public readonly bool IsPoint;
+    /// <summary>
+    /// Non-null for a transition-timeline instrument: the <see cref="TransitionMarker"/>/<see cref="TransitionRegion"/> it belongs
+    /// to. Its region is measured on that transition's local clock, never on the event timeline or a parameter sheet.
+    /// </summary>
+    public readonly LogicMarker? Transition;
     public readonly AutomationLane[] VolumeLanes;
     public readonly AutomationLane[] PitchLanes;
     public readonly ModInfo[] Modulators;
@@ -203,10 +211,11 @@ internal sealed class InstrumentInfo
     /// <summary>Resolved by <see cref="EventDescription.Link"/> once every description exists.</summary>
     public EventDescription? NestedEvent;
 
-    public InstrumentInfo(AudioEvent ev, Track track, Instrument instrument, AudioProject project, IAssetCatalog assets)
+    public InstrumentInfo(AudioEvent ev, Track track, Instrument instrument, AudioProject project, IAssetCatalog assets, LogicMarker? transition)
     {
         Instrument = instrument;
         Track = track;
+        Transition = transition;
         VolumeLanes = ModEval.CollectLanes(ev.Automation, PropertyKind.InstrumentVolumeDb, instrument.Id);
         PitchLanes = ModEval.CollectLanes(ev.Automation, PropertyKind.InstrumentPitch, instrument.Id);
         Modulators = ModEval.Collect(instrument.Modulators, PropertyKind.InstrumentVolumeDb, PropertyKind.InstrumentPitch, instrument.Id);
@@ -257,7 +266,8 @@ internal sealed class InstrumentInfo
         }
 
         Placement placement = instrument.Placement;
-        OnTimeline = placement.OnTimeline;
+        // Transition instruments always live on the transition clock, whatever their placement says (the validator flags sheets).
+        OnTimeline = transition is not null || placement.OnTimeline;
         RegionStart = placement.Start;
         if (OnTimeline)
         {
@@ -844,7 +854,7 @@ internal sealed class InstrumentState
             anyReal = true;
             if (v.WantsPlay)
             {
-                commands.Add(new VoicePlay(v.Id, v.Asset, v.Bus, v.Position, v.Loop, v.VolumeDb, v.Pitch, v.Spatial, v.Attributes, v.MinDistance, v.MaxDistance));
+                commands.Add(new VoicePlay(v.Id, v.Asset, v.Bus, v.Position, v.Loop, v.VolumeDb, v.Pitch, v.Spatial, v.Attributes, v.MinDistance, v.MaxDistance, Info.Instrument.SyncGroup));
                 v.WantsPlay = false;
                 v.HasPlayed = true;
                 v.LastVolumeDb = v.VolumeDb;

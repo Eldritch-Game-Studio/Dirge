@@ -37,6 +37,12 @@ public static class DiagnosticCodes
     public const string TempoBpmInvalid = "tempo-bpm-invalid";
     public const string VcaRefMissing = "vca-ref-missing";
     public const string EffectTypeNameEmpty = "effect-type-name-empty";
+    public const string AudioTableEmptyLocales = "audio-table-empty-locales";
+    public const string DuplicateAudioTableName = "duplicate-audio-table-name";
+    public const string PlatformOverrideTargetMissing = "platform-override-target-missing";
+    public const string PlatformOverrideEmpty = "platform-override-empty";
+    public const string MixerAutomationInvalid = "mixer-automation-invalid";
+    public const string TransitionInstrumentInvalid = "transition-instrument-invalid";
 }
 
 /// <summary>Structural checks over an <see cref="AudioProject"/>. Pure; safe to run on every edit in the tool and in CI.</summary>
@@ -49,6 +55,9 @@ public static class ProjectValidator
         ValidateMixer(context);
         ValidateGlobalParameters(context);
         ValidateSnapshots(context);
+        ValidatePlatformOverrides(context);
+        ValidateMixerAutomation(context);
+        ValidateAudioTables(context);
         ValidateEvents(context);
         ValidateEventInstrumentCycles(context);
         return context.Diagnostics;
@@ -203,6 +212,49 @@ public static class ProjectValidator
                     c.Error(DiagnosticCodes.SnapshotTargetMissing, snapshot.Id, $"Snapshot \"{snapshot.Name}\" targets a {value.Target.Kind} property whose owner does not exist.");
     }
 
+    private static void ValidatePlatformOverrides(Context c)
+    {
+        foreach (PlatformOverride po in c.Project.PlatformOverrides)
+        {
+            if (string.IsNullOrWhiteSpace(po.Platform))
+                c.Error(DiagnosticCodes.PlatformOverrideEmpty, DirgeId.None, "A platform override has no platform name.");
+            foreach (SnapshotValue value in po.Values)
+                if (!c.MixerTargetExists(value.Target))
+                    c.Error(DiagnosticCodes.PlatformOverrideTargetMissing, DirgeId.None, $"Platform override \"{po.Platform}\" targets a {value.Target.Kind} property whose owner does not exist.");
+        }
+    }
+
+    private static void ValidateMixerAutomation(Context c)
+    {
+        foreach (AutomationLane lane in c.Project.MixerAutomation)
+        {
+            if (!c.MixerTargetExists(lane.Target))
+                c.Error(DiagnosticCodes.MixerAutomationInvalid, lane.Id, $"Mixer automation lane targets a {lane.Target.Kind} property whose owner does not exist (only mixer properties can be automated here).");
+            if (!c.GlobalParameters.Contains(lane.Parameter))
+                c.Error(DiagnosticCodes.MixerAutomationInvalid, lane.Id, "Mixer automation lane must be driven by a global parameter.");
+            ValidateCurve(c, lane.Curve, lane.Id, "Mixer automation lane");
+        }
+    }
+
+    private static void ValidateAudioTables(Context c)
+    {
+        ReportDuplicates(c, c.Project.AudioTables, static t => t.Name, static t => t.Id, DiagnosticCodes.DuplicateAudioTableName, "audio table name");
+        foreach (AudioTable table in c.Project.AudioTables)
+        {
+            foreach (KeyValuePair<string, Dictionary<string, AssetRef>> entry in table.Entries)
+            {
+                if (entry.Value.Count == 0)
+                {
+                    c.Error(DiagnosticCodes.AudioTableEmptyLocales, table.Id, $"Audio table \"{table.Name}\" key \"{entry.Key}\" has no locales.");
+                    continue;
+                }
+                foreach (KeyValuePair<string, AssetRef> locale in entry.Value)
+                    if (locale.Value.IsEmpty)
+                        c.Warning(DiagnosticCodes.EmptyAssetRef, table.Id, $"Audio table \"{table.Name}\" key \"{entry.Key}\" locale \"{locale.Key}\" has no asset.");
+            }
+        }
+    }
+
     // ---- events ------------------------------------------------------------------------------------------------
 
     private static void ValidateEvents(Context c)
@@ -259,14 +311,41 @@ public static class ProjectValidator
             case LoopRegion loop when !(loop.Length > 0f):
                 c.Error(DiagnosticCodes.RegionLengthInvalid, marker.Id, $"{where}: loop region length must be > 0.");
                 break;
+            case MagnetRegion magnet when !(magnet.Length > 0f):
+                c.Error(DiagnosticCodes.RegionLengthInvalid, marker.Id, $"{where}: magnet region length must be > 0.");
+                break;
             case TransitionRegion region:
                 if (!(region.Length > 0f))
                     c.Error(DiagnosticCodes.RegionLengthInvalid, marker.Id, $"{where}: transition region length must be > 0.");
                 RequireDestination(c, ev, marker, region.Destination, where);
+                ValidateTransitionInstruments(c, ev, marker, region.TransitionLength, region.TransitionInstruments, where);
                 break;
             case TransitionMarker transition:
                 RequireDestination(c, ev, marker, transition.Destination, where);
+                ValidateTransitionInstruments(c, ev, marker, transition.TransitionLength, transition.TransitionInstruments, where);
                 break;
+        }
+    }
+
+    /// <summary>Transition instruments need a transition timeline (length &gt; 0), must sit on it (no parameter sheet) and start inside it.</summary>
+    private static void ValidateTransitionInstruments(Context c, AudioEvent ev, LogicMarker marker, float length, List<Instrument> instruments, string where)
+    {
+        if (instruments.Count == 0)
+        {
+            if (length < 0f)
+                c.Error(DiagnosticCodes.TransitionInstrumentInvalid, marker.Id, $"{where}: transition length must be ≥ 0.");
+            return;
+        }
+        if (!(length > 0f))
+            c.Error(DiagnosticCodes.TransitionInstrumentInvalid, marker.Id, $"{where} has transition instruments but no transition length.");
+        foreach (Instrument instrument in instruments)
+        {
+            string iw = $"Transition instrument \"{instrument.Name}\" of {where}";
+            if (!instrument.Placement.OnTimeline)
+                c.Error(DiagnosticCodes.TransitionInstrumentInvalid, instrument.Id, $"{iw} must be placed on the transition timeline, not a parameter sheet.");
+            else if (length > 0f && (instrument.Placement.Start < 0f || instrument.Placement.Start >= length))
+                c.Error(DiagnosticCodes.TransitionInstrumentInvalid, instrument.Id, $"{iw} starts at {instrument.Placement.Start}s, outside the transition timeline [0, {length}).");
+            ValidateInstrument(c, ev, instrument);
         }
     }
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# M1 T1 smoke: import the project headless, build, run the demo scene in smoke mode with the Dummy audio driver.
+# Headless smoke: import the project, build, run the demo scene and the sandbox scene in smoke mode with the Dummy audio driver.
 # Usage: scripts/smoke.sh            (GODOT env var overrides the editor binary)
 set -euo pipefail
 
@@ -19,6 +19,10 @@ if [[ ! -f demo/audio/wind.wav || ! -f demo/audio/click.wav ]]; then
   python3 scripts/gen-demo-audio.py
 fi
 
+if [[ ! -f demo/sandbox/audio/calm_pad.wav || ! -f demo/sandbox/audio/line_de.wav ]]; then
+  python3 scripts/gen-sandbox-audio.py
+fi
+
 echo "smoke: dotnet build"
 dotnet build Dirge.slnx -nologo -v q
 
@@ -28,15 +32,30 @@ if ! "$GODOT" --headless --audio-driver Dummy --path . --import >/tmp/dirge-impo
   "$GODOT" --headless --audio-driver Dummy --path . --import >/tmp/dirge-import.log 2>&1 || {
     echo "smoke: import failed"; cat /tmp/dirge-import.log; exit 1; }
 fi
-echo "smoke: run"
+echo "smoke: run demo"
 set +e
 "$GODOT" --headless --audio-driver Dummy --path . res://demo/demo.tscn -- --smoke 2>&1 | tee /tmp/dirge-smoke.log
 status=${PIPESTATUS[0]}
 set -e
 
 if grep -q '^DIRGE_SMOKE PASS' /tmp/dirge-smoke.log && [[ $status -eq 0 ]]; then
-  echo "smoke: PASS"
-  exit 0
+  echo "smoke: demo PASS"
+else
+  echo "smoke: demo FAIL (exit $status)"
+  exit 1
 fi
-echo "smoke: FAIL (exit $status)"
-exit 1
+
+echo "smoke: run sandbox"
+set +e
+"$GODOT" --headless --audio-driver Dummy --path . res://demo/sandbox/sandbox.tscn -- --smoke 2>&1 | tee /tmp/dirge-sandbox-smoke.log
+status=${PIPESTATUS[0]}
+set -e
+
+if grep -q '^SANDBOX_SMOKE PASS' /tmp/dirge-sandbox-smoke.log && [[ $status -eq 0 ]]; then
+  echo "smoke: sandbox PASS"
+else
+  echo "smoke: sandbox FAIL (exit $status)"
+  exit 1
+fi
+
+echo "smoke: PASS"

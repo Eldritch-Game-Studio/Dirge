@@ -29,6 +29,7 @@ public sealed class SnapshotInstance
 
     internal Definition Def = null!;
     internal AhdsrState Envelope;
+    private MixerState? _mixer;
     private float _intensity = 1f;
 
     internal SnapshotInstance() { }
@@ -39,7 +40,11 @@ public sealed class SnapshotInstance
     public float Intensity
     {
         get => _intensity;
-        set => _intensity = Math.Clamp(value, 0f, 1f);
+        set
+        {
+            _mixer?.System?.Recorder?.Call(this, "SetIntensity", null, null, value, false, 0);
+            _intensity = Math.Clamp(value, 0f, 1f);
+        }
     }
 
     public bool IsActive { get; private set; }
@@ -50,13 +55,15 @@ public sealed class SnapshotInstance
     /// <summary>Begin the AHDSR release; the instance is removed by the mixer once the release has finished.</summary>
     public void Stop()
     {
+        _mixer?.System?.Recorder?.Call(this, "StopSnapshot", null, null, 0, false, 0);
         if (!IsActive) return;
         Envelope.Release();
     }
 
-    internal void Activate(Definition definition)
+    internal void Activate(Definition definition, MixerState mixer)
     {
         Def = definition;
+        _mixer = mixer;
         Envelope = new AhdsrState(definition.Snapshot.Intensity);
         _intensity = 1f;
         IsActive = true;

@@ -1,0 +1,41 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Dirge</title>
+    <link rel="stylesheet" href="theme.css">
+    <link rel="stylesheet" href="shell.css">
+</head>
+<body>
+<div class="menubar" role="menubar">
+    <p class="brand">DIRGE</p>
+    <div class="group" aria-label="File">
+        <p class="group-label">File</p>
+        <button id="file-new" type="button" class="flat" title="Ctrl+N">New</button>
+        <button id="file-open" type="button" class="flat" title="Ctrl+O">Open…</button>
+        <button id="file-save" type="button" class="flat" title="Ctrl+S">Save</button>
+        <button id="file-save-as" type="button" class="flat">Save As…</button>
+    </div>
+    <div class="sep"></div>
+    <div class="group" aria-label="Edit">
+        <p class="group-label">Edit</p>
+        <button id="edit-undo" type="button" class="flat" title="Ctrl+Z" disabled>Undo</button>
+        <button id="edit-redo" type="button" class="flat" title="Ctrl+Shift+Z" disabled>Redo</button>
+    </div>
+    <div class="sep"></div>
+    <div class="group" aria-label="Project">
+        <p class="group-label">Project</p>
+        <button id="project-validate" type="button" class="flat">Validate</button>
+        <button id="project-build-banks" type="button" class="flat">Build Banks</button>
+    </div>
+    <div class="sep"></div>
+    <div class="group" aria-label="Live">
+        <p class="group-label">Live</p>
+        <button id="live-connect" type="button" class="flat">Connect…</button>
+        <p id="live-state" class="live-state" hidden>LIVE</p>
+    </div>
+    <div class="spacer"></div>
+    <p id="project-name" class="project-name">Untitled</p>
+</div>
+</body>
+</html>

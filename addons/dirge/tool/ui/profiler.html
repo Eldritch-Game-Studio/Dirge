@@ -1,0 +1,61 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Dirge · Profiler</title>
+    <link rel="stylesheet" href="theme.css">
+    <link rel="stylesheet" href="profiler.css">
+</head>
+<body>
+<main class="profiler">
+    <section class="bar source-bar" aria-label="Profiler source">
+        <p class="label">SOURCE</p>
+        <button id="src-editor" class="toggle selected" type="button">Editor</button>
+        <button id="src-game" class="toggle" type="button">Game</button>
+        <input id="host" type="text" value="127.0.0.1:7447" aria-label="Game host and port">
+        <button id="connect" type="button">Connect</button>
+        <p id="source-status" class="status muted" role="status">Editor audition</p>
+    </section>
+    <section class="counters" aria-label="Counters">
+        <div class="counter"><p class="k">INSTANCES</p><p id="c-instances" class="v">0</p></div>
+        <div class="counter"><p class="k">REAL VOICES</p><p id="c-voices" class="v">0</p></div>
+        <div class="counter"><p class="k">UPDATE</p><p id="c-update" class="v">0.00 ms</p></div>
+        <div class="counter"><p class="k">TIME</p><p id="c-time" class="v">0.0 s</p></div>
+        <div class="counter lufs"><p class="k">LUFS M</p><p id="c-lufs-m" class="v">—</p></div>
+        <div class="counter lufs"><p class="k">LUFS S</p><p id="c-lufs-s" class="v">—</p></div>
+        <div class="counter lufs"><p class="k">LUFS I</p><p id="c-lufs-i" class="v">—</p></div>
+        <div class="counter lufs"><p class="k">TRUE PEAK</p><p id="c-peak" class="v">—</p></div>
+    </section>
+    <section class="live" aria-label="Live state">
+        <div class="instances">
+            <div class="row head">
+                <p class="c-handle">#</p>
+                <p class="c-event">EVENT</p>
+                <p class="c-state">STATE</p>
+                <p class="c-pos">POSITION</p>
+                <p class="c-virt">VIRT</p>
+                <p class="c-params">PARAMETERS</p>
+                <p class="c-act"></p>
+            </div>
+            <div id="instance-rows" class="rows"></div>
+            <p id="instances-empty" class="empty muted">No live instances.</p>
+        </div>
+        <div class="buses">
+            <p class="label">BUS LEVELS</p>
+            <div id="bus-rows" class="bus-rows"></div>
+        </div>
+    </section>
+    <section class="bar recording-bar" aria-label="Recording">
+        <p class="label">RECORDING</p>
+        <button id="rec-start" type="button" class="record">Record</button>
+        <button id="rec-stop" type="button" disabled>Stop</button>
+        <input id="rec-path" type="text" value="user://rec.json" aria-label="Recording file path">
+        <button id="rec-save" type="button" disabled>Save…</button>
+        <button id="rec-load" type="button">Load…</button>
+        <button id="rec-replay" type="button" disabled>Replay</button>
+        <p id="rec-status" class="status muted" role="status">No recording</p>
+    </section>
+    <p id="rec-compare" class="compare" role="status" hidden></p>
+</main>
+</body>
+</html>

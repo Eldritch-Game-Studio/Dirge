@@ -1,0 +1,132 @@
+/* Profiler pane. Tokens, resets, buttons, inputs and .meter.horizontal come from theme.css (linked first). */
+.profiler {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    row-gap: var(--space-2);
+    padding: var(--space-2);
+}
+
+.label { letter-spacing: 1px; font-size: 10px; }
+.status { font-size: var(--font-size-small); line-height: 16px; flex-grow: 1; flex-shrink: 1; min-width: 0; text-wrap-mode: nowrap; overflow-x: hidden; overflow-y: hidden; text-overflow: ellipsis; }
+
+/* Bars: source selector and recording controls. */
+.bar {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    column-gap: var(--space-2);
+    flex-shrink: 0;
+    height: 32px;
+    padding: 0 var(--space-2);
+    background-color: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+.bar .label { width: 72px; flex-shrink: 0; }
+.bar button, .bar input { flex-shrink: 0; }
+button.selected { border-color: var(--accent); color: var(--accent); background-color: var(--selection); }
+button.record { color: var(--danger); }
+button.record.active { background-color: #5a1f1f; border-color: var(--danger); }
+button.small { height: 18px; padding: 0 6px; font-size: 10px; line-height: 14px; }
+input { width: 150px; font-size: var(--font-size-small); }
+#rec-path { width: 190px; }
+
+/* Counters. */
+.counters {
+    display: flex;
+    flex-direction: row;
+    column-gap: var(--space-2);
+    flex-shrink: 0;
+}
+.counter {
+    flex-grow: 1;
+    flex-basis: 0;
+    min-width: 0;
+    height: 40px;
+    padding: 3px var(--space-2);
+    background-color: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+.counter .k { font-size: 9px; line-height: 12px; letter-spacing: 1px; color: var(--muted); text-wrap-mode: nowrap; }
+.counter .v { font-size: 15px; line-height: 20px; color: var(--accent); text-wrap-mode: nowrap; overflow-x: hidden; overflow-y: hidden; text-overflow: ellipsis; }
+.counter.lufs .v { color: var(--fg); }
+
+/* Live state: instance table and bus bars. */
+.live {
+    display: flex;
+    flex-direction: row;
+    column-gap: var(--space-2);
+    flex-grow: 1;
+    flex-shrink: 1;
+    min-height: 0;
+}
+.instances {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    flex-shrink: 1;
+    min-width: 0;
+    min-height: 0;
+    background-color: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+.rows {
+    flex-grow: 1;
+    flex-shrink: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+.instances .row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    column-gap: var(--space-2);
+    height: var(--row-h);
+    padding: 0 var(--space-2);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+.instances .row.head { height: 20px; background-color: var(--bg); }
+.instances .row.head p { font-size: 9px; line-height: 12px; letter-spacing: 1px; color: var(--muted); }
+.instances .row:hover { background-color: var(--hover); }
+.instances .row.selected { background-color: var(--selection); }
+.instances .row p { font-size: var(--font-size-small); line-height: 16px; text-wrap-mode: nowrap; overflow-x: hidden; overflow-y: hidden; text-overflow: ellipsis; flex-shrink: 0; }
+.c-handle { width: 28px; color: var(--muted); }
+.c-event { flex-grow: 1; flex-shrink: 1; min-width: 80px; cursor: pointer; }
+.c-state { width: 74px; }
+.c-pos { width: 64px; text-align: right; }
+.c-virt { width: 34px; text-align: center; color: var(--muted); }
+.c-params { width: 160px; flex-shrink: 1; color: var(--muted); }
+.c-act { width: 44px; display: flex; flex-direction: row; justify-content: flex-end; }
+.instances .row .c-virt.on { color: var(--accent); }
+.instances .row .c-state.stopping { color: var(--warning); }
+.instances .row .c-state.playing { color: var(--meter-low); }
+.empty { padding: 6px var(--space-2); font-size: var(--font-size-small); }
+
+.buses {
+    width: 260px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    row-gap: var(--space-1);
+    padding: 6px var(--space-2);
+    background-color: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+.bus-rows { display: flex; flex-direction: column; row-gap: var(--space-1); }
+.bus { display: flex; flex-direction: column; row-gap: 2px; flex-shrink: 0; }
+.bus-head { display: flex; flex-direction: row; justify-content: space-between; }
+.bus-head p { font-size: 10px; line-height: 14px; text-wrap-mode: nowrap; overflow-x: hidden; overflow-y: hidden; text-overflow: ellipsis; }
+.bus-head .db { color: var(--muted); flex-shrink: 0; }
+.bus .meter.horizontal { border-radius: 2px; }
+
+.compare { flex-shrink: 0; padding: 0 var(--space-2); font-size: var(--font-size-small); line-height: 16px; color: var(--meter-low); text-wrap-mode: nowrap; overflow-x: hidden; overflow-y: hidden; text-overflow: ellipsis; }
+.compare.diverged { color: var(--danger); }

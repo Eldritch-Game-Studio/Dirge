@@ -1,0 +1,715 @@
+{
+  "name": "Dirge Sandbox",
+  "assetLengths": {
+    "res://demo/sandbox/audio/bird_chirp_1.wav": 0.34997732426303857,
+    "res://demo/sandbox/audio/bird_chirp_2.wav": 0.44997732426303855,
+    "res://demo/sandbox/audio/bird_chirp_3.wav": 0.3,
+    "res://demo/sandbox/audio/calm_arp.wav": 4,
+    "res://demo/sandbox/audio/calm_pad.wav": 4,
+    "res://demo/sandbox/audio/combat_drums.wav": 4,
+    "res://demo/sandbox/audio/combat_lead.wav": 4,
+    "res://demo/sandbox/audio/line_de.wav": 1.8,
+    "res://demo/sandbox/audio/line_en.wav": 1.6,
+    "res://demo/sandbox/audio/stinger.wav": 1,
+    "res://demo/sandbox/audio/ui_click.wav": 0.08
+  },
+  "audioTables": [
+    {
+      "id": "5a4db0c0000000000000000000000022",
+      "name": "Dialogue",
+      "entries": {
+        "line": {
+          "de": "res://demo/sandbox/audio/line_de.wav",
+          "en": "res://demo/sandbox/audio/line_en.wav"
+        }
+      }
+    }
+  ],
+  "banks": [],
+  "events": [
+    {
+      "id": "5a4db0c0000000000000000000000008",
+      "path": "Music/Stinger",
+      "automation": [],
+      "bus": "5a4db0c0000000000000000000000002",
+      "isConductor": false,
+      "localParameters": [],
+      "macros": {
+        "cooldown": 0,
+        "doppler": false,
+        "dopplerScale": 1,
+        "is3D": false,
+        "maxDistance": 20,
+        "maxInstances": 2,
+        "minDistance": 1,
+        "persistent": false,
+        "pitch": 1,
+        "priority": 128,
+        "scheduleLookahead": 0,
+        "startQuantization": "Beat",
+        "stealing": "Oldest",
+        "volumeDb": 0
+      },
+      "markers": [],
+      "modulators": [],
+      "tempo": [],
+      "tracks": [
+        {
+          "id": "5a4db0c0000000000000000000000009",
+          "name": "Hit",
+          "instruments": [
+            {
+              "$type": "Clip",
+              "id": "5a4db0c000000000000000000000000a",
+              "name": "Stinger",
+              "asset": "res://demo/sandbox/audio/stinger.wav",
+              "async": false,
+              "conditions": [],
+              "cutMode": "Cut",
+              "fadeIn": 0,
+              "fadeOut": 0,
+              "loop": false,
+              "modulators": [],
+              "pitch": 1,
+              "pitchRandom": 0,
+              "placement": {
+                "length": 0,
+                "parameter": "00000000000000000000000000000000",
+                "start": 0
+              },
+              "polyphony": 0,
+              "probability": 1,
+              "startOffset": 0,
+              "syncGroup": 0,
+              "triggerDelay": 0,
+              "volumeDb": -2,
+              "volumeRandomDb": 0
+            }
+          ],
+          "volumeDb": 0
+        }
+      ]
+    },
+    {
+      "id": "5a4db0c000000000000000000000000b",
+      "path": "Music/Main",
+      "automation": [],
+      "bus": "5a4db0c0000000000000000000000002",
+      "isConductor": true,
+      "localParameters": [],
+      "macros": {
+        "cooldown": 0,
+        "doppler": false,
+        "dopplerScale": 1,
+        "is3D": false,
+        "maxDistance": 20,
+        "maxInstances": 1,
+        "minDistance": 1,
+        "persistent": true,
+        "pitch": 1,
+        "priority": 0,
+        "scheduleLookahead": 0,
+        "startQuantization": "None",
+        "stealing": "Oldest",
+        "volumeDb": 0
+      },
+      "markers": [
+        {
+          "$type": "Destination",
+          "id": "5a4db0c0000000000000000000000014",
+          "name": "Calm",
+          "conditions": [],
+          "position": 0,
+          "probability": 1
+        },
+        {
+          "$type": "Loop",
+          "id": "5a4db0c0000000000000000000000018",
+          "name": "Calm loop",
+          "conditions": [],
+          "length": 4,
+          "position": 0,
+          "probability": 1
+        },
+        {
+          "$type": "TransitionRegion",
+          "id": "5a4db0c0000000000000000000000016",
+          "name": "To Combat",
+          "conditions": [
+            {
+              "maximum": 1,
+              "minimum": 0.5,
+              "parameter": "5a4db0c0000000000000000000000007"
+            }
+          ],
+          "destination": "5a4db0c0000000000000000000000015",
+          "length": 4,
+          "position": 0,
+          "probability": 1,
+          "quantization": "Beat",
+          "transitionInstruments": [],
+          "transitionLength": 0
+        },
+        {
+          "$type": "Destination",
+          "id": "5a4db0c0000000000000000000000015",
+          "name": "Combat",
+          "conditions": [],
+          "position": 4,
+          "probability": 1
+        },
+        {
+          "$type": "Loop",
+          "id": "5a4db0c0000000000000000000000019",
+          "name": "Combat loop",
+          "conditions": [],
+          "length": 4,
+          "position": 4,
+          "probability": 1
+        },
+        {
+          "$type": "TransitionRegion",
+          "id": "5a4db0c0000000000000000000000017",
+          "name": "To Calm",
+          "conditions": [
+            {
+              "maximum": 0.49,
+              "minimum": 0,
+              "parameter": "5a4db0c0000000000000000000000007"
+            }
+          ],
+          "destination": "5a4db0c0000000000000000000000014",
+          "length": 4,
+          "position": 4,
+          "probability": 1,
+          "quantization": "Beat",
+          "transitionInstruments": [],
+          "transitionLength": 0
+        }
+      ],
+      "modulators": [],
+      "tempo": [
+        {
+          "beatsPerBar": 4,
+          "bpm": 120,
+          "position": 0
+        }
+      ],
+      "tracks": [
+        {
+          "id": "5a4db0c000000000000000000000000c",
+          "name": "Calm",
+          "instruments": [
+            {
+              "$type": "Clip",
+              "id": "5a4db0c000000000000000000000000d",
+              "name": "Calm pad",
+              "asset": "res://demo/sandbox/audio/calm_pad.wav",
+              "async": false,
+              "conditions": [],
+              "cutMode": "FadeOut",
+              "fadeIn": 0.02,
+              "fadeOut": 0.08,
+              "loop": true,
+              "modulators": [],
+              "pitch": 1,
+              "pitchRandom": 0,
+              "placement": {
+                "length": 4,
+                "parameter": "00000000000000000000000000000000",
+                "start": 0
+              },
+              "polyphony": 0,
+              "probability": 1,
+              "startOffset": 0,
+              "syncGroup": 1,
+              "triggerDelay": 0,
+              "volumeDb": 0,
+              "volumeRandomDb": 0
+            },
+            {
+              "$type": "Clip",
+              "id": "5a4db0c000000000000000000000000e",
+              "name": "Calm arp",
+              "asset": "res://demo/sandbox/audio/calm_arp.wav",
+              "async": false,
+              "conditions": [],
+              "cutMode": "FadeOut",
+              "fadeIn": 0.02,
+              "fadeOut": 0.08,
+              "loop": true,
+              "modulators": [],
+              "pitch": 1,
+              "pitchRandom": 0,
+              "placement": {
+                "length": 4,
+                "parameter": "00000000000000000000000000000000",
+                "start": 0
+              },
+              "polyphony": 0,
+              "probability": 1,
+              "startOffset": 0,
+              "syncGroup": 1,
+              "triggerDelay": 0,
+              "volumeDb": -4,
+              "volumeRandomDb": 0
+            }
+          ],
+          "volumeDb": 0
+        },
+        {
+          "id": "5a4db0c000000000000000000000000f",
+          "name": "Combat",
+          "instruments": [
+            {
+              "$type": "Clip",
+              "id": "5a4db0c0000000000000000000000010",
+              "name": "Combat drums",
+              "asset": "res://demo/sandbox/audio/combat_drums.wav",
+              "async": false,
+              "conditions": [],
+              "cutMode": "FadeOut",
+              "fadeIn": 0.02,
+              "fadeOut": 0.08,
+              "loop": true,
+              "modulators": [],
+              "pitch": 1,
+              "pitchRandom": 0,
+              "placement": {
+                "length": 4,
+                "parameter": "00000000000000000000000000000000",
+                "start": 4
+              },
+              "polyphony": 0,
+              "probability": 1,
+              "startOffset": 0,
+              "syncGroup": 2,
+              "triggerDelay": 0,
+              "volumeDb": 0,
+              "volumeRandomDb": 0
+            },
+            {
+              "$type": "Clip",
+              "id": "5a4db0c0000000000000000000000011",
+              "name": "Combat lead",
+              "asset": "res://demo/sandbox/audio/combat_lead.wav",
+              "async": false,
+              "conditions": [],
+              "cutMode": "FadeOut",
+              "fadeIn": 0.02,
+              "fadeOut": 0.08,
+              "loop": true,
+              "modulators": [],
+              "pitch": 1,
+              "pitchRandom": 0,
+              "placement": {
+                "length": 4,
+                "parameter": "00000000000000000000000000000000",
+                "start": 4
+              },
+              "polyphony": 0,
+              "probability": 1,
+              "startOffset": 0,
+              "syncGroup": 2,
+              "triggerDelay": 0,
+              "volumeDb": -3,
+              "volumeRandomDb": 0
+            }
+          ],
+          "volumeDb": 0
+        },
+        {
+          "id": "5a4db0c0000000000000000000000012",
+          "name": "Cues",
+          "instruments": [
+            {
+              "$type": "Command",
+              "id": "5a4db0c0000000000000000000000013",
+              "name": "Combat stinger",
+              "action": "StartEvent",
+              "async": false,
+              "conditions": [],
+              "cutMode": "Cut",
+              "fadeIn": 0,
+              "fadeOut": 0,
+              "loop": false,
+              "modulators": [],
+              "pitch": 1,
+              "pitchRandom": 0,
+              "placement": {
+                "length": 0.5,
+                "parameter": "5a4db0c0000000000000000000000007",
+                "start": 0.5
+              },
+              "polyphony": 0,
+              "probability": 1,
+              "startOffset": 0,
+              "syncGroup": 0,
+              "targetEvent": "5a4db0c0000000000000000000000008",
+              "targetParameter": "00000000000000000000000000000000",
+              "triggerDelay": 0,
+              "value": 0,
+              "volumeDb": 0,
+              "volumeRandomDb": 0
+            }
+          ],
+          "volumeDb": 0
+        }
+      ]
+    },
+    {
+      "id": "5a4db0c000000000000000000000001a",
+      "path": "Ambience/Birds",
+      "automation": [],
+      "bus": "5a4db0c0000000000000000000000004",
+      "isConductor": false,
+      "localParameters": [],
+      "macros": {
+        "cooldown": 0,
+        "doppler": false,
+        "dopplerScale": 1,
+        "is3D": true,
+        "maxDistance": 30,
+        "maxInstances": 1,
+        "minDistance": 2,
+        "persistent": true,
+        "pitch": 1,
+        "priority": 128,
+        "scheduleLookahead": 0,
+        "startQuantization": "None",
+        "stealing": "Oldest",
+        "volumeDb": 0
+      },
+      "markers": [],
+      "modulators": [],
+      "tempo": [],
+      "tracks": [
+        {
+          "id": "5a4db0c000000000000000000000001b",
+          "name": "Birds",
+          "instruments": [
+            {
+              "$type": "Scatterer",
+              "id": "5a4db0c000000000000000000000001c",
+              "name": "Chirps",
+              "async": false,
+              "conditions": [],
+              "cutMode": "Cut",
+              "entries": [
+                {
+                  "asset": "res://demo/sandbox/audio/bird_chirp_1.wav",
+                  "weight": 1
+                },
+                {
+                  "asset": "res://demo/sandbox/audio/bird_chirp_2.wav",
+                  "weight": 1
+                },
+                {
+                  "asset": "res://demo/sandbox/audio/bird_chirp_3.wav",
+                  "weight": 1
+                }
+              ],
+              "fadeIn": 0,
+              "fadeOut": 0,
+              "loop": false,
+              "maxInterval": 1.6,
+              "maxScatterDistance": 6,
+              "minInterval": 0.4,
+              "minScatterDistance": 1,
+              "mode": "Shuffle",
+              "modulators": [],
+              "pitch": 1,
+              "pitchRandom": 0.08,
+              "placement": {
+                "length": 0,
+                "parameter": "00000000000000000000000000000000",
+                "start": 0
+              },
+              "polyphony": 4,
+              "probability": 1,
+              "startOffset": 0,
+              "syncGroup": 0,
+              "triggerDelay": 0,
+              "volumeDb": 0,
+              "volumeRandomDb": 3
+            }
+          ],
+          "volumeDb": 0
+        }
+      ]
+    },
+    {
+      "id": "5a4db0c000000000000000000000001d",
+      "path": "Dialogue/Line",
+      "automation": [],
+      "bus": "5a4db0c0000000000000000000000005",
+      "isConductor": false,
+      "localParameters": [],
+      "macros": {
+        "cooldown": 0,
+        "doppler": false,
+        "dopplerScale": 1,
+        "is3D": false,
+        "maxDistance": 20,
+        "maxInstances": 1,
+        "minDistance": 1,
+        "persistent": false,
+        "pitch": 1,
+        "priority": 128,
+        "scheduleLookahead": 0,
+        "startQuantization": "None",
+        "stealing": "Oldest",
+        "volumeDb": 0
+      },
+      "markers": [],
+      "modulators": [],
+      "tempo": [],
+      "tracks": [
+        {
+          "id": "5a4db0c000000000000000000000001e",
+          "name": "Voice",
+          "instruments": [
+            {
+              "$type": "Programmer",
+              "id": "5a4db0c000000000000000000000001f",
+              "name": "Line",
+              "async": false,
+              "conditions": [],
+              "cutMode": "Cut",
+              "fadeIn": 0,
+              "fadeOut": 0,
+              "key": "line",
+              "loop": false,
+              "modulators": [],
+              "pitch": 1,
+              "pitchRandom": 0,
+              "placement": {
+                "length": 2,
+                "parameter": "00000000000000000000000000000000",
+                "start": 0
+              },
+              "polyphony": 0,
+              "probability": 1,
+              "startOffset": 0,
+              "syncGroup": 0,
+              "triggerDelay": 0,
+              "volumeDb": 0,
+              "volumeRandomDb": 0
+            }
+          ],
+          "volumeDb": 0
+        },
+        {
+          "id": "5a4db0c0000000000000000000000020",
+          "name": "Ducking",
+          "instruments": [
+            {
+              "$type": "Snapshot",
+              "id": "5a4db0c0000000000000000000000021",
+              "name": "Duck music",
+              "async": false,
+              "conditions": [],
+              "cutMode": "Cut",
+              "fadeIn": 0,
+              "fadeOut": 0,
+              "loop": false,
+              "modulators": [],
+              "pitch": 1,
+              "pitchRandom": 0,
+              "placement": {
+                "length": 2,
+                "parameter": "00000000000000000000000000000000",
+                "start": 0
+              },
+              "polyphony": 0,
+              "probability": 1,
+              "snapshot": "5a4db0c0000000000000000000000006",
+              "startOffset": 0,
+              "syncGroup": 0,
+              "triggerDelay": 0,
+              "volumeDb": 0,
+              "volumeRandomDb": 0
+            }
+          ],
+          "volumeDb": 0
+        }
+      ]
+    },
+    {
+      "id": "5a4db0c0000000000000000000000023",
+      "path": "UI/Click",
+      "automation": [],
+      "bus": "5a4db0c0000000000000000000000003",
+      "isConductor": false,
+      "localParameters": [],
+      "macros": {
+        "cooldown": 0,
+        "doppler": false,
+        "dopplerScale": 1,
+        "is3D": false,
+        "maxDistance": 20,
+        "maxInstances": 4,
+        "minDistance": 1,
+        "persistent": false,
+        "pitch": 1,
+        "priority": 128,
+        "scheduleLookahead": 0,
+        "startQuantization": "None",
+        "stealing": "Oldest",
+        "volumeDb": 0
+      },
+      "markers": [],
+      "modulators": [],
+      "tempo": [],
+      "tracks": [
+        {
+          "id": "5a4db0c0000000000000000000000024",
+          "name": "Click",
+          "instruments": [
+            {
+              "$type": "Clip",
+              "id": "5a4db0c0000000000000000000000025",
+              "name": "Click",
+              "asset": "res://demo/sandbox/audio/ui_click.wav",
+              "async": false,
+              "conditions": [],
+              "cutMode": "Cut",
+              "fadeIn": 0,
+              "fadeOut": 0,
+              "loop": false,
+              "modulators": [],
+              "pitch": 1,
+              "pitchRandom": 0.05,
+              "placement": {
+                "length": 0,
+                "parameter": "00000000000000000000000000000000",
+                "start": 0
+              },
+              "polyphony": 0,
+              "probability": 1,
+              "startOffset": 0,
+              "syncGroup": 0,
+              "triggerDelay": 0,
+              "volumeDb": -6,
+              "volumeRandomDb": 0
+            }
+          ],
+          "volumeDb": 0
+        }
+      ]
+    }
+  ],
+  "globalParameters": [
+    {
+      "id": "5a4db0c0000000000000000000000007",
+      "name": "Threat",
+      "builtIn": "None",
+      "default": 0,
+      "hold": true,
+      "kind": "Continuous",
+      "labels": [],
+      "maximum": 1,
+      "minimum": 0,
+      "seekSpeedDown": 0.5,
+      "seekSpeedUp": 0.5
+    }
+  ],
+  "mixer": {
+    "buses": [
+      {
+        "id": "5a4db0c0000000000000000000000001",
+        "name": "Master",
+        "bypassEffects": false,
+        "effects": [],
+        "maxVoices": 0,
+        "mute": false,
+        "parent": "00000000000000000000000000000000",
+        "solo": false,
+        "vcas": [],
+        "volumeDb": 0
+      },
+      {
+        "id": "5a4db0c0000000000000000000000002",
+        "name": "Music",
+        "bypassEffects": false,
+        "effects": [],
+        "maxVoices": 0,
+        "mute": false,
+        "parent": "5a4db0c0000000000000000000000001",
+        "solo": false,
+        "vcas": [],
+        "volumeDb": -3
+      },
+      {
+        "id": "5a4db0c0000000000000000000000003",
+        "name": "SFX",
+        "bypassEffects": false,
+        "effects": [],
+        "maxVoices": 0,
+        "mute": false,
+        "parent": "5a4db0c0000000000000000000000001",
+        "solo": false,
+        "vcas": [],
+        "volumeDb": 0
+      },
+      {
+        "id": "5a4db0c0000000000000000000000004",
+        "name": "Ambience",
+        "bypassEffects": false,
+        "effects": [],
+        "maxVoices": 0,
+        "mute": false,
+        "parent": "5a4db0c0000000000000000000000003",
+        "solo": false,
+        "vcas": [],
+        "volumeDb": -2
+      },
+      {
+        "id": "5a4db0c0000000000000000000000005",
+        "name": "Dialogue",
+        "bypassEffects": false,
+        "effects": [],
+        "maxVoices": 0,
+        "mute": false,
+        "parent": "5a4db0c0000000000000000000000003",
+        "solo": false,
+        "vcas": [],
+        "volumeDb": 0
+      }
+    ],
+    "vcas": []
+  },
+  "mixerAutomation": [],
+  "platformOverrides": [],
+  "snapshots": [
+    {
+      "id": "5a4db0c0000000000000000000000006",
+      "name": "Dialogue Ducking",
+      "intensity": {
+        "attack": 0.2,
+        "decay": 0,
+        "hold": 0,
+        "release": 0.8,
+        "sustain": 1
+      },
+      "mode": "Blending",
+      "priority": 10,
+      "values": [
+        {
+          "target": {
+            "kind": "BusVolumeDb",
+            "owner": "5a4db0c0000000000000000000000002"
+          },
+          "value": -12
+        },
+        {
+          "target": {
+            "kind": "BusVolumeDb",
+            "owner": "5a4db0c0000000000000000000000004"
+          },
+          "value": -6
+        }
+      ]
+    }
+  ]
+}

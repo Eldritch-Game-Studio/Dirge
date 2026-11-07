@@ -46,6 +46,29 @@ public sealed class AssetCatalog : IAssetCatalog
         return stream;
     }
 
+    /// <summary>True when <paramref name="path"/> has a cache entry (loaded or known-missing).</summary>
+    public bool IsCached(string path) => _streams.ContainsKey(path);
+
+    /// <summary>Seeds the cache with a stream loaded elsewhere (bank preloads); replaces any existing entry.</summary>
+    public void Register(string path, AudioStream? stream)
+    {
+        _streams[path] = stream;
+        _looping.Remove(path);
+        _lengths.Remove(path);
+        if (stream is not null)
+        {
+            _lengths[path] = stream.GetLength();
+        }
+    }
+
+    /// <summary>Drops every cache entry for <paramref name="path"/>; players already holding the stream keep it alive.</summary>
+    public void Evict(string path)
+    {
+        _streams.Remove(path);
+        _looping.Remove(path);
+        _lengths.Remove(path);
+    }
+
     /// <summary>A copy of the asset configured to loop whole; shares sample data with the imported resource.</summary>
     public AudioStream? GetLoopingStream(AssetRef asset)
     {

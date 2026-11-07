@@ -1,0 +1,88 @@
+[gd_scene load_steps=10 format=3]
+
+[ext_resource type="Script" path="res://demo/sandbox/Sandbox.cs" id="1_sandbox"]
+[ext_resource type="Script" path="res://addons/dirge/runtime/DirgeServer.cs" id="2_server"]
+
+[sub_resource type="Environment" id="env"]
+background_mode = 1
+background_color = Color(0.36, 0.5, 0.68, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.62, 0.66, 0.72, 1)
+ambient_light_energy = 1.4
+
+[sub_resource type="PlaneMesh" id="ground_mesh"]
+size = Vector2(80, 80)
+
+[sub_resource type="StandardMaterial3D" id="ground_material"]
+albedo_color = Color(0.32, 0.4, 0.25, 1)
+
+[sub_resource type="BoxMesh" id="pillar_mesh"]
+size = Vector3(1, 4, 1)
+
+[sub_resource type="StandardMaterial3D" id="pillar_material"]
+albedo_color = Color(0.55, 0.5, 0.42, 1)
+
+[sub_resource type="SphereMesh" id="bird_mesh"]
+radius = 0.3
+height = 0.6
+
+[sub_resource type="StandardMaterial3D" id="bird_material"]
+albedo_color = Color(0.95, 0.8, 0.2, 1)
+emission_enabled = true
+emission = Color(0.6, 0.45, 0.05, 1)
+
+[node name="Sandbox" type="Node3D"]
+script = ExtResource("1_sandbox")
+
+[node name="DirgeServer" type="Node" parent="."]
+script = ExtResource("2_server")
+ProjectPath = "res://demo/sandbox/sandbox.dirge.json"
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("env")
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.642788, -0.766044, 0, 0.766044, 0.642788, 0, 10, 0)
+shadow_enabled = true
+
+[node name="Player" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.7, 0)
+current = true
+
+[node name="BirdEmitter" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 2.5, 0)
+mesh = SubResource("bird_mesh")
+surface_material_override/0 = SubResource("bird_material")
+
+[node name="Ground" type="MeshInstance3D" parent="."]
+mesh = SubResource("ground_mesh")
+surface_material_override/0 = SubResource("ground_material")
+
+[node name="PillarN" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, -10)
+mesh = SubResource("pillar_mesh")
+surface_material_override/0 = SubResource("pillar_material")
+
+[node name="PillarS" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 10)
+mesh = SubResource("pillar_mesh")
+surface_material_override/0 = SubResource("pillar_material")
+
+[node name="PillarE" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 2, 0)
+mesh = SubResource("pillar_mesh")
+surface_material_override/0 = SubResource("pillar_material")
+
+[node name="PillarW" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 2, 0)
+mesh = SubResource("pillar_mesh")
+surface_material_override/0 = SubResource("pillar_material")
+
+[node name="Hud" type="CanvasLayer" parent="."]
+
+[node name="Label" type="Label" parent="Hud"]
+offset_left = 16.0
+offset_top = 12.0
+offset_right = 900.0
+offset_bottom = 140.0
+text = "Dirge sandbox"

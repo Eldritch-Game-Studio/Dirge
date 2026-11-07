@@ -7,14 +7,22 @@ namespace Dirge.Runtime;
 /// <summary>One parameter's target and seek-smoothed effective value.</summary>
 public sealed class ParameterState
 {
+    private float _previous;
+
     public ParameterDefinition Definition { get; }
     public float Target { get; private set; }
     public float Value { get; private set; }
+    /// <summary>
+    /// Rate of change of <see cref="Value"/> in units per second, measured over the last <see cref="Advance"/>: it covers seek
+    /// smoothing as well as immediate sets made since the previous tick (built-in parameters are written immediately every
+    /// tick, so their velocity is the engine-fed derivative, e.g. closing speed for Distance). 0 while steady.
+    /// </summary>
+    public float Velocity { get; private set; }
 
     public ParameterState(ParameterDefinition definition)
     {
         Definition = definition;
-        Target = Value = definition.Default;
+        Target = Value = _previous = definition.Default;
     }
 
     public void Set(float value, bool immediate = false)
@@ -25,15 +33,31 @@ public sealed class ParameterState
         if (immediate) Value = clamped;
     }
 
-    /// <summary>Move <see cref="Value"/> toward <see cref="Target"/> by seek speed. Returns true when the value changed.</summary>
+    /// <summary>Move <see cref="Value"/> toward <see cref="Target"/> by seek speed and refresh <see cref="Velocity"/>. Returns true when the value changed.</summary>
     public bool Advance(double dt)
     {
-        if (Value == Target) return false;
-        float speed = Target > Value ? Definition.SeekSpeedUp : Definition.SeekSpeedDown;
-        if (speed <= 0f) { Value = Target; return true; }
-        float step = (float)(speed * dt);
-        Value = Target > Value ? MathF.Min(Value + step, Target) : MathF.Max(Value - step, Target);
-        return true;
+        bool changed = false;
+        if (Value != Target)
+        {
+            float speed = Target > Value ? Definition.SeekSpeedUp : Definition.SeekSpeedDown;
+            if (speed <= 0f) Value = Target;
+            else
+            {
+                float step = (float)(speed * dt);
+                Value = Target > Value ? MathF.Min(Value + step, Target) : MathF.Max(Value - step, Target);
+            }
+            changed = true;
+        }
+        Velocity = dt > 0 ? (float)((Value - _previous) / dt) : 0f;
+        _previous = Value;
+        return changed;
+    }
+
+    /// <summary>Forget the previous tick's value so a reused pooled instance does not report a velocity spike.</summary>
+    internal void Rebase()
+    {
+        _previous = Value;
+        Velocity = 0f;
     }
 }
 

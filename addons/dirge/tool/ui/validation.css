@@ -1,0 +1,18 @@
+/* Validation panel: diagnostics list; click selects the offending object. */
+.validation { display: flex; flex-direction: column; width: 100%; height: 100%; background-color: var(--bg); }
+.validation .toolbar { flex-shrink: 0; }
+.validation .title { color: var(--fg); font-weight: 700; text-wrap-mode: nowrap; }
+.validation .summary { color: var(--muted); font-size: 11px; text-wrap-mode: nowrap; padding-left: var(--space-2); }
+.validation .spacer { flex-grow: 1; flex-shrink: 1; min-width: 0; height: 1px; }
+.diagnostics { flex-grow: 1; flex-shrink: 1; min-height: 0; border-width: 0; border-radius: 0; }
+.diagnostic { display: flex; flex-direction: row; align-items: center; column-gap: var(--space-2); height: var(--row-h); padding: 0 var(--space-2); cursor: pointer; border-bottom: 1px solid var(--panel); }
+.diagnostic:hover { background-color: var(--hover); }
+.diagnostic.selected { background-color: var(--selection); }
+.diagnostic.unselectable { cursor: default; }
+.diagnostic .severity { display: block; width: 64px; flex-shrink: 0; height: 16px; padding: 0 6px; font-size: 11px; line-height: 14px; text-align: center; border: 1px solid var(--border); border-radius: 8px; color: var(--muted); text-wrap-mode: nowrap; }
+.diagnostic.error .severity { color: var(--danger); border-color: var(--danger); }
+.diagnostic.warning .severity { color: var(--warning); border-color: var(--warning); }
+.diagnostic .code { width: 220px; flex-shrink: 0; color: var(--muted); font-size: 11px; overflow-x: hidden; overflow-y: hidden; text-wrap-mode: nowrap; text-overflow: ellipsis; }
+.diagnostic .message { flex-grow: 1; flex-shrink: 1; min-width: 0; color: var(--fg); overflow-x: hidden; overflow-y: hidden; text-wrap-mode: nowrap; text-overflow: ellipsis; }
+.diagnostic .subject { flex-shrink: 0; color: var(--muted); font-size: 11px; text-wrap-mode: nowrap; }
+.empty { color: var(--muted); padding: var(--space-3); }

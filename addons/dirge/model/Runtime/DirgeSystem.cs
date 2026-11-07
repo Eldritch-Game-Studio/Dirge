@@ -36,6 +36,14 @@ public sealed class DirgeSystem
 {
     public const int MaxListeners = 8;
 
+    /// <summary>One programmer key's locale map and its fallback (first authored locale).</summary>
+    private readonly struct TableEntry
+    {
+        public readonly Dictionary<string, AssetRef> Locales;
+        public readonly AssetRef Fallback;
+        public TableEntry(Dictionary<string, AssetRef> locales, AssetRef fallback) { Locales = locales; Fallback = fallback; }
+    }
+
     private readonly Dictionary<string, EventDescription> _byPath = new(StringComparer.Ordinal);
     private readonly Dictionary<DirgeId, EventDescription> _byId = new();
     private readonly List<EventDescription> _descriptions = new();
@@ -44,7 +52,10 @@ public sealed class DirgeSystem
     private readonly List<Feedback> _feedback = new();
     private readonly Attributes3D[] _listeners = new Attributes3D[MaxListeners];
     private readonly float[] _listenerWeights = new float[MaxListeners];
+    private readonly Dictionary<string, TableEntry> _tables = new(StringComparer.Ordinal);
     private int _totalInstances;
+    private int _maxRealVoices = 64;
+    private string _locale = "";
 
     public AudioProject Project { get; }
     public MixerState Mixer { get; }
@@ -56,16 +67,53 @@ public sealed class DirgeSystem
     /// <summary>Live instances including nested children.</summary>
     public int InstanceCount => _totalInstances;
     public int RealVoiceCount => Voices.RealCount;
+    /// <summary>Top-level live instances (created through the API or by command instruments); nested children are not listed.</summary>
+    public IReadOnlyList<EventInstance> Instances => _instances;
+    /// <summary>Seed the system was built with; a replay with the same project, seed and API calls emits identical commands.</summary>
+    public int Seed { get; }
+    /// <summary>Platform string the mixer baseline was resolved for (<see cref="AudioProject.PlatformOverrides"/>), or null.</summary>
+    public string? Platform { get; }
+
     /// <summary>Global cap on voices with an engine player; the rest virtualize by Priority.</summary>
-    public int MaxRealVoices { get; set; } = 64;
+    public int MaxRealVoices
+    {
+        get => _maxRealVoices;
+        set
+        {
+            Recorder?.Call(null, "SetMaxRealVoices", null, null, value, false, 0);
+            _maxRealVoices = value;
+        }
+    }
+
+    /// <summary>Locale code used to resolve programmer keys through <see cref="AudioProject.AudioTables"/>; "" = first authored locale.</summary>
+    public string Locale
+    {
+        get => _locale;
+        set
+        {
+            Recorder?.Call(null, "SetLocale", value, null, 0, false, 0);
+            _locale = value ?? "";
+        }
+    }
+
+    /// <summary>
+    /// Playing instance of the most recently started event flagged <see cref="AudioEvent.IsConductor"/>; null when none plays.
+    /// Quantized starts (<see cref="EventMacros.StartQuantization"/>) wait for its grid.
+    /// </summary>
+    public EventInstance? Conductor { get; private set; }
+
+    /// <summary>Optional observer of API calls and ticks (profiler recording). Null in production: every hook is a null check.</summary>
+    public IApiSink? Recorder { get; set; }
 
     internal DirgeRandom Random { get; }
     internal IAssetCatalog Assets { get; }
     internal VoicePool Voices { get; }
 
-    public DirgeSystem(AudioProject project, int seed = 0, IAssetCatalog? assets = null)
+    public DirgeSystem(AudioProject project, int seed = 0, IAssetCatalog? assets = null, string? platform = null)
     {
         Project = project ?? throw new ArgumentNullException(nameof(project));
+        Seed = seed;
+        Platform = platform;
         Random = new DirgeRandom(seed);
         Assets = assets ?? new ProjectAssetCatalog(project);
         GlobalParameters = new ParameterBank(project.GlobalParameters);
@@ -82,7 +130,43 @@ public sealed class DirgeSystem
         }
         for (int i = 0; i < _descriptions.Count; i++) _descriptions[i].Link();
 
-        Mixer = new MixerState(project, GlobalParameters, Commands, Random);
+        // Earlier tables win for a key defined twice; within a key the first authored locale is the fallback.
+        for (int t = 0; t < project.AudioTables.Count; t++)
+        {
+            foreach (KeyValuePair<string, Dictionary<string, AssetRef>> entry in project.AudioTables[t].Entries)
+            {
+                if (_tables.ContainsKey(entry.Key)) continue;
+                AssetRef fallback = default;
+                foreach (KeyValuePair<string, AssetRef> locale in entry.Value) { fallback = locale.Value; break; }
+                _tables[entry.Key] = new TableEntry(entry.Value, fallback);
+            }
+        }
+
+        Mixer = new MixerState(project, GlobalParameters, Commands, Random, platform) { System = this };
+    }
+
+    /// <summary>Audio-table lookup: <see cref="Locale"/> first, then the key's first authored locale. Empty when the key is unknown.</summary>
+    internal AssetRef ResolveTableAsset(string key)
+    {
+        if (!_tables.TryGetValue(key, out TableEntry entry)) return default;
+        return _locale.Length > 0 && entry.Locales.TryGetValue(_locale, out AssetRef asset) ? asset : entry.Fallback;
+    }
+
+    internal void OnConductorPlaying(EventInstance instance) => Conductor = instance;
+
+    internal void OnConductorStopped(EventInstance instance)
+    {
+        if (!ReferenceEquals(Conductor, instance)) return;
+        Conductor = null;
+        // Fall back to the most recently started conductor instance that is still playing.
+        double best = double.NegativeInfinity;
+        for (int i = 0; i < _instances.Count; i++)
+        {
+            EventInstance candidate = _instances[i];
+            if (!candidate.Description.Event.IsConductor || !candidate.CanTrigger || candidate.StartTime < best) continue;
+            best = candidate.StartTime;
+            Conductor = candidate;
+        }
     }
 
     // ---- lookup --------------------------------------------------------------------------------------------------
@@ -101,6 +185,7 @@ public sealed class DirgeSystem
 
     public void SetGlobalParameter(string name, float value, bool immediate = false)
     {
+        Recorder?.Call(null, "SetGlobalParameter", name, null, value, immediate, 0);
         if (GlobalParameters.TryGet(name, out ParameterState state)) state.Set(value, immediate);
     }
 
@@ -110,6 +195,7 @@ public sealed class DirgeSystem
     public void SetListener(int index, Attributes3D attributes, float weight = 1f)
     {
         if (index < 0 || index >= MaxListeners) throw new ArgumentOutOfRangeException(nameof(index));
+        Recorder?.Call3D(null, "SetListener", index, attributes, weight);
         _listeners[index] = attributes;
         _listenerWeights[index] = MathF.Max(0f, weight);
     }
@@ -131,14 +217,33 @@ public sealed class DirgeSystem
 
     public void StopAll(StopMode mode)
     {
+        IApiSink? recorder = Recorder;
+        recorder?.Call(null, "StopAll", null, null, 0, false, (int)mode);
+        recorder?.EnterInternal();
         for (int i = _instances.Count - 1; i >= 0; i--)
             if (i < _instances.Count) _instances[i].Stop(mode);
+        recorder?.ExitInternal();
     }
 
     /// <summary>Driver → model. Applied at the start of the next <see cref="Update"/>.</summary>
     public void Feedback(Feedback feedback)
     {
-        if (feedback is not null) _feedback.Add(feedback);
+        if (feedback is null) return;
+        if (Recorder is not null) RecordFeedback(feedback);
+        _feedback.Add(feedback);
+    }
+
+    private void RecordFeedback(Feedback feedback)
+    {
+        switch (feedback)
+        {
+            case VoiceFinished finished:
+                Recorder!.Call(null, "Feedback", "VoiceFinished", null, finished.Voice.Value, false, 0);
+                break;
+            case VoiceFailed failed:
+                Recorder!.Call(null, "Feedback", "VoiceFailed", failed.Reason, failed.Voice.Value, false, 0);
+                break;
+        }
     }
 
     internal void OnInstanceCreated(EventInstance instance)
@@ -202,6 +307,9 @@ public sealed class DirgeSystem
     public void Update(double dt)
     {
         if (dt < 0) dt = 0;
+        IApiSink? recorder = Recorder;
+        recorder?.BeginUpdate(this, dt);
+        recorder?.EnterInternal();
         FlushDestroyQueue();
 
         for (int i = 0; i < _feedback.Count; i++)
@@ -228,7 +336,7 @@ public sealed class DirgeSystem
         for (int i = 0; i < count && i < _instances.Count; i++) _instances[i].UpdateInternal(dt);
 
         for (int i = 0; i < _descriptions.Count; i++) _descriptions[i].ApplyVirtualizeStealing();
-        Voices.ApplyLimits(Math.Max(0, MaxRealVoices), Commands);
+        Voices.ApplyLimits(Math.Max(0, _maxRealVoices), Commands);
 
         count = _instances.Count;
         for (int i = 0; i < count && i < _instances.Count; i++) _instances[i].EmitInternal(Commands);
@@ -236,5 +344,7 @@ public sealed class DirgeSystem
         Mixer.Update(dt);
         Time += dt;
         FlushDestroyQueue();
+        recorder?.ExitInternal();
+        recorder?.EndUpdate(this);
     }
 }

@@ -16,6 +16,8 @@ public interface IAudition
     DirgeSystem? System { get; }
     /// <summary>Raised after a rebuild; panes holding <see cref="EventInstance"/>s must drop them.</summary>
     event Action? Rebuilt;
+    /// <summary>Stops everything, drops the current system and builds a fresh one immediately (not debounced); <see cref="Rebuilt"/> is raised synchronously before that system's first Update.</summary>
+    void Restart();
 
     EventInstance? Play(DirgeId eventId);
     void StopAll(StopMode mode);

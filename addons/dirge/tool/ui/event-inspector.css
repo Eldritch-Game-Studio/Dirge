@@ -1,0 +1,7 @@
+/* Instrument / marker / track inspector: single column of sections. */
+#event-inspector .section-body.grid .row { width: 100%; }
+#event-inspector .section-body.grid .row .label { width: 104px; }
+#event-inspector .head { padding: 0 2px; }
+#event-inspector .item.inline { flex-wrap: nowrap; }
+#event-inspector .item.inline .field.num { width: 48px; min-width: 36px; }
+#event-inspector .item.inline .field.grow { min-width: 60px; }

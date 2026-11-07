@@ -1,0 +1,7 @@
+/* Event header: toolbar + collapsible macro/parameter/tempo sections. */
+#event-header .scroll { flex-direction: row; flex-wrap: wrap; align-items: flex-start; column-gap: var(--space-2, 8px); row-gap: var(--space-1, 4px); align-content: flex-start; }
+#event-header .section { min-width: 300px; flex-grow: 1; flex-shrink: 1; }
+#event-header .section-body.grid .row { width: 210px; }
+#event-header .section-body.grid .row .label { width: 90px; }
+#event-header .item.grid .row { width: 170px; }
+#event-header .item.grid .row .label { width: 60px; }

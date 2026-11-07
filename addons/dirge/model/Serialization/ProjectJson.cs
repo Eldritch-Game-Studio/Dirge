@@ -23,7 +23,7 @@ namespace Dirge.Serialization;
 /// Modulator:    RandomModulator → Random, AhdsrModulator → Ahdsr, LfoModulator → Lfo
 /// LogicMarker:  DestinationMarker → Destination, LoopRegion → Loop, TransitionMarker → Transition,
 ///               TransitionRegion → TransitionRegion (stripping "Region" would collide with TransitionMarker),
-///               SustainPoint → SustainPoint (no suffix to strip)
+///               SustainPoint → SustainPoint (no suffix to strip), MagnetRegion → Magnet
 /// </code>
 /// Value encodings: <see cref="DirgeId"/> ↔ 32-hex string, <see cref="AssetRef"/> ↔ string,
 /// <see cref="CurvePoint"/> ↔ <c>[x, y, "Shape"]</c>, <see cref="PropertyRef"/> ↔ <c>{kind, owner, effectIndex?, name?}</c>.
@@ -147,7 +147,8 @@ public static class ProjectJson
                 (typeof(LoopRegion), "Loop"),
                 (typeof(TransitionMarker), "Transition"),
                 (typeof(TransitionRegion), "TransitionRegion"),
-                (typeof(SustainPoint), "SustainPoint"));
+                (typeof(SustainPoint), "SustainPoint"),
+                (typeof(MagnetRegion), "Magnet"));
         }
         if (polymorphism is not null) info.PolymorphismOptions = polymorphism;
     }

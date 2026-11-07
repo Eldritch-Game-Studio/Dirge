@@ -5,9 +5,10 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <RootNamespace>DirgeDemo</RootNamespace>
+    <DefaultItemExcludes>$(DefaultItemExcludes);.godot/**;proof/**;proof-*/**</DefaultItemExcludes>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Remove="tests/**" />
+    <Compile Remove="tests/**;tools/**;native/**;proof/**;proof-*/**" />
   </ItemGroup>
   <Import Project="addons/necronomidom/NecronomiDom.targets" />
   <Import Project="addons/dirge/Dirge.targets" />

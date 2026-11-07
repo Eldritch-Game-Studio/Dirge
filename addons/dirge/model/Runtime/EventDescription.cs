@@ -19,8 +19,11 @@ public sealed class EventDescription
     private readonly DirgeId[] _markerIds;
     private readonly double[] _markerPositions;
 
+    /// <summary>Track instruments first, then every transition timeline's instruments (<see cref="InstrumentInfo.Transition"/> set).</summary>
     internal readonly InstrumentInfo[] Instruments;
     internal readonly TimelinePoint[] Points;
+    /// <summary>Seek snap regions, in authored order.</summary>
+    internal readonly MagnetRegion[] Magnets;
     internal readonly AutomationLane[] EventVolumeLanes;
     internal readonly AutomationLane[] EventPitchLanes;
     internal readonly ModInfo[] EventModulators;
@@ -67,16 +70,29 @@ public sealed class EventDescription
             Track track = ev.Tracks[t];
             for (int i = 0; i < track.Instruments.Count; i++)
             {
-                var info = new InstrumentInfo(ev, track, track.Instruments[i], project, assets);
+                var info = new InstrumentInfo(ev, track, track.Instruments[i], project, assets, null);
                 instruments.Add(info);
                 if (info.OnTimeline && track.Instruments[i].Loop) loopingInstrument = true;
             }
+        }
+        for (int i = 0; i < ev.Markers.Count; i++)
+        {
+            List<Instrument>? transitionInstruments = ev.Markers[i] switch
+            {
+                TransitionMarker tm when tm.TransitionLength > 0f => tm.TransitionInstruments,
+                TransitionRegion tr when tr.TransitionLength > 0f => tr.TransitionInstruments,
+                _ => null,
+            };
+            if (transitionInstruments is null) continue;
+            for (int k = 0; k < transitionInstruments.Count; k++)
+                instruments.Add(new InstrumentInfo(ev, InstrumentInfo.NoTrack, transitionInstruments[k], project, assets, ev.Markers[i]));
         }
         Instruments = instruments.ToArray();
 
         var points = new List<TimelinePoint>();
         var markerIds = new List<DirgeId>();
         var markerPositions = new List<double>();
+        var magnets = new List<MagnetRegion>();
         bool hasLoop = false;
         for (int i = 0; i < ev.Markers.Count; i++)
         {
@@ -93,6 +109,9 @@ public sealed class EventDescription
                     points.Add(new TimelinePoint(region.Position, region, PointKind.RegionStart));
                     points.Add(new TimelinePoint(region.Position + Math.Max(0f, region.Length), region, PointKind.RegionEnd));
                     break;
+                case MagnetRegion magnet:
+                    magnets.Add(magnet);
+                    break;
                 default:
                     points.Add(new TimelinePoint(m.Position, m, PointKind.Marker));
                     break;
@@ -100,6 +119,7 @@ public sealed class EventDescription
         }
         points.Sort(ComparePoints);
         Points = points.ToArray();
+        Magnets = magnets.ToArray();
         _markerIds = markerIds.ToArray();
         _markerPositions = markerPositions.ToArray();
 
@@ -120,8 +140,9 @@ public sealed class EventDescription
 
         double length = 0;
         for (int i = 0; i < Instruments.Length; i++)
-            if (Instruments[i].OnTimeline) length = Math.Max(length, Instruments[i].LengthContribution);
+            if (Instruments[i].OnTimeline && Instruments[i].Transition is null) length = Math.Max(length, Instruments[i].LengthContribution);
         for (int i = 0; i < Points.Length; i++) length = Math.Max(length, Points[i].Position);
+        for (int i = 0; i < Magnets.Length; i++) length = Math.Max(length, Magnets[i].Position + Math.Max(0f, Magnets[i].Length));
         Length = length;
         IsOneshot = !ev.Macros.Persistent && !hasLoop && !loopingInstrument;
     }
@@ -143,7 +164,12 @@ public sealed class EventDescription
     }
 
     /// <summary>Pooled. MaxInstances/stealing are applied by <see cref="EventInstance.Start"/>, not here.</summary>
-    public EventInstance CreateInstance() => CreateInstance(null);
+    public EventInstance CreateInstance()
+    {
+        EventInstance instance = CreateInstance(null);
+        _system.Recorder?.Created(instance, "CreateInstance", Path);
+        return instance;
+    }
 
     /// <summary>Nested instances (event instruments) are owned and updated by <paramref name="parent"/>, never by the system list.</summary>
     internal EventInstance CreateInstance(EventInstance? parent)
@@ -199,6 +225,17 @@ public sealed class EventDescription
         }
         position = 0;
         return false;
+    }
+
+    /// <summary>Apply <see cref="MagnetRegion"/>s to a seek target: the first region containing it wins.</summary>
+    internal double Magnetize(double position)
+    {
+        for (int i = 0; i < Magnets.Length; i++)
+        {
+            MagnetRegion m = Magnets[i];
+            if (position >= m.Position - Epsilon && position < m.Position + m.Length - Epsilon) return m.Position;
+        }
+        return position;
     }
 
     // ---- tempo ---------------------------------------------------------------------------------------------------

@@ -10,7 +10,7 @@ public sealed record EventDrag(DirgeId Event) : DragPayload;
 public sealed record SnapshotDrag(DirgeId Snapshot) : DragPayload;
 public sealed record ParameterDrag(DirgeId Parameter, bool Global) : DragPayload;
 
-public static class ToolDrag
+public static partial class ToolDrag
 {
     /// <summary>Wraps a payload for <c>Control.ForceDrag</c>/<c>_GetDragData</c>; the Variant is a <see cref="Godot.GodotObject"/> wrapper.</summary>
     public static Godot.Variant Wrap(DragPayload payload) => new DragHolder(payload);

@@ -1,0 +1,68 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Dirge Mixer</title>
+  <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="mixer.css">
+</head>
+<body>
+  <main id="mixer">
+    <section id="strips-pane" class="strips-pane">
+      <div class="pane-head">
+        <div class="pane-title">Buses</div>
+        <div class="pane-tools">
+          <button id="bus-add" class="tool" title="Add bus (child of selected bus or Master)">+ Bus</button>
+          <div id="snap-banner" class="snap-banner" hidden>Editing snapshot</div>
+        </div>
+      </div>
+      <div class="strips-row">
+        <div id="master-slot" class="master-slot"></div>
+        <div id="bus-strips" class="bus-strips"></div>
+      </div>
+    </section>
+    <section id="side-pane" class="side-pane">
+      <div class="pane-head">
+        <div class="pane-title">VCAs</div>
+        <div class="pane-tools"><button id="vca-add" class="tool" title="Add VCA">+ VCA</button></div>
+      </div>
+      <div id="vca-list" class="vca-list"></div>
+      <div class="pane-head">
+        <div class="pane-title">Snapshots</div>
+        <div class="pane-tools"><button id="snap-add" class="tool" title="Add snapshot">+ Snapshot</button></div>
+      </div>
+      <div id="snap-list" class="snap-list"></div>
+      <div id="snap-editor" class="snap-editor" hidden>
+        <div class="snap-editor-head">
+          <div id="snap-editor-title" class="snap-editor-title">Snapshot</div>
+          <button id="snap-capture" class="tool" title="Scope every bus volume at its authored value">Capture</button>
+          <button id="snap-done" class="tool" title="Leave snapshot editing">Done</button>
+        </div>
+        <div class="field-row">
+          <div class="field-label">Intensity</div>
+          <div id="snap-intensity" class="hslider"><div class="hfill"></div><div class="hthumb"></div></div>
+          <div id="snap-intensity-text" class="field-value">0 %</div>
+        </div>
+        <div class="field-row">
+          <div class="field-label">Attack</div><input id="snap-attack" class="num" type="text" value="0">
+          <div class="field-label">Hold</div><input id="snap-hold" class="num" type="text" value="0">
+          <div class="field-label">Decay</div><input id="snap-decay" class="num" type="text" value="0">
+        </div>
+        <div class="field-row">
+          <div class="field-label">Sustain</div><input id="snap-sustain" class="num" type="text" value="1">
+          <div class="field-label">Release</div><input id="snap-release" class="num" type="text" value="0">
+        </div>
+        <div id="snap-scope-note" class="hint">Touch a fader or effect parameter to scope it. Scoped controls are highlighted; click the x badge to unscope.</div>
+      </div>
+    </section>
+    <div id="popup" class="popup" hidden></div>
+    <div id="popover" class="popover" hidden>
+      <div class="popover-head">
+        <div id="popover-title" class="popover-title">Effect</div>
+        <button id="popover-close" class="tool">x</button>
+      </div>
+      <div id="popover-body" class="popover-body"></div>
+    </div>
+  </main>
+</body>
+</html>

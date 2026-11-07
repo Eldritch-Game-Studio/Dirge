@@ -101,8 +101,17 @@ public sealed class MixerState
 
     /// <summary>System random; the M1 mixer has no random sources but keeps the shared generator for determinism of later features.</summary>
     internal DirgeRandom Random { get; }
+    /// <summary>Owning system (set by <see cref="DirgeSystem"/>); reached for the API recorder.</summary>
+    internal DirgeSystem? System { get; set; }
+    private IApiSink? Recorder => System?.Recorder;
 
-    public MixerState(AudioProject project, ParameterBank globals, CommandBuffer commands, DirgeRandom random)
+    /// <summary>
+    /// <paramref name="platform"/> selects the <see cref="AudioProject.PlatformOverrides"/> entry (case-insensitive) whose values
+    /// replace the authored baseline before snapshots and automation; null or no match keeps the authored values.
+    /// <see cref="AudioProject.MixerAutomation"/> lanes are registered at construction (lanes with an unknown target or a
+    /// non-global parameter are skipped; the validator reports them).
+    /// </summary>
+    public MixerState(AudioProject project, ParameterBank globals, CommandBuffer commands, DirgeRandom random, string? platform = null)
     {
         _globals = globals;
         _commands = commands;
@@ -189,6 +198,7 @@ public sealed class MixerState
             _busVcaProperties[i] = scratch.ToArray();
         }
 
+        ApplyPlatformOverrides(project, platform);
         Array.Copy(_authored, _value, propertyCount);
         _busVolumeOverride = new float[_busCount];
         _busMuteOverride = new bool[_busCount];
@@ -209,6 +219,25 @@ public sealed class MixerState
                 values[k] = new SnapshotInstance.ResolvedValue(_propertyByRef.TryGetValue(sv.Target, out int p) ? p : -1, sv.Value);
             }
             _snapshotsByName[snapshot.Name] = new SnapshotInstance.Definition(snapshot, values);
+        }
+
+        for (int i = 0; i < project.MixerAutomation.Count; i++)
+        {
+            AutomationLane lane = project.MixerAutomation[i];
+            if (_propertyByRef.TryGetValue(lane.Target, out int property) && _globals.TryGet(lane.Parameter, out ParameterState parameter))
+                _automation.Add(new AutomationSlot(lane.Id, property, parameter, lane.Curve));
+        }
+    }
+
+    private void ApplyPlatformOverrides(AudioProject project, string? platform)
+    {
+        if (string.IsNullOrEmpty(platform)) return;
+        for (int i = 0; i < project.PlatformOverrides.Count; i++)
+        {
+            PlatformOverride po = project.PlatformOverrides[i];
+            if (!string.Equals(po.Platform, platform, StringComparison.OrdinalIgnoreCase)) continue;
+            for (int k = 0; k < po.Values.Count; k++)
+                if (_propertyByRef.TryGetValue(po.Values[k].Target, out int p)) _authored[p] = po.Values[k].Value;
         }
     }
 
@@ -241,11 +270,32 @@ public sealed class MixerState
     public float EffectiveVcaVolumeDb(DirgeId vca) => _value[VcaProperty(VcaIndex(vca))];
 
     /// <summary>Runtime offset added on top of the evaluated bus volume (FMOD <c>Bus::setVolume</c> semantics).</summary>
-    public void SetBusVolume(string bus, float db) => _busVolumeOverride[BusIndex(bus)] = db;
-    public void SetBusMute(string bus, bool mute) => _busMuteOverride[BusIndex(bus)] = mute;
-    public void SetBusSolo(string bus, bool solo) => _busSoloOverride[BusIndex(bus)] = solo;
+    public void SetBusVolume(string bus, float db)
+    {
+        Recorder?.Call(this, "SetBusVolume", bus, null, db, false, 0);
+        _busVolumeOverride[BusIndex(bus)] = db;
+    }
+
+    public void SetBusMute(string bus, bool mute)
+    {
+        Recorder?.Call(this, "SetBusMute", bus, null, 0, mute, 0);
+        _busMuteOverride[BusIndex(bus)] = mute;
+    }
+
+    public void SetBusSolo(string bus, bool solo)
+    {
+        Recorder?.Call(this, "SetBusSolo", bus, null, 0, solo, 0);
+        _busSoloOverride[BusIndex(bus)] = solo;
+    }
+
     /// <summary>Runtime offset added on top of the evaluated VCA volume.</summary>
-    public void SetVcaVolume(string vca, float db) => _vcaOverride[VcaIndex(vca)] = db;
+    public void SetVcaVolume(string vca, float db)
+    {
+        Recorder?.Call(this, "SetVcaVolume", vca, null, db, false, 0);
+        _vcaOverride[VcaIndex(vca)] = db;
+    }
+
+    public bool HasSnapshot(string name) => _snapshotsByName.ContainsKey(name);
 
     /// <summary>Start a snapshot by name. Multiple instances of the same snapshot may run at once.</summary>
     public SnapshotInstance StartSnapshot(string name)
@@ -253,18 +303,19 @@ public sealed class MixerState
         if (!_snapshotsByName.TryGetValue(name, out SnapshotInstance.Definition? def))
             throw new KeyNotFoundException($"Snapshot '{name}' not found.");
         SnapshotInstance instance = _pool.Count > 0 ? _pool.Pop() : new SnapshotInstance();
-        instance.Activate(def);
+        instance.Activate(def, this);
         int priority = def.Snapshot.Priority;
         int insertAt = _active.Count;
         while (insertAt > 0 && _active[insertAt - 1].Def.Snapshot.Priority > priority) insertAt--;
         _active.Insert(insertAt, instance);
+        Recorder?.Created(instance, "StartSnapshot", name);
         return instance;
     }
 
     /// <summary>
     /// Drive a mixer property (bus volume/pitch, VCA volume, effect parameter) from a global parameter. The curve value is
-    /// added to the property in its own units after snapshots and before runtime overrides. M1 projects have no project-level
-    /// automation list, so lanes are registered here by whoever owns them.
+    /// added to the property in its own units after snapshots and before runtime overrides. <see cref="AudioProject.MixerAutomation"/>
+    /// lanes are registered at construction; this adds a lane at runtime (tool live-edit) and throws on invalid targets.
     /// </summary>
     public void AddAutomation(AutomationLane lane)
     {

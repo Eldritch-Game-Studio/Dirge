@@ -22,7 +22,8 @@ public readonly record struct Attributes3D(Vector3 Position, Vector3 Velocity, V
 /// </summary>
 public abstract record Command;
 
-public sealed record VoicePlay(VoiceId Voice, AssetRef Asset, string Bus, double StartSeconds, bool Loop, float VolumeDb, float Pitch, bool Spatial, Attributes3D Attributes, float MinDistance, float MaxDistance) : Command;
+/// <summary><paramref name="SyncGroup"/> ≠ 0: the driver starts voices sharing the group (same instance, same track) sample-locked.</summary>
+public sealed record VoicePlay(VoiceId Voice, AssetRef Asset, string Bus, double StartSeconds, bool Loop, float VolumeDb, float Pitch, bool Spatial, Attributes3D Attributes, float MinDistance, float MaxDistance, int SyncGroup = 0) : Command;
 public sealed record VoiceStop(VoiceId Voice) : Command;
 public sealed record VoiceSeek(VoiceId Voice, double Seconds) : Command;
 public sealed record VoiceSetVolume(VoiceId Voice, float VolumeDb) : Command;
@@ -50,4 +51,28 @@ public sealed class CommandBuffer
     public int Count => _commands.Count;
     public void Add(Command command) => _commands.Add(command);
     public void Clear() => _commands.Clear();
+}
+
+/// <summary>Which runtime object an API call was made on.</summary>
+public enum ApiTarget { System, Instance, Mixer, Snapshot }
+
+/// <summary>
+/// Observer of every public API call and tick of a <see cref="DirgeSystem"/> (installed via <see cref="DirgeSystem.Recorder"/>;
+/// implemented by <c>Dirge.Profiling.Recorder</c>). Calls made internally during <see cref="DirgeSystem.Update"/> or on behalf
+/// of another API call (stealing, StopAll) are bracketed by <see cref="EnterInternal"/>/<see cref="ExitInternal"/> so a
+/// recording contains only what a replay must reissue. All hooks are no-ops in cost when no sink is attached.
+/// </summary>
+public interface IApiSink
+{
+    /// <summary>A new <see cref="EventInstance"/> (<paramref name="name"/> = event path) or <see cref="SnapshotInstance"/> (snapshot name) handed out by the API.</summary>
+    void Created(object target, string method, string name);
+    /// <summary><paramref name="target"/>: null = system, <see cref="MixerState"/>, <see cref="EventInstance"/> or <see cref="SnapshotInstance"/>.</summary>
+    void Call(object? target, string method, string? name, string? text, double value, bool flag, int mode);
+    void Call3D(object? target, string method, int index, in Attributes3D attributes, float weight);
+    /// <summary>A programmer-sound callback (or <c>SetProgrammerSound</c>/audio-table fallback) resolved <paramref name="key"/> during Update.</summary>
+    void ProgrammerSound(EventInstance instance, string key, AssetRef asset);
+    void EnterInternal();
+    void ExitInternal();
+    void BeginUpdate(DirgeSystem system, double dt);
+    void EndUpdate(DirgeSystem system);
 }

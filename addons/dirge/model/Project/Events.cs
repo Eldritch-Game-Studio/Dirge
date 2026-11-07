@@ -22,8 +22,17 @@ public sealed class EventMacros
     public float MaxDistance { get; set; } = 20f;
     public bool Doppler { get; set; }
     public float DopplerScale { get; set; } = 1f;
-    /// <summary>Seconds the scheduler is allowed to look ahead when quantizing starts.</summary>
+    /// <summary>
+    /// Seconds the scheduler is allowed to look ahead when quantizing starts. With <see cref="StartQuantization"/> set, a grid
+    /// point closer than this is considered too late to commit to and the following one is used instead; 0 = any grid point.
+    /// </summary>
     public float ScheduleLookahead { get; set; }
+    /// <summary>
+    /// Defer <c>Start()</c> to the next grid point of the system's conductor (<see cref="Dirge.Runtime.DirgeSystem.Conductor"/>,
+    /// the playing instance of an event flagged <see cref="AudioEvent.IsConductor"/>). Without a conductor, or when the
+    /// conductor has no tempo map, the start is immediate.
+    /// </summary>
+    public Quantization StartQuantization { get; set; } = Quantization.None;
 }
 
 public sealed class AudioEvent
@@ -32,6 +41,11 @@ public sealed class AudioEvent
     /// <summary>Slash-separated path, e.g. "Ambience/Wind".</summary>
     public string Path { get; set; } = "";
     public DirgeId Bus { get; set; }
+    /// <summary>
+    /// When an instance of this event is playing it becomes <see cref="Dirge.Runtime.DirgeSystem.Conductor"/>: its tempo map and
+    /// playhead define the grid that <see cref="EventMacros.StartQuantization"/> starts of other events wait for.
+    /// </summary>
+    public bool IsConductor { get; set; }
     public EventMacros Macros { get; set; } = new();
     public List<ParameterDefinition> LocalParameters { get; } = new();
     public List<Track> Tracks { get; } = new();
@@ -91,6 +105,11 @@ public abstract class Instrument
     public float TriggerDelay { get; set; }
     /// <summary>0..1 chance the instrument triggers when its region is entered.</summary>
     public float Probability { get; set; } = 1f;
+    /// <summary>
+    /// Instruments on the same track sharing a non-zero group start sample-locked (the driver plays them through one
+    /// synchronized stream). Data only for the model: it is forwarded on <see cref="Dirge.Runtime.VoicePlay"/>. 0 = none.
+    /// </summary>
+    public int SyncGroup { get; set; }
     public List<TriggerCondition> Conditions { get; } = new();
     public List<Modulator> Modulators { get; } = new();
 }
@@ -174,13 +193,20 @@ public sealed class LoopRegion : LogicMarker
     public float Length { get; set; }
 }
 
-/// <summary>Jump to <see cref="Destination"/> when reached and conditions pass.</summary>
+/// <summary>
+/// Jump to <see cref="Destination"/> when reached and conditions pass. With <see cref="TransitionLength"/> &gt; 0 the jump is
+/// preceded by a transition timeline: the source timeline freezes at the marker (its synchronous instruments are cut, async
+/// ones keep playing), <see cref="TransitionInstruments"/> play on a local clock from 0 to <see cref="TransitionLength"/>
+/// (their <see cref="Placement"/> is relative to that clock), and the destination is entered when the clock ends.
+/// </summary>
 public sealed class TransitionMarker : LogicMarker
 {
     public DirgeId Destination { get; set; }
     public Quantization Quantization { get; set; } = Quantization.None;
     /// <summary>Optional transition timeline length in seconds played between source and destination.</summary>
     public float TransitionLength { get; set; }
+    /// <summary>Instruments of the transition timeline; placements are seconds from the transition start.</summary>
+    public List<Instrument> TransitionInstruments { get; } = new();
 }
 
 /// <summary>Like <see cref="TransitionMarker"/> but armed for the whole region; fires at the next quantization point.</summary>
@@ -189,6 +215,20 @@ public sealed class TransitionRegion : LogicMarker
     public float Length { get; set; }
     public DirgeId Destination { get; set; }
     public Quantization Quantization { get; set; } = Quantization.Beat;
+    /// <summary>Optional transition timeline length in seconds played between source and destination.</summary>
+    public float TransitionLength { get; set; }
+    /// <summary>Instruments of the transition timeline; placements are seconds from the transition start.</summary>
+    public List<Instrument> TransitionInstruments { get; } = new();
+}
+
+/// <summary>
+/// Seek helper: a seek (<c>TimelinePosition</c> set, or the initial start position) landing inside
+/// [<see cref="LogicMarker.Position"/>, Position + <see cref="Length"/>) snaps to <see cref="LogicMarker.Position"/>.
+/// Jumps made by loops and transitions are not affected.
+/// </summary>
+public sealed class MagnetRegion : LogicMarker
+{
+    public float Length { get; set; }
 }
 
 /// <summary>Timeline holds here until KeyOff.</summary>

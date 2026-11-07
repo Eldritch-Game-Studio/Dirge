@@ -162,7 +162,9 @@ Dirge.Native       (GDExtension, optional)            AudioEffectSend/Return, Co
 
 Evaluation loop per `Update(dt)`: inputs (global/local params, listener, 3D attrs, snapshot intensities) → model emits `Command[]` (`PlayerPlay/Seek/Stop/SetVolume/SetPitch`, `BusVolume/Mute/Solo`, `EffectParam`) → Runtime applies to `AudioServer`. Commands are the T1 oracle.
 
-## 5. Data model (Resources)
+## 5. Data model
+
+Canonical form is the `Dirge.Model` object graph serialized as JSON (`*.dirge.json`, System.Text.Json, deterministic key order) — text, diffable, loadable without the engine. Typed Godot `Resource` wrappers for Inspector editing arrive with the tool (M2+); they are views over the same model, not a second schema.
 
 `AudioProject` → `AudioBank[]`, `MixerGraph` (`Bus[]`, `Vca[]`, `Return[]`), `Snapshot[]`, `GlobalParameter[]`, `AudioTable[]`.
 `AudioEvent` → `Macros`, `Parameter[]` (local), `Track[]` → `Instrument[]` (typed), `AutomationLane[]`, `Modulator[]`, `LogicMarker[]`, `TempoMarker[]`.

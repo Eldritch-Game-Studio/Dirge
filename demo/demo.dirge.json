@@ -1,0 +1,215 @@
+{
+  "name": "Dirge Demo",
+  "assetLengths": {},
+  "banks": [],
+  "events": [
+    {
+      "id": "66666666666666666666666666666666",
+      "path": "Ambience/Wind",
+      "automation": [],
+      "bus": "22222222222222222222222222222222",
+      "localParameters": [],
+      "macros": {
+        "cooldown": 0,
+        "doppler": false,
+        "dopplerScale": 1,
+        "is3D": false,
+        "maxDistance": 20,
+        "maxInstances": 0,
+        "minDistance": 1,
+        "persistent": false,
+        "pitch": 1,
+        "priority": 128,
+        "scheduleLookahead": 0,
+        "stealing": "Oldest",
+        "volumeDb": 0
+      },
+      "markers": [],
+      "modulators": [],
+      "tempo": [],
+      "tracks": [
+        {
+          "id": "77777777777777777777777777777777",
+          "name": "Bed",
+          "instruments": [
+            {
+              "$type": "Clip",
+              "id": "88888888888888888888888888888888",
+              "name": "Wind loop",
+              "asset": "res://demo/audio/wind.wav",
+              "async": false,
+              "conditions": [],
+              "cutMode": "Cut",
+              "fadeIn": 0.25,
+              "fadeOut": 0.5,
+              "loop": true,
+              "modulators": [],
+              "pitch": 1,
+              "pitchRandom": 0,
+              "placement": {
+                "length": 0,
+                "parameter": "00000000000000000000000000000000",
+                "start": 0
+              },
+              "polyphony": 0,
+              "probability": 1,
+              "startOffset": 0,
+              "triggerDelay": 0,
+              "volumeDb": 0,
+              "volumeRandomDb": 0
+            }
+          ],
+          "volumeDb": 0
+        }
+      ]
+    },
+    {
+      "id": "99999999999999999999999999999999",
+      "path": "UI/Click",
+      "automation": [],
+      "bus": "11111111111111111111111111111111",
+      "localParameters": [],
+      "macros": {
+        "cooldown": 0,
+        "doppler": false,
+        "dopplerScale": 1,
+        "is3D": false,
+        "maxDistance": 20,
+        "maxInstances": 4,
+        "minDistance": 1,
+        "persistent": false,
+        "pitch": 1,
+        "priority": 128,
+        "scheduleLookahead": 0,
+        "stealing": "Oldest",
+        "volumeDb": 0
+      },
+      "markers": [],
+      "modulators": [],
+      "tempo": [],
+      "tracks": [
+        {
+          "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "name": "Click",
+          "instruments": [
+            {
+              "$type": "Clip",
+              "id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "name": "Click",
+              "asset": "res://demo/audio/click.wav",
+              "async": false,
+              "conditions": [],
+              "cutMode": "Cut",
+              "fadeIn": 0,
+              "fadeOut": 0,
+              "loop": false,
+              "modulators": [],
+              "pitch": 1,
+              "pitchRandom": 0.05,
+              "placement": {
+                "length": 0,
+                "parameter": "00000000000000000000000000000000",
+                "start": 0
+              },
+              "polyphony": 0,
+              "probability": 1,
+              "startOffset": 0,
+              "triggerDelay": 0,
+              "volumeDb": -6,
+              "volumeRandomDb": 0
+            }
+          ],
+          "volumeDb": 0
+        }
+      ]
+    }
+  ],
+  "globalParameters": [
+    {
+      "id": "44444444444444444444444444444444",
+      "name": "Wind",
+      "builtIn": "None",
+      "default": 0.5,
+      "hold": true,
+      "kind": "Continuous",
+      "labels": [],
+      "maximum": 1,
+      "minimum": 0,
+      "seekSpeedDown": 0.5,
+      "seekSpeedUp": 0.5
+    }
+  ],
+  "mixer": {
+    "buses": [
+      {
+        "id": "11111111111111111111111111111111",
+        "name": "Master",
+        "bypassEffects": false,
+        "effects": [],
+        "maxVoices": 0,
+        "mute": false,
+        "parent": "00000000000000000000000000000000",
+        "solo": false,
+        "vcas": [],
+        "volumeDb": 0
+      },
+      {
+        "id": "22222222222222222222222222222222",
+        "name": "Ambience",
+        "bypassEffects": false,
+        "effects": [
+          {
+            "id": "33333333333333333333333333333333",
+            "enabled": true,
+            "parameters": {
+              "cutoff_hz": 20000,
+              "resonance": 0.5
+            },
+            "stringParameters": {},
+            "typeName": "AudioEffectLowPassFilter"
+          }
+        ],
+        "maxVoices": 0,
+        "mute": false,
+        "parent": "11111111111111111111111111111111",
+        "solo": false,
+        "vcas": [],
+        "volumeDb": -3
+      }
+    ],
+    "vcas": []
+  },
+  "snapshots": [
+    {
+      "id": "55555555555555555555555555555555",
+      "name": "Muffled",
+      "intensity": {
+        "attack": 0,
+        "decay": 0,
+        "hold": 0,
+        "release": 0,
+        "sustain": 1
+      },
+      "mode": "Blending",
+      "priority": 10,
+      "values": [
+        {
+          "target": {
+            "kind": "BusVolumeDb",
+            "owner": "22222222222222222222222222222222"
+          },
+          "value": -18
+        },
+        {
+          "target": {
+            "kind": "EffectParameter",
+            "owner": "22222222222222222222222222222222",
+            "effectIndex": 0,
+            "name": "cutoff_hz"
+          },
+          "value": 800
+        }
+      ]
+    }
+  ]
+}

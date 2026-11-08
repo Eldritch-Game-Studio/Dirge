@@ -28,6 +28,8 @@ public sealed class EventEditorPane : IToolPane, IToolPaneCommands
     private EventInspectorView? _inspector;
     private AutomationView? _automation;
     private Ticker? _ticker;
+    private Control? _headerSlot;
+    private HSplitContainer? _automationSplit;
 
     private bool _syncingSelection;
     private bool _renderQueued;
@@ -46,6 +48,12 @@ public sealed class EventEditorPane : IToolPane, IToolPaneCommands
     public EventEditorState? State => _state;
     public TimelineCanvas? Timeline => _timeline;
     public CurveCanvas? Curve => _curve;
+
+    /// <summary>Pixels (at the current scale) the pane spends outside the timeline: header row, automation panel and the
+    /// two split separators. The shell budgets the timeline's share of the center column from it.</summary>
+    public float ChromeHeight => _headerSlot is null || _automationSplit is null
+        ? 0f
+        : _headerSlot.CustomMinimumSize.Y + _automationSplit.CustomMinimumSize.Y + 2f * _root.GetThemeConstant("separation");
 
     public void Attach(ToolContext context)
     {
@@ -68,30 +76,38 @@ public sealed class EventEditorPane : IToolPane, IToolPaneCommands
         _inspector = new EventInspectorView(_state, _edits, _assets);
         _automation = new AutomationView(_state, _edits, _curve);
 
-        _header.Host.CustomMinimumSize = new Vector2(0, 150);
-        var headerWrap = new MarginContainer { Name = "Header", CustomMinimumSize = new Vector2(0, 150), SizeFlagsVertical = Control.SizeFlags.Fill };
-        headerWrap.AddChild(_header.Host);
+        // Hosts live in plain slots: a container parent would reset their text scale (see ToolDocuments.Slot). All minimum
+        // sizes are authored at scale 1 and re-applied by OnScaleChanged. The header costs one toolbar row until a section
+        // is shown.
+        Control headerSlot = ToolDocuments.Slot(_header.Host, "Header", new Vector2(0, _header.AuthoredHeight));
+        headerSlot.SizeFlagsVertical = Control.SizeFlags.Fill;
+        _headerSlot = headerSlot;
+        EventHeaderView header = _header;
+        header.SectionsChanged = () => ToolDocuments.SetAuthoredMinimumSize(headerSlot, new Vector2(0, header.AuthoredHeight));
 
         var middle = new HSplitContainer { Name = "Middle", SizeFlagsVertical = Control.SizeFlags.ExpandFill, SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
         middle.AddChild(_timeline);
-        var inspectorWrap = new MarginContainer { Name = "Inspector", CustomMinimumSize = new Vector2(320, 0), SizeFlagsHorizontal = Control.SizeFlags.Fill };
-        inspectorWrap.AddChild(_inspector.Host);
-        middle.AddChild(inspectorWrap);
+        Control inspectorSlot = ToolDocuments.Slot(_inspector.Host, "Inspector", new Vector2(320, 0));
+        inspectorSlot.SizeFlagsHorizontal = Control.SizeFlags.Fill;
+        middle.AddChild(inspectorSlot);
 
-        var bottom = new HSplitContainer { Name = "Automation", SizeFlagsVertical = Control.SizeFlags.Fill, SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, CustomMinimumSize = new Vector2(0, 170) };
-        var lanesWrap = new MarginContainer { Name = "Lanes", CustomMinimumSize = new Vector2(380, 0) };
-        lanesWrap.AddChild(_automation.Host);
-        bottom.AddChild(lanesWrap);
+        var bottom = new HSplitContainer { Name = "Automation", SizeFlagsVertical = Control.SizeFlags.Fill, SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        ToolDocuments.SetAuthoredMinimumSize(bottom, new Vector2(0, 170));
+        _automationSplit = bottom;
+        Control lanesSlot = ToolDocuments.Slot(_automation.Host, "Lanes", new Vector2(380, 0));
+        lanesSlot.SizeFlagsHorizontal = Control.SizeFlags.Fill;
+        bottom.AddChild(lanesSlot);
         bottom.AddChild(_curve);
 
         var lower = new VSplitContainer { Name = "Lower", SizeFlagsVertical = Control.SizeFlags.ExpandFill, SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
         lower.AddChild(middle);
         lower.AddChild(bottom);
 
-        _root.AddChild(headerWrap);
+        _root.AddChild(headerSlot);
         _root.AddChild(lower);
         _ticker = new Ticker { OnTick = Tick };
         _root.AddChild(_ticker);
+        ToolScale.Changed += OnScaleChanged;
 
         context.Project.Changed += OnProjectChanged;
         context.Selection.Changed += OnToolSelectionChanged;
@@ -111,6 +127,7 @@ public sealed class EventEditorPane : IToolPane, IToolPaneCommands
             _context.Audition.Rebuilt -= OnRebuilt;
         }
         if (_state is not null) _state.SelectionChanged -= OnStateSelectionChanged;
+        ToolScale.Changed -= OnScaleChanged;
         _assets?.Dispose();
         foreach (Node child in _root.GetChildren())
         {
@@ -119,7 +136,11 @@ public sealed class EventEditorPane : IToolPane, IToolPaneCommands
         }
         _context = null; _state = null; _edits = null; _lengths = null; _assets = null;
         _timeline = null; _curve = null; _header = null; _inspector = null; _automation = null; _ticker = null;
+        _headerSlot = null; _automationSplit = null;
     }
+
+    /// <summary>Authored minimum sizes follow the tool scale; canvases and hosts rescale themselves.</summary>
+    private void OnScaleChanged() => ToolDocuments.ApplyMinimumSizes(_root);
 
     /// <summary>Edit a specific event (the browser does this through <see cref="Selection"/>; tests call it directly).</summary>
     public void Edit(DirgeId eventId)
@@ -152,9 +173,27 @@ public sealed class EventEditorPane : IToolPane, IToolPaneCommands
         if ((scope & (ChangeScope.Mixer | ChangeScope.Snapshots | ChangeScope.GlobalParameters | ChangeScope.Assets)) != 0)
         {
             if ((scope & ChangeScope.Assets) != 0) _lengths?.Clear();
+            // The editor shows only bus/snapshot names: a fader or snapshot-value drag (Changed every frame) must not rebuild it.
+            if ((scope & ~(ChangeScope.Mixer | ChangeScope.Snapshots)) == 0 && !NamesChanged()) return;
             _state.Bump();
             QueueRender(0.2);
         }
+    }
+
+    private int _namesSignature;
+
+    /// <summary>True (and remembers) when the set of bus/snapshot ids and names differs from the last render.</summary>
+    private bool NamesChanged()
+    {
+        var hash = new HashCode();
+        List<Bus> buses = _state!.Project.Mixer.Buses;
+        for (int i = 0; i < buses.Count; i++) { hash.Add(buses[i].Id); hash.Add(buses[i].Name); }
+        List<Snapshot> snapshots = _state.Project.Snapshots;
+        for (int i = 0; i < snapshots.Count; i++) { hash.Add(snapshots[i].Id); hash.Add(snapshots[i].Name); }
+        int signature = hash.ToHashCode();
+        if (signature == _namesSignature) return false;
+        _namesSignature = signature;
+        return true;
     }
 
     private void OnRebuilt() => _timeline?.Invalidate();

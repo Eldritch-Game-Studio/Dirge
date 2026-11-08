@@ -41,9 +41,9 @@ public sealed partial class MixerPane
         public List<EffectRow> Effects { get; } = new();
         public object FaderToken { get; } = new();
 
-        private readonly HTMLElement _barL, _barR, _hold, _clip;
-        private int _lastL = -1, _lastR = -1, _lastHold = -1;
-        private bool _hotL, _hotR, _clipOn;
+        private readonly HTMLElement _barL, _barR, _hotL, _hotR, _hold, _clip;
+        private int _lastL = -1, _lastR = -1, _lastHotL = -1, _lastHotR = -1, _lastHold = -1;
+        private bool _clipOn;
         private float _holdDb = -80f;
         private double _holdAge;
         private string _effectSignature = "";
@@ -87,8 +87,16 @@ public sealed partial class MixerPane
             HTMLElement meter = dom.El(faderRow, "div", "meter");
             _barL = dom.El(meter, "div", "bar l");
             _barR = dom.El(meter, "div", "bar r");
+            _hotL = dom.El(meter, "div", "bar l hot");
+            _hotR = dom.El(meter, "div", "bar r hot");
             _hold = dom.El(meter, "div", "hold");
             _clip = dom.El(meter, "div", "clip");
+            // Inline transforms exist from the first layout so every later write is a compositor-only update.
+            _barL.Style.SetProperty("transform", Dom.ScaleY(0, MeterInnerPx));
+            _barR.Style.SetProperty("transform", Dom.ScaleY(0, MeterInnerPx));
+            _hotL.Style.SetProperty("transform", Dom.ScaleY(0, MeterHotPx));
+            _hotR.Style.SetProperty("transform", Dom.ScaleY(0, MeterHotPx));
+            _hold.Style.SetProperty("transform", Dom.TranslateYUp(0));
             _clip.Title = "Clip indicator (click to reset)";
             dom.On(_clip, "click", ResetClip);
 
@@ -171,11 +179,11 @@ public sealed partial class MixerPane
         public void UpdateMeter(float leftDb, float rightDb, double delta)
         {
             int l = MeterPx(leftDb), r = MeterPx(rightDb);
-            if (l != _lastL) { _lastL = l; _barL.Style.SetProperty("height", Dom.Px(l)); }
-            if (r != _lastR) { _lastR = r; _barR.Style.SetProperty("height", Dom.Px(r)); }
-            bool hotL = leftDb > -6f, hotR = rightDb > -6f;
-            if (hotL != _hotL) { _hotL = hotL; Dom.SetClass(_barL, "hot", hotL); }
-            if (hotR != _hotR) { _hotR = hotR; Dom.SetClass(_barR, "hot", hotR); }
+            if (l != _lastL) { _lastL = l; _barL.Style.SetProperty("transform", Dom.ScaleY(Math.Min(l, MeterHotFromPx), MeterInnerPx)); }
+            if (r != _lastR) { _lastR = r; _barR.Style.SetProperty("transform", Dom.ScaleY(Math.Min(r, MeterHotFromPx), MeterInnerPx)); }
+            int hotL = Math.Max(0, l - MeterHotFromPx), hotR = Math.Max(0, r - MeterHotFromPx);
+            if (hotL != _lastHotL) { _lastHotL = hotL; _hotL.Style.SetProperty("transform", Dom.ScaleY(hotL, MeterHotPx)); }
+            if (hotR != _lastHotR) { _lastHotR = hotR; _hotR.Style.SetProperty("transform", Dom.ScaleY(hotR, MeterHotPx)); }
 
             float peak = MathF.Max(leftDb, rightDb);
             if (peak >= _holdDb) { _holdDb = peak; _holdAge = 0; }
@@ -185,7 +193,7 @@ public sealed partial class MixerPane
                 if (_holdAge > HoldSeconds) _holdDb = MathF.Max(peak, _holdDb - HoldDecayDbPerSecond * (float)delta);
             }
             int hold = MeterPx(_holdDb);
-            if (hold != _lastHold) { _lastHold = hold; _hold.Style.SetProperty("top", Dom.Px(MeterInnerPx - hold)); }
+            if (hold != _lastHold) { _lastHold = hold; _hold.Style.SetProperty("transform", Dom.TranslateYUp(hold)); }
             if (peak > 0f && !_clipOn) { _clipOn = true; _clip.ClassList.Add("on"); }
         }
 
@@ -205,6 +213,10 @@ public sealed partial class MixerPane
             return (int)MathF.Round(norm * MeterInnerPx);
         }
 
+        /// <summary>Bar pixels below the −6 dB "hot" threshold; the yellow segment covers the remaining <see cref="MeterHotPx"/> (mixer.css).</summary>
+        private const int MeterHotFromPx = 121;
+        private const int MeterHotPx = MeterInnerPx - MeterHotFromPx;
+
         public void Dispose() => Root.Remove();
     }
 
@@ -213,6 +225,7 @@ public sealed partial class MixerPane
     private readonly List<Bus> _routingTargets = new();
     private readonly List<Popup.Item> _popupItems = new();
     private double _peakTextAge;
+    private float _peakTextDb = float.NaN;
 
     // Strip drag (reorder) state.
     private BusStrip? _dragStrip;
@@ -332,13 +345,18 @@ public sealed partial class MixerPane
     {
         IAudition audition = Audition;
         _peakTextAge += delta;
-        bool updatePeakText = _peakTextAge > 0.1;
+        // The peak readout is text: a changed string relayouts the document, so it follows the hold at 4 Hz in 0.5 dB steps.
+        bool updatePeakText = _peakTextAge > 0.25;
         if (updatePeakText) _peakTextAge = 0;
         foreach (KeyValuePair<DirgeId, BusStrip> pair in _strips)
         {
             (float left, float right) = audition.BusPeakDb(pair.Key);
             pair.Value.UpdateMeter(left, right, delta);
-            if (pair.Value.IsMaster && updatePeakText) Dom.SetText(pair.Value.PeakText, "peak " + Dom.Db(pair.Value.HoldDb));
+            if (pair.Value.IsMaster && updatePeakText)
+            {
+                float hold = MathF.Round(pair.Value.HoldDb * 2f) / 2f;
+                if (hold != _peakTextDb) { _peakTextDb = hold; Dom.SetText(pair.Value.PeakText, "peak " + Dom.Db(hold)); }
+            }
         }
     }
 

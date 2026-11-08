@@ -34,6 +34,7 @@ public sealed partial class ProfilerPane : IToolPane
 
     private ToolContext? _context;
     private DocumentHost? _host;
+    private Control? _hostSlot;
     private ProfilerFeed? _feed;
     private LiveUpdateClient? _client;
     private Recorder? _recorder;
@@ -43,6 +44,8 @@ public sealed partial class ProfilerPane : IToolPane
     private FileDialog? _dialog;
     private double _domClock;
     private int _selectedRow = -1;
+    private int _shownInstances = -1, _shownVoices = -1;
+    private double _shownUpdateMs = double.NaN, _shownTime = double.NaN;
     private int _recordingTicksShown = -1;
 
     private Element? _instanceRows;
@@ -57,8 +60,10 @@ public sealed partial class ProfilerPane : IToolPane
     public ProfilerPane()
     {
         _root = new PaneRoot { Pane = this, Name = "Profiler", SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, SizeFlagsVertical = Control.SizeFlags.ExpandFill };
-        _canvases = new VBoxContainer { Name = "Canvases", SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, SizeFlagsVertical = Control.SizeFlags.ExpandFill, CustomMinimumSize = new Vector2(300, 0) };
-        _graph = new UpdateGraph { Name = "UpdateGraph", CustomMinimumSize = new Vector2(300, 140) };
+        _canvases = new VBoxContainer { Name = "Canvases", SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, SizeFlagsVertical = Control.SizeFlags.ExpandFill };
+        ToolDocuments.SetAuthoredMinimumSize(_canvases, new Vector2(300, 0));
+        _graph = new UpdateGraph { Name = "UpdateGraph" };
+        ToolDocuments.SetAuthoredMinimumSize(_graph, new Vector2(300, 140));
         _timeline = new RecordingCanvas { Name = "RecordingCanvas" };
         _canvases.AddChild(_graph);
         _canvases.AddChild(_timeline);
@@ -86,11 +91,10 @@ public sealed partial class ProfilerPane : IToolPane
         _context = context;
         _host = ToolDocuments.Create(DocumentName);
         _host.Name = "ProfilerDocument";
-        _host.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
-        _host.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
-        _host.CustomMinimumSize = new Vector2(520, 0);
-        _root.AddChild(_host);
-        _root.MoveChild(_host, 0);
+        _hostSlot = ToolDocuments.Slot(_host, "Document", new Vector2(520, 0));
+        _root.AddChild(_hostSlot);
+        _root.MoveChild(_hostSlot, 0);
+        ToolScale.Changed += OnScaleChanged;
 
         if (_host.IsNodeReady()) BindDocument();
         else _host.Ready += BindDocument;
@@ -98,7 +102,9 @@ public sealed partial class ProfilerPane : IToolPane
         UseEditor();
         _context.Audition.Rebuilt += OnAuditionRebuilt;
         _context.Selection.Changed += OnSelectionChanged;
-        _root.SetProcess(true);
+        // Hidden bottom tab: no polling, graph samples or DOM writes until the tab is shown again.
+        _root.VisibilityChanged += OnRootVisibilityChanged;
+        OnRootVisibilityChanged();
     }
 
     public void Detach()
@@ -122,12 +128,15 @@ public sealed partial class ProfilerPane : IToolPane
             _dialog = null;
         }
         UnbindDocument();
-        if (_host is not null)
+        ToolScale.Changed -= OnScaleChanged;
+        if (_hostSlot is not null)
         {
-            _root.RemoveChild(_host);
-            _host.QueueFree();
+            _root.RemoveChild(_hostSlot);
+            _hostSlot.QueueFree();
+            _hostSlot = null;
             _host = null;
         }
+        _root.VisibilityChanged -= OnRootVisibilityChanged;
         _root.SetProcess(false);
         _graph.Clear();
         _timeline.SetRecording(null, "No recording");
@@ -136,6 +145,10 @@ public sealed partial class ProfilerPane : IToolPane
         _shownText.Clear();
         _context = null;
     }
+
+    private void OnRootVisibilityChanged() => _root.SetProcess(_context is not null && _root.IsVisibleInTree());
+
+    private void OnScaleChanged() => ToolDocuments.ApplyMinimumSizes(_root);
 
     // ---- document binding ----------------------------------------------------------------------------------------
 
@@ -350,13 +363,17 @@ public sealed partial class ProfilerPane : IToolPane
     private void RefreshDom()
     {
         if (_host?.Document is null || _feed is null) return;
+        _feed.PollRows();
         ProfilerStats stats = _feed.Stats;
         Document document = _host.Document;
 
-        SetText(document.GetElementById("c-instances"), "c-instances", stats.Instances.ToString(CultureInfo.InvariantCulture));
-        SetText(document.GetElementById("c-voices"), "c-voices", stats.RealVoices.ToString(CultureInfo.InvariantCulture));
-        SetText(document.GetElementById("c-update"), "c-update", stats.UpdateMs.ToString("0.00", CultureInfo.InvariantCulture) + " ms");
-        SetText(document.GetElementById("c-time"), "c-time", stats.Time.ToString("0.0", CultureInfo.InvariantCulture) + " s");
+        if (stats.Instances != _shownInstances) { _shownInstances = stats.Instances; SetText(document.GetElementById("c-instances"), "c-instances", stats.Instances.ToString(CultureInfo.InvariantCulture)); }
+        if (stats.RealVoices != _shownVoices) { _shownVoices = stats.RealVoices; SetText(document.GetElementById("c-voices"), "c-voices", stats.RealVoices.ToString(CultureInfo.InvariantCulture)); }
+        // 0.1 ms / 0.1 s steps keep the counters idle-stable; same-width digit changes are retained text swaps, not relayouts.
+        double updateMs = Math.Round(stats.UpdateMs, 1);
+        if (updateMs != _shownUpdateMs) { _shownUpdateMs = updateMs; SetText(document.GetElementById("c-update"), "c-update", updateMs.ToString("0.0", CultureInfo.InvariantCulture) + " ms"); }
+        double time = Math.Round(stats.Time, 1);
+        if (time != _shownTime) { _shownTime = time; SetText(document.GetElementById("c-time"), "c-time", time.ToString("0.0", CultureInfo.InvariantCulture) + " s"); }
         SetText(document.GetElementById("c-lufs-m"), "c-lufs-m", FormatLufs(stats.MomentaryLufs));
         SetText(document.GetElementById("c-lufs-s"), "c-lufs-s", FormatLufs(stats.ShortTermLufs));
         SetText(document.GetElementById("c-lufs-i"), "c-lufs-i", FormatLufs(stats.IntegratedLufs));
@@ -476,9 +493,14 @@ public sealed partial class ProfilerPane : IToolPane
         public Element Root = null!;
         public Element Name = null!;
         public Element Db = null!;
-        public Element Fill = null!;
-        public int ShownPercent = -1;
+        public HTMLElement Low = null!, Mid = null!, High = null!;
+        public float ShownDb = float.NaN;
+        public int ShownLow = -1, ShownMid = -1, ShownHigh = -1;
     }
+
+    // Segment boundaries of the horizontal bus meter as fractions of the −60..0 dB range (profiler.css: .fill.low/.mid/.high).
+    private const float MeterMidFrom = (-12f - MeterFloorDb) / -MeterFloorDb;
+    private const float MeterHighFrom = (-1f - MeterFloorDb) / -MeterFloorDb;
 
     private void RefreshBuses(Document document)
     {
@@ -489,18 +511,22 @@ public sealed partial class ProfilerPane : IToolPane
             BusRowElements row = i < _busElements.Count ? _busElements[i] : CreateBusRow(document);
             ProfilerBusLevel level = buses[i];
             SetHidden(row.Root, false);
-            string prefix = "bus" + i.ToString(CultureInfo.InvariantCulture) + ".";
-            SetText(row.Name, prefix + "n", level.Bus);
-            float peak = MathF.Max(level.Left, level.Right);
-            SetText(row.Db, prefix + "d", peak <= MeterFloorDb ? "-inf dB" : peak.ToString("0.0", CultureInfo.InvariantCulture) + " dB");
-            int percent = (int)MathF.Round(Mathf.Clamp((peak - MeterFloorDb) / -MeterFloorDb, 0f, 1f) * 100f);
-            if (percent != row.ShownPercent)
+            SetText(row.Name, "bus" + i.ToString(CultureInfo.InvariantCulture) + ".n", level.Bus);
+            // 0.5 dB readout steps, fixed width: a change is a retained digit swap, not a relayout.
+            float peak = MathF.Round(MathF.Max(level.Left, level.Right) * 2f) / 2f;
+            if (peak != row.ShownDb)
             {
-                row.ShownPercent = percent;
-                ((HTMLElement)row.Fill).Style.SetProperty("width", percent.ToString(CultureInfo.InvariantCulture) + "%");
-                SetClass(row.Fill, "mid", peak > -12f && peak <= -1f);
-                SetClass(row.Fill, "high", peak > -1f);
+                row.ShownDb = peak;
+                row.Db.TextContent = peak <= MeterFloorDb ? "-inf dB" : peak.ToString("+00.0;-00.0;+00.0", CultureInfo.InvariantCulture) + " dB";
             }
+            // Three fixed segments scaled from the left through inline transforms (compositor-only updates, no class toggles).
+            float f = Mathf.Clamp((MathF.Max(level.Left, level.Right) - MeterFloorDb) / -MeterFloorDb, 0f, 1f);
+            int low = (int)MathF.Round(Math.Min(f, MeterMidFrom) / MeterMidFrom * 1000f);
+            int mid = (int)MathF.Round(Mathf.Clamp((f - MeterMidFrom) / (MeterHighFrom - MeterMidFrom), 0f, 1f) * 1000f);
+            int high = (int)MathF.Round(Mathf.Clamp((f - MeterHighFrom) / (1f - MeterHighFrom), 0f, 1f) * 1000f);
+            if (low != row.ShownLow) { row.ShownLow = low; row.Low.Style.SetProperty("transform", Browser.Dom.ScaleX(low / 1000f)); }
+            if (mid != row.ShownMid) { row.ShownMid = mid; row.Mid.Style.SetProperty("transform", Browser.Dom.ScaleX(mid / 1000f)); }
+            if (high != row.ShownHigh) { row.ShownHigh = high; row.High.Style.SetProperty("transform", Browser.Dom.ScaleX(high / 1000f)); }
         }
         for (int i = buses.Count; i < _busElements.Count; i++) SetHidden(_busElements[i].Root, true);
     }
@@ -520,14 +546,23 @@ public sealed partial class ProfilerPane : IToolPane
         head.AppendChild(row.Db);
         Element meter = document.CreateElement("div");
         meter.ClassName = "meter horizontal";
-        row.Fill = document.CreateElement("div");
-        row.Fill.ClassName = "fill";
-        meter.AppendChild(row.Fill);
+        row.Low = Segment(document, meter, "fill low");
+        row.Mid = Segment(document, meter, "fill mid");
+        row.High = Segment(document, meter, "fill high");
         row.Root.AppendChild(head);
         row.Root.AppendChild(meter);
         _busRows!.AppendChild(row.Root);
         _busElements.Add(row);
         return row;
+    }
+
+    private static HTMLElement Segment(Document document, Element meter, string className)
+    {
+        var segment = (HTMLElement)document.CreateElement("div");
+        segment.ClassName = className;
+        segment.Style.SetProperty("transform", Browser.Dom.ScaleX(0f)); // present from the first layout: later writes are compositor-only
+        meter.AppendChild(segment);
+        return segment;
     }
 
     // ---- selection -----------------------------------------------------------------------------------------------

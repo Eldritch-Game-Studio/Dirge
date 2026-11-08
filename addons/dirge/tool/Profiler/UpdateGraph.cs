@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Globalization;
+using Dirge.Tool.Core;
 using Godot;
 
 namespace Dirge.Tool.Profiler;
@@ -31,10 +32,12 @@ public sealed partial class UpdateGraph : Control
 {
     public const double WindowSeconds = 10.0;
     private const int Capacity = 4096;
-    private const float LeftGutter = 44f;
-    private const float RightGutter = 40f;
-    private const float TopGutter = 18f;
-    private const float BottomGutter = 16f;
+    // Authored pixels at tool scale 1.
+    private const float LeftGutterBase = 44f;
+    private const float RightGutterBase = 40f;
+    private const float TopGutterBase = 18f;
+    private const float BottomGutterBase = 16f;
+    private const float FontSizeBase = 11f;
 
     private readonly double[] _time = new double[Capacity];
     private readonly float[] _ms = new float[Capacity];
@@ -59,11 +62,18 @@ public sealed partial class UpdateGraph : Control
 
     public UpdateGraph()
     {
-        CustomMinimumSize = new Vector2(240, 120);
+        ToolDocuments.SetAuthoredMinimumSize(this, new Vector2(240, 120));
         SizeFlagsHorizontal = SizeFlags.ExpandFill;
         MouseFilter = MouseFilterEnum.Ignore;
         ClipContents = true;
     }
+
+    /// <summary>Label size in pixels at the current tool scale.</summary>
+    public int FontSize => ToolScale.Px(FontSizeBase);
+
+    public override void _EnterTree() => ToolScale.Changed += QueueRedraw;
+
+    public override void _ExitTree() => ToolScale.Changed -= QueueRedraw;
 
     public int SampleCount => _count;
 
@@ -88,12 +98,16 @@ public sealed partial class UpdateGraph : Control
         }
     }
 
-    /// <summary>Moves the window's right edge to <paramref name="wallSeconds"/> without adding a sample and redraws.</summary>
+    /// <summary>Moves the window's right edge to <paramref name="wallSeconds"/> without adding a sample; redraws at most 30 times a second.</summary>
     public void Advance(double wallSeconds)
     {
+        if (wallSeconds - _drawnAt < 1.0 / 30.0 - 0.002) return; // 2 ms slack so a 60 Hz frame cadence lands on every second frame
+        _drawnAt = wallSeconds;
         _now = wallSeconds;
         QueueRedraw();
     }
+
+    private double _drawnAt = double.NegativeInfinity;
 
     public void Clear()
     {
@@ -149,13 +163,15 @@ public sealed partial class UpdateGraph : Control
     public override void _Draw()
     {
         Vector2 size = Size;
+        float ui = ToolScale.Current;
+        float leftGutter = LeftGutterBase * ui, rightGutter = RightGutterBase * ui, topGutter = TopGutterBase * ui, bottomGutter = BottomGutterBase * ui;
         DrawRect(new Rect2(Vector2.Zero, size), ProfilerPalette.Background);
-        var plot = new Rect2(LeftGutter, TopGutter, MathF.Max(1f, size.X - LeftGutter - RightGutter), MathF.Max(1f, size.Y - TopGutter - BottomGutter));
+        var plot = new Rect2(leftGutter, topGutter, MathF.Max(1f, size.X - leftGutter - rightGutter), MathF.Max(1f, size.Y - topGutter - bottomGutter));
         DrawRect(plot, ProfilerPalette.Panel);
         UpdateScales();
 
         Font font = GetThemeDefaultFont();
-        int fontSize = Math.Max(10, GetThemeDefaultFontSize() - 3);
+        int fontSize = FontSize;
 
         // Horizontal grid: 0, 25, 50, 75, 100 %.
         for (int i = 0; i <= 4; i++)
@@ -176,14 +192,15 @@ public sealed partial class UpdateGraph : Control
 
         // Axis labels: ms on the left, voices on the right.
         float textY = plot.Position.Y + fontSize * 0.5f;
-        DrawString(font, new Vector2(2f, textY), _msScaleLabel, HorizontalAlignment.Left, LeftGutter - 4f, fontSize, ProfilerPalette.Accent);
-        DrawString(font, new Vector2(2f, plot.Position.Y + plot.Size.Y * 0.5f + fontSize * 0.35f), _midMsLabel, HorizontalAlignment.Left, LeftGutter - 4f, fontSize, ProfilerPalette.Muted);
-        DrawString(font, new Vector2(2f, plot.End.Y), "0", HorizontalAlignment.Left, LeftGutter - 4f, fontSize, ProfilerPalette.Muted);
-        DrawString(font, new Vector2(plot.End.X + 4f, textY), _voiceScaleLabel, HorizontalAlignment.Left, RightGutter - 4f, fontSize, ProfilerPalette.Series2);
-        DrawString(font, new Vector2(plot.End.X + 4f, plot.Position.Y + plot.Size.Y * 0.5f + fontSize * 0.35f), _midVoiceLabel, HorizontalAlignment.Left, RightGutter - 4f, fontSize, ProfilerPalette.Muted);
-        DrawString(font, new Vector2(plot.End.X + 4f, plot.End.Y), "0", HorizontalAlignment.Left, RightGutter - 4f, fontSize, ProfilerPalette.Muted);
-        DrawString(font, new Vector2(plot.Position.X, size.Y - 3f), "-10 s", HorizontalAlignment.Left, -1, fontSize, ProfilerPalette.Muted);
-        DrawString(font, new Vector2(plot.End.X - 26f, size.Y - 3f), "now", HorizontalAlignment.Left, -1, fontSize, ProfilerPalette.Muted);
+        float pad = 2f * ui;
+        DrawString(font, new Vector2(pad, textY), _msScaleLabel, HorizontalAlignment.Left, leftGutter - 2f * pad, fontSize, ProfilerPalette.Accent);
+        DrawString(font, new Vector2(pad, plot.Position.Y + plot.Size.Y * 0.5f + fontSize * 0.35f), _midMsLabel, HorizontalAlignment.Left, leftGutter - 2f * pad, fontSize, ProfilerPalette.Muted);
+        DrawString(font, new Vector2(pad, plot.End.Y), "0", HorizontalAlignment.Left, leftGutter - 2f * pad, fontSize, ProfilerPalette.Muted);
+        DrawString(font, new Vector2(plot.End.X + 2f * pad, textY), _voiceScaleLabel, HorizontalAlignment.Left, rightGutter - 2f * pad, fontSize, ProfilerPalette.Series2);
+        DrawString(font, new Vector2(plot.End.X + 2f * pad, plot.Position.Y + plot.Size.Y * 0.5f + fontSize * 0.35f), _midVoiceLabel, HorizontalAlignment.Left, rightGutter - 2f * pad, fontSize, ProfilerPalette.Muted);
+        DrawString(font, new Vector2(plot.End.X + 2f * pad, plot.End.Y), "0", HorizontalAlignment.Left, rightGutter - 2f * pad, fontSize, ProfilerPalette.Muted);
+        DrawString(font, new Vector2(plot.Position.X, size.Y - 3f * ui), "-10 s", HorizontalAlignment.Left, -1, fontSize, ProfilerPalette.Muted);
+        DrawString(font, new Vector2(plot.End.X - 26f * ui, size.Y - 3f * ui), "now", HorizontalAlignment.Left, -1, fontSize, ProfilerPalette.Muted);
 
         // Series.
         double oldest = _now - WindowSeconds;
@@ -208,8 +225,8 @@ public sealed partial class UpdateGraph : Control
         }
 
         // Legend with current values.
-        DrawString(font, new Vector2(plot.Position.X + 6f, fontSize + 1f), _msLabel, HorizontalAlignment.Left, -1, fontSize, ProfilerPalette.Accent);
-        DrawString(font, new Vector2(plot.Position.X + 110f, fontSize + 1f), _voiceLabel, HorizontalAlignment.Left, -1, fontSize, ProfilerPalette.Series2);
-        DrawString(font, new Vector2(plot.End.X - 80f, fontSize + 1f), "update / voices", HorizontalAlignment.Left, -1, fontSize, ProfilerPalette.Muted);
+        DrawString(font, new Vector2(plot.Position.X + 6f * ui, fontSize + 1f), _msLabel, HorizontalAlignment.Left, -1, fontSize, ProfilerPalette.Accent);
+        DrawString(font, new Vector2(plot.Position.X + 110f * ui, fontSize + 1f), _voiceLabel, HorizontalAlignment.Left, -1, fontSize, ProfilerPalette.Series2);
+        DrawString(font, new Vector2(plot.End.X - 80f * ui, fontSize + 1f), "update / voices", HorizontalAlignment.Left, -1, fontSize, ProfilerPalette.Muted);
     }
 }

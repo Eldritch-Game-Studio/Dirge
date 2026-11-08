@@ -11,15 +11,31 @@ namespace Dirge.Tool.Events;
 /// <summary>Event header document: transport/snap toolbar, path, bus, macros, local parameters, tempo markers.</summary>
 internal sealed class EventHeaderView
 {
+    /// <summary>Authored height of the one-row toolbar (<c>.toolbar</c> 28 px + 1 px border in <c>event.css</c>); the header's
+    /// minimum when every section is collapsed.</summary>
+    public const float ToolbarHeight = 29f;
+    /// <summary>Authored minimum height once a section is shown.</summary>
+    public const float ExpandedHeight = 150f;
+
     private readonly EventEditorState _state;
     private readonly EventEdits _edits;
     private readonly Action _playToggle;
     private readonly Action _zoomFit;
-    private bool _showMacros = true;
-    private bool _showParameters = true;
-    private bool _showTempo = true;
+    // Sections start collapsed so the header costs one toolbar row; the user's choice persists in editor settings.
+    private bool _showMacros;
+    private bool _showParameters;
+    private bool _showTempo;
 
     public DocumentHost Host { get; }
+
+    /// <summary>Raised after a section toggle; the pane resizes the header slot.</summary>
+    public Action? SectionsChanged { get; set; }
+
+    /// <summary>True when any of the macro/parameter/tempo sections is shown.</summary>
+    public bool AnySectionShown => _showMacros || _showParameters || _showTempo;
+
+    /// <summary>Authored minimum height of the header for the current section state.</summary>
+    public float AuthoredHeight => AnySectionShown ? ExpandedHeight : ToolbarHeight;
 
     public EventHeaderView(EventEditorState state, EventEdits edits, Action playToggle, Action zoomFit)
     {
@@ -28,6 +44,25 @@ internal sealed class EventHeaderView
         _playToggle = playToggle;
         _zoomFit = zoomFit;
         Host = ToolDocuments.Create("event-header.html");
+        if (ToolSettings.TryGet(ToolSettings.HeaderSections, out Godot.Variant stored))
+        {
+            string sections = stored.AsString();
+            _showMacros = sections.Contains("macros", StringComparison.Ordinal);
+            _showParameters = sections.Contains("parameters", StringComparison.Ordinal);
+            _showTempo = sections.Contains("tempo", StringComparison.Ordinal);
+        }
+    }
+
+    private void SetSections(bool macros, bool parameters, bool tempo)
+    {
+        _showMacros = macros; _showParameters = parameters; _showTempo = tempo;
+        var shown = new List<string>(3);
+        if (macros) shown.Add("macros");
+        if (parameters) shown.Add("parameters");
+        if (tempo) shown.Add("tempo");
+        ToolSettings.Set(ToolSettings.HeaderSections, string.Join(',', shown));
+        Render();
+        SectionsChanged?.Invoke();
     }
 
     /// <summary>True while an audition instance of the edited event runs; drives the Play/Stop label.</summary>
@@ -76,9 +111,9 @@ internal sealed class EventHeaderView
         for (int i = 0; i < buses.Count; i++) { names[i] = buses[i].Name; if (buses[i].Id == ev.Bus) selected = i; }
         form.ChoiceButton(toolbar, names, selected, i => _edits.Set("Route event", ev.Bus, buses[i].Id, b => ev.Bus = b), "(master)");
         form.ToggleButton(toolbar, "Conductor", ev.IsConductor, v => _edits.Set("Conductor", ev.IsConductor, v, b => ev.IsConductor = b));
-        form.ToggleButton(toolbar, "Macros", _showMacros, v => { _showMacros = v; Render(); });
-        form.ToggleButton(toolbar, "Parameters", _showParameters, v => { _showParameters = v; Render(); });
-        form.ToggleButton(toolbar, "Tempo", _showTempo, v => { _showTempo = v; Render(); });
+        form.ToggleButton(toolbar, "Macros", _showMacros, v => SetSections(v, _showParameters, _showTempo));
+        form.ToggleButton(toolbar, "Parameters", _showParameters, v => SetSections(_showMacros, v, _showTempo));
+        form.ToggleButton(toolbar, "Tempo", _showTempo, v => SetSections(_showMacros, _showParameters, v));
     }
 
     private void RenderMacros(DomForm form, Element content, AudioEvent ev)

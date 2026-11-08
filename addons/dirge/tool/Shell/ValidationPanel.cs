@@ -13,8 +13,11 @@ namespace Dirge.Tool.Shell;
 /// <summary>Diagnostics of the open project; clicking a row selects the offending object.</summary>
 public sealed class ValidationPanel : IToolPane
 {
+    private const double DebounceSeconds = 0.5;
+
     private readonly Control _root;
     private readonly DocumentHost _host;
+    private readonly Timer _debounce;
     private readonly List<Diagnostic> _shown = new();
     private readonly List<Element> _rows = new();
     private ToolContext? _context;
@@ -34,6 +37,8 @@ public sealed class ValidationPanel : IToolPane
         };
         _host = ToolDocuments.Create("validation.html");
         _root.AddChild(_host);
+        _debounce = new Timer { Name = "ValidationDebounce", OneShot = true, WaitTime = DebounceSeconds };
+        _root.AddChild(_debounce);
     }
 
     public string Title => "Validation";
@@ -54,6 +59,7 @@ public sealed class ValidationPanel : IToolPane
         _empty = Required(document, "empty");
         Required(document, "revalidate").AddEventListener("click", new DelegateEventListener(_ => Refresh(force: true)));
         context.Project.Changed += OnProjectChanged;
+        _debounce.Timeout += OnDebounceTimeout;
         context.Selection.Changed += OnSelectionChanged;
         Refresh(force: true);
     }
@@ -64,12 +70,18 @@ public sealed class ValidationPanel : IToolPane
         {
             _context.Project.Changed -= OnProjectChanged;
             _context.Selection.Changed -= OnSelectionChanged;
+            _debounce.Timeout -= OnDebounceTimeout;
+            _debounce.Stop();
         }
 
         _context = null;
     }
 
-    private void OnProjectChanged(ChangeScope scope, DirgeId subject) => Refresh(force: false);
+    /// <summary>Edits arrive per frame during drags; validating 250 events each time is wasted work, so the re-validation
+    /// waits until the project has been quiet for <see cref="DebounceSeconds"/>. The explicit menu/button path stays immediate.</summary>
+    private void OnProjectChanged(ChangeScope scope, DirgeId subject) => _debounce.Start();
+
+    private void OnDebounceTimeout() => Refresh(force: false);
 
     /// <summary>Re-validates; rebuilds the rows only when the diagnostics actually changed.</summary>
     public void Refresh(bool force)

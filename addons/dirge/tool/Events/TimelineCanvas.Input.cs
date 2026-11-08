@@ -104,7 +104,7 @@ public sealed partial class TimelineCanvas
         for (int i = _markers.Count - 1; i >= 0; i--)
         {
             MarkerGeom m = _markers[i];
-            Rect2 r = m.Region ? m.Rect : new Rect2(m.Rect.Position.X - 2, m.Rect.Position.Y, Math.Max(m.Rect.Size.X, 40f * _scale), m.Rect.Size.Y);
+            Rect2 r = m.Region ? m.Rect : new Rect2(m.Rect.Position.X - 2, m.Rect.Position.Y, Math.Max(m.Rect.Size.X, 40f * UiScale), m.Rect.Size.Y);
             if (r.HasPoint(p)) return i;
         }
         return -1;
@@ -291,7 +291,7 @@ public sealed partial class TimelineCanvas
                 UpdateCursorShape(p);
                 return;
             case Mode.PendingDrag:
-                if ((p - _pressPosition).Length() < 4f * _scale) return;
+                if ((p - _pressPosition).Length() < 4f * UiScale) return;
                 _mode = Mode.DragMove;
                 goto case Mode.DragMove;
             case Mode.DragMove:

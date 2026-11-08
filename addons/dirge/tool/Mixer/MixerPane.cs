@@ -146,7 +146,7 @@ public sealed partial class MixerPane : IToolPane, IToolPaneCommands
             _deferred = null;
             deferred();
         }
-        UpdateMeters(delta);
+        if (_root.IsVisibleInTree()) UpdateMeters(delta); // hidden bottom tab: no DOM writes nobody can see
         TickSnapshotAudition(delta);
     }
 

@@ -65,8 +65,10 @@ public abstract class ProfilerFeed
     /// <summary>The system a <c>Recorder</c> can attach to; null for a remote game.</summary>
     public abstract DirgeSystem? RecordableSystem { get; }
 
-    /// <summary>Refresh <see cref="Stats"/>, <see cref="Instances"/> and <see cref="Buses"/>. True when a new sample arrived.</summary>
+    /// <summary>Refresh <see cref="Stats"/> (and bus levels). Called every frame for the graph; allocation-free. True when a new sample arrived.</summary>
     public abstract bool Poll();
+    /// <summary>Refresh <see cref="Instances"/> and <see cref="Buses"/> for the tables; called at the document refresh rate.</summary>
+    public abstract void PollRows();
     public abstract void StopInstance(int handle, bool immediate);
     public virtual void Dispose() { }
 }
@@ -100,8 +102,6 @@ public sealed class EditorFeed : ProfilerFeed
     public override bool Poll()
     {
         DirgeSystem? system = _audition.System;
-        InstanceRows.Clear();
-        BusRows.Clear();
         if (system is null)
         {
             Stats = ProfilerStats.Empty;
@@ -114,6 +114,15 @@ public sealed class EditorFeed : ProfilerFeed
         stats.RealVoices = system.RealVoiceCount;
         stats.UpdateMs = _audition.LastUpdateMs;
         Stats = stats;
+        return true;
+    }
+
+    public override void PollRows()
+    {
+        DirgeSystem? system = _audition.System;
+        InstanceRows.Clear();
+        BusRows.Clear();
+        if (system is null) return;
 
         IReadOnlyList<EventInstance> live = system.Instances;
         foreach (KeyValuePair<EventInstance, int> pair in _handles)
@@ -135,7 +144,7 @@ public sealed class EditorFeed : ProfilerFeed
             {
                 Handle = handle,
                 Event = instance.Description.Path,
-                State = instance.State.ToString(),
+                State = StateName(instance.State),
                 Position = instance.TimelinePosition,
                 Virtual = instance.IsVirtual,
                 Parameters = FormatParameters(instance),
@@ -149,8 +158,16 @@ public sealed class EditorFeed : ProfilerFeed
             (float left, float right) = _audition.BusPeakDb(buses[i].Id);
             BusRows.Add(new ProfilerBusLevel { Bus = buses[i].Name, Left = left, Right = right });
         }
-        return true;
     }
+
+    private static string StateName(PlaybackState state) => state switch
+    {
+        PlaybackState.Starting => nameof(PlaybackState.Starting),
+        PlaybackState.Playing => nameof(PlaybackState.Playing),
+        PlaybackState.Sustaining => nameof(PlaybackState.Sustaining),
+        PlaybackState.Stopping => nameof(PlaybackState.Stopping),
+        _ => nameof(PlaybackState.Stopped),
+    };
 
     private static bool Contains(IReadOnlyList<EventInstance> list, EventInstance instance)
     {
@@ -284,7 +301,11 @@ public sealed class GameFeed : ProfilerFeed
             }
             _statsDirty = false;
         }
+        return fresh;
+    }
 
+    public override void PollRows()
+    {
         if (_instancesDirty && _lastInstances is not null)
         {
             InstanceRows.Clear();
@@ -308,7 +329,6 @@ public sealed class GameFeed : ProfilerFeed
         {
             InstanceRows.Clear();
         }
-        return fresh;
     }
 
     public override void StopInstance(int handle, bool immediate)

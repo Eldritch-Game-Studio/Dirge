@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using Dirge.Profiling;
+using Dirge.Tool.Core;
 using Godot;
 
 namespace Dirge.Tool.Profiler;
@@ -30,11 +31,18 @@ public struct LifetimeBar
 /// </summary>
 public sealed partial class RecordingCanvas : Control
 {
-    private const float AxisHeight = 20f;
-    private const float StripHeight = 18f;
-    private const float RowHeight = 20f;
-    private const float RowGap = 2f;
-    private const float Gutter = 40f;
+    // Authored pixels at tool scale 1; the properties below read the live tool scale.
+    private const float AxisHeightBase = 20f;
+    private const float StripHeightBase = 18f;
+    private const float RowHeightBase = 20f;
+    private const float RowGapBase = 2f;
+    private const float GutterBase = 40f;
+    private const float FontSizeBase = 11f;
+    private static float AxisHeight => AxisHeightBase * ToolScale.Current;
+    private static float StripHeight => StripHeightBase * ToolScale.Current;
+    private static float RowHeight => RowHeightBase * ToolScale.Current;
+    private static float RowGap => RowGapBase * ToolScale.Current;
+    private static float Gutter => GutterBase * ToolScale.Current;
     private const double MinPixelsPerSecond = 4.0;
     private const double MaxPixelsPerSecond = 4000.0;
 
@@ -60,7 +68,7 @@ public sealed partial class RecordingCanvas : Control
 
     public RecordingCanvas()
     {
-        CustomMinimumSize = new Vector2(240, 80);
+        ToolDocuments.SetAuthoredMinimumSize(this, new Vector2(240, 80));
         SizeFlagsHorizontal = SizeFlags.ExpandFill;
         SizeFlagsVertical = SizeFlags.ExpandFill;
         MouseFilter = MouseFilterEnum.Stop;
@@ -71,6 +79,12 @@ public sealed partial class RecordingCanvas : Control
     public IReadOnlyList<LifetimeBar> Bars => _bars;
     public double Length => _length;
     public int SelectedHandle => _selectedHandle;
+    /// <summary>Label size in pixels at the current tool scale.</summary>
+    public int FontSize => ToolScale.Px(FontSizeBase);
+
+    public override void _EnterTree() => ToolScale.Changed += QueueRedraw;
+
+    public override void _ExitTree() => ToolScale.Changed -= QueueRedraw;
 
     /// <summary>Replaces the shown recording (null clears) and fits the whole length into the view.</summary>
     public void SetRecording(Recording? recording, string title)
@@ -306,7 +320,7 @@ public sealed partial class RecordingCanvas : Control
         Vector2 size = Size;
         DrawRect(new Rect2(Vector2.Zero, size), ProfilerPalette.Background);
         Font font = GetThemeDefaultFont();
-        int fontSize = Math.Max(10, GetThemeDefaultFontSize() - 3);
+        int fontSize = FontSize;
 
         if (_bars.Count == 0)
         {

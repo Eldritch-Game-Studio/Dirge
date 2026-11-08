@@ -14,6 +14,8 @@ internal sealed class Dom
 {
     private readonly List<(EventTarget Target, string Type, IEventListener Listener)> _listeners = new();
     private static readonly string[] PixelStrings = BuildPixelStrings(400);
+    private static readonly string?[] ScaleYStrings = new string?[1001];
+    private static readonly string?[] TranslateYStrings = new string?[400];
 
     public DocumentHost Host { get; }
     public Document Document => Host.Document;
@@ -94,6 +96,21 @@ internal sealed class Dom
         return pixels.ToString(CultureInfo.InvariantCulture) + "px";
     }
 
+    /// <summary>"scaleY(0.123)" for <paramref name="pixels"/> of <paramref name="full"/> (0..1 in 1/1000 steps), cached: a meter
+    /// bar writes one of these per tick and NecronomiDOM composites the inline transform without relayout.</summary>
+    public static string ScaleY(int pixels, int full)
+    {
+        int permille = Math.Clamp((int)MathF.Round(pixels * 1000f / full), 0, 1000);
+        return ScaleYStrings[permille] ??= "scaleY(" + (permille / 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + ")";
+    }
+
+    /// <summary>"translateY(-123px)" for 0 ≤ pixels &lt; 400, cached.</summary>
+    public static string TranslateYUp(int pixels)
+    {
+        if (pixels < 0 || pixels >= PixelStrings.Length) return "translateY(" + (-pixels).ToString(CultureInfo.InvariantCulture) + "px)";
+        return TranslateYStrings[pixels] ??= "translateY(-" + PixelStrings[pixels] + ")";
+    }
+
     public static void SetClass(Element element, string className, bool on)
     {
         if (on) { if (!element.ClassList.Contains(className)) element.ClassList.Add(className); }
@@ -105,8 +122,10 @@ internal sealed class Dom
         if (element.TextContent != text) element.TextContent = text;
     }
 
+    /// <summary>Fixed-width "+00.0 dB"/"-12.3 dB": a changed readout keeps its length and digit positions, so NecronomiDOM
+    /// swaps the glyphs in place instead of relayouting the document (the "-inf dB" floor is the one width change).</summary>
     public static string Db(float value) =>
-        float.IsNegativeInfinity(value) || value <= -80f ? "-inf dB" : value.ToString("+0.0;-0.0;0.0", CultureInfo.InvariantCulture) + " dB";
+        float.IsNegativeInfinity(value) || value <= -80f ? "-inf dB" : value.ToString("+00.0;-00.0;+00.0", CultureInfo.InvariantCulture) + " dB";
 
     public static string Num(float value, float step)
     {

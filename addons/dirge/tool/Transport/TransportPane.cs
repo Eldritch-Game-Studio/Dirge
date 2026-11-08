@@ -59,13 +59,13 @@ public sealed partial class TransportPane : IToolPane, IToolPaneCommands
     public void Attach(ToolContext context)
     {
         _ctx = context;
-        var documentSlot = new Control { Name = "DocumentSlot", SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, CustomMinimumSize = new Vector2(360, 0) };
         _host = ToolDocuments.Create("transport.html");
         _host.Name = "Document";
-        documentSlot.AddChild(_host);
-        _root.AddChild(documentSlot);
-        _panner = new PreviewPanner { SizeFlagsHorizontal = Control.SizeFlags.Fill, CustomMinimumSize = new Vector2(220, 150) };
+        _root.AddChild(ToolDocuments.Slot(_host, "DocumentSlot", new Vector2(360, 0)));
+        _panner = new PreviewPanner { SizeFlagsHorizontal = Control.SizeFlags.Fill };
+        ToolDocuments.SetAuthoredMinimumSize(_panner, new Vector2(220, 150));
         _root.AddChild(_panner);
+        ToolScale.Changed += OnScaleChanged;
         _root.SplitOffsets = new[] { 0 };
         _root.Processed += Tick;
         _panner.Changed += OnPannerChanged;
@@ -89,6 +89,7 @@ public sealed partial class TransportPane : IToolPane, IToolPaneCommands
         _ctx.Selection.Changed -= OnSelectionChanged;
         _ctx.Audition.Rebuilt -= OnRebuilt;
         _root.Processed -= Tick;
+        ToolScale.Changed -= OnScaleChanged;
         _panner.Changed -= OnPannerChanged;
         foreach (Godot.Node child in _root.GetChildren()) { _root.RemoveChild(child); child.QueueFree(); }
         _host = null;
@@ -100,6 +101,8 @@ public sealed partial class TransportPane : IToolPane, IToolPaneCommands
         _userStopped.Clear();
         _ctx = null;
     }
+
+    private void OnScaleChanged() => ToolDocuments.ApplyMinimumSizes(_root);
 
     // ---- document -------------------------------------------------------------------------------------------------------
 
@@ -308,10 +311,11 @@ public sealed partial class TransportPane : IToolPane, IToolPaneCommands
         DirgeSystem? system = _ctx!.Audition.System;
         int instances = system?.InstanceCount ?? 0;
         int voices = system?.RealVoiceCount ?? 0;
-        double ms = _ctx.Audition.LastUpdateMs;
+        // 0.1 ms steps: the readout is idle-stable and every change is a same-width digit swap (no relayout).
+        double ms = Math.Round(_ctx.Audition.LastUpdateMs, 1);
         if (instances != _lastInstances) { _lastInstances = instances; _roInstances.TextContent = instances.ToString(System.Globalization.CultureInfo.InvariantCulture); }
         if (voices != _lastVoices) { _lastVoices = voices; _roVoices.TextContent = voices.ToString(System.Globalization.CultureInfo.InvariantCulture); }
-        if (Math.Abs(ms - _lastMs) >= 0.005 || double.IsNaN(_lastMs)) { _lastMs = ms; _roMs.TextContent = Dom.F(ms) + " ms"; }
+        if (ms != _lastMs) { _lastMs = ms; _roMs.TextContent = Dom.F(ms, 1) + " ms"; }
     }
 
     // ---- instances ---------------------------------------------------------------------------------------------------------
@@ -435,6 +439,7 @@ public sealed partial class TransportPane : IToolPane, IToolPaneCommands
         {
             HTMLElement track = Dom.Add(row, "div", definition.BuiltIn != BuiltInParameter.None ? "slider readonly" : "slider");
             HTMLElement fill = Dom.Add(track, "div", "fill");
+            fill.Style.SetProperty("transform", Dom.ScaleX(0f)); // present from the first layout: later writes are compositor-only
             HTMLElement value = Dom.Add(row, "p", "pval", "");
             slider = new SliderRow(definition, global, row, track, fill, value, null);
         }
@@ -492,7 +497,7 @@ public sealed partial class TransportPane : IToolPane, IToolPaneCommands
         }
         float range = d.Maximum - d.Minimum;
         float t = range <= 0f ? 0f : Math.Clamp((value - d.Minimum) / range, 0f, 1f);
-        ((HTMLElement)slider.Fill!).Style.SetProperty("width", Dom.F(t * 100f, 1) + "%");
+        ((HTMLElement)slider.Fill!).Style.SetProperty("transform", Dom.ScaleX(t));
         Dom.SetText(slider.Value!, d.Kind == ParameterKind.Discrete ? Dom.F(value, 0) : Dom.F(value));
     }
 

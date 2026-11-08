@@ -11,8 +11,9 @@ public static partial class ToolDocuments
 
     /// <summary>
     /// The document is parsed immediately so <c>host.Document</c> is bindable before the host enters the tree; layout and paint
-    /// resources are created by the host itself on <c>_Ready</c>. The editor text scale is applied once the host has mounted
-    /// (and again on every re-entry), because <see cref="DocumentHost.ApplyTextScale"/> needs the mounted authored scale.
+    /// resources are created by the host itself on <c>_Ready</c>. <see cref="ToolScale.Current"/> is applied once the host has
+    /// mounted (and again on every re-entry, because <see cref="DocumentHost"/> withdraws its text scale on exit) and whenever
+    /// <see cref="ToolScale.Changed"/> fires while the host is in the tree.
     /// </summary>
     public static partial DocumentHost Create(string documentName)
     {
@@ -31,31 +32,59 @@ public static partial class ToolDocuments
         host.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
         host.LoadDocument(host.DocumentPath);
 
-        float scale = EditorScale();
-        if (scale != 1f)
+        void Apply() => host.ApplyTextScale(ToolScale.Current);
+        host.Ready += Apply;
+        host.TreeEntered += () =>
         {
-            host.Ready += () => host.ApplyTextScale(scale);
-            host.TreeEntered += () =>
-            {
-                if (host.IsNodeReady())
-                {
-                    host.ApplyTextScale(scale);
-                }
-            };
-        }
+            ToolScale.Changed += Apply;
+            if (host.IsNodeReady()) Apply();
+        };
+        host.TreeExited += () => ToolScale.Changed -= Apply;
 
         return host;
     }
 
-    /// <summary>Editor UI scale when running inside the editor; 1 in a game (overlay).</summary>
-    public static float EditorScale()
+    /// <summary>
+    /// A plain <see cref="Control"/> holding <paramref name="host"/> for mounting inside a container. Godot containers call
+    /// <c>fit_child_in_rect</c> on their children, which resets the child's <c>scale</c> to 1 and forces its size to the cell;
+    /// that undoes <see cref="DocumentHost.ApplyTextScale"/>. The container sizes the slot instead, and the host fits the slot
+    /// at <c>slot.Size / TextScale</c>. <paramref name="minimumSize"/> is in authored pixels (see
+    /// <see cref="SetAuthoredMinimumSize"/>).
+    /// </summary>
+    public static partial Control Slot(DocumentHost host, string name, Vector2 minimumSize)
     {
-#if TOOLS
-        if (Engine.IsEditorHint())
+        var slot = new Control
         {
-            return EditorInterface.Singleton.GetEditorScale();
+            Name = name,
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+            SizeFlagsVertical = Control.SizeFlags.ExpandFill,
+            ClipContents = true,
+        };
+        SetAuthoredMinimumSize(slot, minimumSize);
+        slot.AddChild(host);
+        return slot;
+    }
+
+    /// <summary>
+    /// Records <paramref name="authored"/> (scale-1 pixels) as the control's minimum size and applies it at the current scale.
+    /// <see cref="ApplyMinimumSizes"/> re-applies it after a scale change.
+    /// </summary>
+    public static partial void SetAuthoredMinimumSize(Control control, Vector2 authored)
+    {
+        control.SetMeta(AuthoredMinimumMeta, authored);
+        control.CustomMinimumSize = authored * ToolScale.Current;
+    }
+
+    /// <summary>Re-applies every authored minimum size under <paramref name="root"/> (inclusive) at the current scale.</summary>
+    public static partial void ApplyMinimumSizes(Node root)
+    {
+        if (root is Control control && control.HasMeta(AuthoredMinimumMeta))
+        {
+            control.CustomMinimumSize = control.GetMeta(AuthoredMinimumMeta).AsVector2() * ToolScale.Current;
         }
-#endif
-        return 1f;
+        foreach (Node child in root.GetChildren())
+        {
+            if (child is not DocumentHost) ApplyMinimumSizes(child);
+        }
     }
 }

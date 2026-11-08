@@ -101,6 +101,8 @@ Priority tiers: P0 ships with 1.0, P1 in 1.x, P2 after; `—` is a deliberate no
 | Localization audio tables | `AudioTable`, `DirgeSystem.Locale` | P1 | Done | |
 | Banks | `AudioBank`; `DirgeServer.LoadBank/UnloadBank/IsBankLoaded`, `BankLoader` | — | Done | preload groups over `ResourceLoader`; no bank files |
 | Version control | text `*.dirge.json` | — | Done | |
+| Hi-DPI / editor scale | `ToolScale` (`Core`); `dirge/ui_scale` editor setting | — | Done | one scale for every document host and canvas: editor display scale × `main_font_size` / 14, or `dirge/ui_scale` verbatim when > 0 (0 = auto); re-applied live on settings/DPI changes. Hosts mount through `ToolDocuments.Slot` — never as direct children of a Godot container, which resets their scale |
+| Layout preferences | `ToolSettings` (`Core`): `dirge/header_sections`, `dirge/split_browser`, `dirge/split_bottom` | — | Done | event header sections start collapsed and persist; browser/center and top/bottom split offsets persist (scale-1 px); the default bottom split gives the timeline ≥ 40 % of the center column, bottom tabs minimum 180 px |
 | Tool UI localization | — | P2 | Planned | |
 
 ## Runtime API reference

@@ -125,8 +125,14 @@ input { width: 150px; font-size: var(--font-size-small); }
 .bus { display: flex; flex-direction: column; row-gap: 2px; flex-shrink: 0; }
 .bus-head { display: flex; flex-direction: row; justify-content: space-between; }
 .bus-head p { font-size: 10px; line-height: 14px; text-wrap-mode: nowrap; overflow-x: hidden; overflow-y: hidden; text-overflow: ellipsis; }
-.bus-head .db { color: var(--muted); flex-shrink: 0; }
+.bus-head .db { color: var(--muted); flex-shrink: 0; overflow-x: visible; overflow-y: visible; text-overflow: clip; }
 .bus .meter.horizontal { border-radius: 2px; }
+/* Three fixed segments (−60..−12, −12..−1, −1..0 dB) scaled from the left through inline transforms set by C#; a width
+   or class write per tick would relayout the whole document. */
+.bus .meter.horizontal .fill { position: absolute; top: 0; bottom: 0; height: auto; transform-origin: 0 50%; }
+.bus .meter.horizontal .fill.low { left: 0; width: 80%; background-color: var(--meter-low); }
+.bus .meter.horizontal .fill.mid { left: 80%; width: 18.333%; background-color: var(--meter-mid); }
+.bus .meter.horizontal .fill.high { left: 98.333%; width: 1.667%; background-color: var(--meter-high); }
 
 .compare { flex-shrink: 0; padding: 0 var(--space-2); font-size: var(--font-size-small); line-height: 16px; color: var(--meter-low); text-wrap-mode: nowrap; overflow-x: hidden; overflow-y: hidden; text-overflow: ellipsis; }
 .compare.diverged { color: var(--danger); }

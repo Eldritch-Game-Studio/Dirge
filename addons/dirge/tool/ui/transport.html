@@ -15,9 +15,10 @@
         <button id="loop" type="button" class="toggle">Loop</button>
         <p id="event-name" class="event-name">No event selected</p>
         <div class="readouts">
-            <p class="readout"><span class="ro-label">Instances </span><span id="ro-instances">0</span></p>
-            <p class="readout"><span class="ro-label">Voices </span><span id="ro-voices">0</span></p>
-            <p class="readout"><span class="ro-label">Update </span><span id="ro-ms">0.00 ms</span></p>
+            <!-- Each value is its own single-text block so NecronomiDOM swaps digits in place instead of relayouting. -->
+            <div class="readout"><p class="ro-label">Instances</p><p id="ro-instances" class="ro-value">0</p></div>
+            <div class="readout"><p class="ro-label">Voices</p><p id="ro-voices" class="ro-value">0</p></div>
+            <div class="readout"><p class="ro-label">Update</p><p id="ro-ms" class="ro-value">0.0 ms</p></div>
         </div>
     </div>
     <div class="columns">

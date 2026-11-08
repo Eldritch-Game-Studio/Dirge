@@ -25,20 +25,22 @@ public sealed partial class TimelineCanvas : Control
     private const float HeaderWidthBase = 150f;
     private const float GripWidthBase = 6f;
     private const float MinBlockWidthBase = 8f;
+    private const float FontSizeBase = 11f;
 
     private readonly EventEditorState _state;
     private readonly EventEdits _edits;
     private readonly AssetLengthCache _lengths;
     private readonly IAudition _audition;
 
-    private float _scale = 1f;
-    private float TabsHeight => TabsHeightBase * _scale;
-    private float RulerHeight => RulerHeightBase * _scale;
-    private float BeatsHeight => _hasTempo && _state.Sheet.IsNone ? BeatsHeightBase * _scale : 0f;
-    private float MarkerLaneHeight => _state.Sheet.IsNone ? MarkerLaneHeightBase * _scale : 0f;
-    private float TrackHeight => TrackHeightBase * _scale;
-    private float HeaderWidth => HeaderWidthBase * _scale;
-    private float GripWidth => GripWidthBase * _scale;
+    /// <summary>Read on every layout/draw/hit test so the canvas never holds a stale scale.</summary>
+    private static float UiScale => ToolScale.Current;
+    private float TabsHeight => TabsHeightBase * UiScale;
+    private float RulerHeight => RulerHeightBase * UiScale;
+    private float BeatsHeight => _hasTempo && _state.Sheet.IsNone ? BeatsHeightBase * UiScale : 0f;
+    private float MarkerLaneHeight => _state.Sheet.IsNone ? MarkerLaneHeightBase * UiScale : 0f;
+    private float TrackHeight => TrackHeightBase * UiScale;
+    private float HeaderWidth => HeaderWidthBase * UiScale;
+    private float GripWidth => GripWidthBase * UiScale;
     private float TracksTop => TabsHeight + RulerHeight + BeatsHeight + MarkerLaneHeight;
     private float RulerTop => TabsHeight;
     private float MarkerLaneTop => TabsHeight + RulerHeight + BeatsHeight;
@@ -76,7 +78,8 @@ public sealed partial class TimelineCanvas : Control
     private double _sheetValue = double.NaN;
 
     private Font _font = null!;
-    private int _fontSize = 12;
+    /// <summary>Label size in pixels at the current tool scale.</summary>
+    public int FontSize => ToolScale.Px(FontSizeBase);
 
     public TimelineCanvas(EventEditorState state, EventEdits edits, AssetLengthCache lengths, IAudition audition)
     {
@@ -89,20 +92,22 @@ public sealed partial class TimelineCanvas : Control
         MouseFilter = MouseFilterEnum.Stop;
         SizeFlagsHorizontal = SizeFlags.ExpandFill;
         SizeFlagsVertical = SizeFlags.ExpandFill;
-        CustomMinimumSize = new Vector2(320, 160);
+        ToolDocuments.SetAuthoredMinimumSize(this, new Vector2(320, 160));
     }
 
     public override void _Ready()
     {
         _font = GetThemeDefaultFont();
-        _fontSize = Math.Clamp(GetThemeDefaultFontSize() - 3, 10, 14);
-        _scale = ToolDocuments.EditorScale();
         BuildMenu();
         SetProcess(true);
     }
 
     /// <summary>Call after any change of the edited event's content or view selection.</summary>
     public void Invalidate() => QueueRedraw();
+
+    public override void _EnterTree() => ToolScale.Changed += QueueRedraw;
+
+    public override void _ExitTree() => ToolScale.Changed -= QueueRedraw;
 
     public override void _Notification(int what)
     {
@@ -122,7 +127,6 @@ public sealed partial class TimelineCanvas : Control
 
     private void EnsureLayout()
     {
-        _scale = ToolDocuments.EditorScale();
         AudioEvent? ev = _state.Event;
         _hasTempo = ev is not null && ev.Tempo.Count > 0;
         if (_viewSheet != _state.Sheet)
@@ -135,14 +139,14 @@ public sealed partial class TimelineCanvas : Control
             _scrollY = 0;
         }
         if (_layoutRevision == _state.Revision && _layoutSize == Size && _layoutZoom == _zoom && _layoutScrollX == _scrollX
-            && _layoutScrollY == _scrollY && _layoutScale == _scale)
+            && _layoutScrollY == _scrollY && _layoutScale == UiScale)
             return;
         _layoutRevision = _state.Revision;
         _layoutSize = Size;
         _layoutZoom = _zoom;
         _layoutScrollX = _scrollX;
         _layoutScrollY = _scrollY;
-        _layoutScale = _scale;
+        _layoutScale = UiScale;
 
         _tabs.Clear(); _rows.Clear(); _blocks.Clear(); _markers.Clear(); _tempos.Clear(); _ticks.Clear(); _beats.Clear();
         if (ev is null) return;
@@ -165,15 +169,15 @@ public sealed partial class TimelineCanvas : Control
 
     private void AddTab(string label, DirgeId id, ref float x, bool global = false)
     {
-        float width = _font.GetStringSize(label, HorizontalAlignment.Left, -1, _fontSize).X + 20f * _scale + (global ? 14f * _scale : 0f);
+        float width = _font.GetStringSize(label, HorizontalAlignment.Left, -1, FontSize).X + 20f * UiScale + (global ? 14f * UiScale : 0f);
         _tabs.Add(new TabGeom(new Rect2(x, 0, width, TabsHeight), label, id, global, id == _state.Sheet));
-        x += width + 2f * _scale;
+        x += width + 2f * UiScale;
     }
 
     private void LayoutRuler()
     {
         double visible = VisibleUnits;
-        double step = NiceStep(visible, Math.Max(1, (Size.X - HeaderWidth) / (70f * _scale)));
+        double step = NiceStep(visible, Math.Max(1, (Size.X - HeaderWidth) / (70f * UiScale)));
         bool onSheet = !_state.Sheet.IsNone;
         ParameterDefinition? parameter = SheetParameter;
         double first = Math.Floor(_scrollX / step) * step;
@@ -229,7 +233,7 @@ public sealed partial class TimelineCanvas : Control
             float x = XOf(m.Position);
             float length = EventEdits.RegionLength(m);
             bool region = EventEdits.IsRegion(m);
-            float w = region ? Math.Max(MinBlockWidthBase * _scale, (float)(length * _zoom)) : 10f * _scale;
+            float w = region ? Math.Max(MinBlockWidthBase * UiScale, (float)(length * _zoom)) : 10f * UiScale;
             var rect = new Rect2(x, top, w, h);
             string label = m.Name.Length > 0 ? m.Name : EventEdits.MarkerLabel(m);
             _markers.Add(new MarkerGeom(rect, m, label, MarkerColor(m), region, _state.IsSelected(m)));
@@ -242,8 +246,8 @@ public sealed partial class TimelineCanvas : Control
         {
             TempoMarker t = ev.Tempo[i];
             string label = string.Concat(t.Bpm.ToString("0.#", CultureInfo.InvariantCulture), " bpm ", t.BeatsPerBar.ToString(CultureInfo.InvariantCulture), "/4");
-            float w = _font.GetStringSize(label, HorizontalAlignment.Left, -1, _fontSize - 2).X + 8f * _scale;
-            _tempos.Add(new TempoGeom(new Rect2(XOf(t.Position) + 16f * _scale, RulerTop + RulerHeight, w, BeatsHeight), t, label));
+            float w = _font.GetStringSize(label, HorizontalAlignment.Left, -1, FontSize - 2).X + 8f * UiScale;
+            _tempos.Add(new TempoGeom(new Rect2(XOf(t.Position) + 16f * UiScale, RulerTop + RulerHeight, w, BeatsHeight), t, label));
         }
     }
 
@@ -264,8 +268,8 @@ public sealed partial class TimelineCanvas : Control
                 double length = inst.Placement.Length > 0 ? inst.Placement.Length
                     : sheet.IsNone ? _lengths.NaturalLength(inst) : 0;
                 float x = XOf(inst.Placement.Start);
-                float w = Math.Max(MinBlockWidthBase * _scale, (float)(length * _zoom));
-                var rect = new Rect2(x, y + 4f * _scale, w, TrackHeight - 8f * _scale);
+                float w = Math.Max(MinBlockWidthBase * UiScale, (float)(length * _zoom));
+                var rect = new Rect2(x, y + 4f * UiScale, w, TrackHeight - 8f * UiScale);
                 _blocks.Add(new BlockGeom(rect, inst, track, inst.Name.Length > 0 ? inst.Name : EventEdits.TypeLabel(inst),
                     SubLabel(inst), InstrumentColor(inst), _state.IsSelected(inst), inst.Placement.Length <= 0 && sheet.IsNone));
             }
@@ -368,7 +372,7 @@ public sealed partial class TimelineCanvas : Control
         DrawRect(new Rect2(Vector2.Zero, size), Background);
         if (_state.Event is null)
         {
-            DrawString(_font, new Vector2(12f * _scale, size.Y * 0.5f), "Select an event in the browser to edit it.", HorizontalAlignment.Left, -1, _fontSize, MutedColor);
+            DrawString(_font, new Vector2(12f * UiScale, size.Y * 0.5f), "Select an event in the browser to edit it.", HorizontalAlignment.Left, -1, FontSize, MutedColor);
             return;
         }
 
@@ -390,14 +394,14 @@ public sealed partial class TimelineCanvas : Control
         {
             TabGeom tab = _tabs[i];
             DrawRect(tab.Rect, tab.Active ? PanelColor : HeaderColor);
-            if (tab.Active) DrawRect(new Rect2(tab.Rect.Position.X, tab.Rect.End.Y - 2f * _scale, tab.Rect.Size.X, 2f * _scale), AccentColor);
-            float textX = tab.Rect.Position.X + 10f * _scale;
+            if (tab.Active) DrawRect(new Rect2(tab.Rect.Position.X, tab.Rect.End.Y - 2f * UiScale, tab.Rect.Size.X, 2f * UiScale), AccentColor);
+            float textX = tab.Rect.Position.X + 10f * UiScale;
             if (tab.Global)
             {
-                DrawString(_font, new Vector2(textX, TabsHeight * 0.5f + _fontSize * 0.35f), "G", HorizontalAlignment.Left, -1, _fontSize, AccentColor);
-                textX += 14f * _scale;
+                DrawString(_font, new Vector2(textX, TabsHeight * 0.5f + FontSize * 0.35f), "G", HorizontalAlignment.Left, -1, FontSize, AccentColor);
+                textX += 14f * UiScale;
             }
-            DrawString(_font, new Vector2(textX, TabsHeight * 0.5f + _fontSize * 0.35f), tab.Label, HorizontalAlignment.Left, -1, _fontSize, tab.Active ? TextColor : MutedColor);
+            DrawString(_font, new Vector2(textX, TabsHeight * 0.5f + FontSize * 0.35f), tab.Label, HorizontalAlignment.Left, -1, FontSize, tab.Active ? TextColor : MutedColor);
         }
         DrawLine(new Vector2(0, TabsHeight), new Vector2(Size.X, TabsHeight), BorderColor);
     }
@@ -406,12 +410,12 @@ public sealed partial class TimelineCanvas : Control
     {
         float top = RulerTop;
         DrawRect(new Rect2(HeaderWidth, top, Size.X - HeaderWidth, RulerHeight + BeatsHeight), HeaderColor);
-        float textY = top + RulerHeight * 0.5f + _fontSize * 0.35f;
+        float textY = top + RulerHeight * 0.5f + FontSize * 0.35f;
         for (int i = 0; i < _ticks.Count; i++)
         {
             TickGeom tick = _ticks[i];
-            DrawLine(new Vector2(tick.X, top + RulerHeight - 6f * _scale), new Vector2(tick.X, top + RulerHeight), MutedColor);
-            DrawString(_font, new Vector2(tick.X + 3f * _scale, textY), tick.Label, HorizontalAlignment.Left, -1, _fontSize, TextColor);
+            DrawLine(new Vector2(tick.X, top + RulerHeight - 6f * UiScale), new Vector2(tick.X, top + RulerHeight), MutedColor);
+            DrawString(_font, new Vector2(tick.X + 3f * UiScale, textY), tick.Label, HorizontalAlignment.Left, -1, FontSize, TextColor);
         }
         if (BeatsHeight > 0)
         {
@@ -421,21 +425,21 @@ public sealed partial class TimelineCanvas : Control
                 BeatGeom beat = _beats[i];
                 DrawLine(new Vector2(beat.X, beatsTop + (beat.Bar ? 0 : BeatsHeight * 0.5f)), new Vector2(beat.X, beatsTop + BeatsHeight), beat.Bar ? BarColor : BeatColor);
                 if (beat.BarLabel is not null)
-                    DrawString(_font, new Vector2(beat.X + 2f * _scale, beatsTop + BeatsHeight - 2f * _scale), beat.BarLabel, HorizontalAlignment.Left, -1, _fontSize - 2, MutedColor);
+                    DrawString(_font, new Vector2(beat.X + 2f * UiScale, beatsTop + BeatsHeight - 2f * UiScale), beat.BarLabel, HorizontalAlignment.Left, -1, FontSize - 2, MutedColor);
             }
         }
         DrawLine(new Vector2(HeaderWidth, top + RulerHeight + BeatsHeight), new Vector2(Size.X, top + RulerHeight + BeatsHeight), BorderColor);
-        DrawString(_font, new Vector2(8f * _scale, textY), _sheetTitle, HorizontalAlignment.Left, HeaderWidth - 12f * _scale, _fontSize, MutedColor);
+        DrawString(_font, new Vector2(8f * UiScale, textY), _sheetTitle, HorizontalAlignment.Left, HeaderWidth - 12f * UiScale, FontSize, MutedColor);
         if (_state.SnapToGrid)
-            DrawString(_font, new Vector2(HeaderWidth - 40f * _scale, textY), "snap", HorizontalAlignment.Left, -1, _fontSize - 2, AccentColor);
+            DrawString(_font, new Vector2(HeaderWidth - 40f * UiScale, textY), "snap", HorizontalAlignment.Left, -1, FontSize - 2, AccentColor);
     }
 
     private void DrawMarkerLane()
     {
         float top = MarkerLaneTop;
         DrawRect(new Rect2(HeaderWidth, top, Size.X - HeaderWidth, MarkerLaneHeight), PanelColor);
-        DrawString(_font, new Vector2(8f * _scale, top + MarkerLaneHeight * 0.5f + _fontSize * 0.35f), "Logic", HorizontalAlignment.Left, -1, _fontSize, MutedColor);
-        float textY = top + MarkerLaneHeight * 0.5f + _fontSize * 0.35f;
+        DrawString(_font, new Vector2(8f * UiScale, top + MarkerLaneHeight * 0.5f + FontSize * 0.35f), "Logic", HorizontalAlignment.Left, -1, FontSize, MutedColor);
+        float textY = top + MarkerLaneHeight * 0.5f + FontSize * 0.35f;
         for (int i = 0; i < _markers.Count; i++)
         {
             MarkerGeom m = _markers[i];
@@ -445,20 +449,20 @@ public sealed partial class TimelineCanvas : Control
                 // Bracket: top bar with end caps spanning the region; the region also tints the track area.
                 var tint = Alpha(m.Color, 0.08f);
                 DrawRect(new Rect2(r.Position.X, TracksTop, r.Size.X, Math.Max(0, Size.Y - TracksTop)), tint);
-                DrawRect(new Rect2(r.Position.X, top + 2f * _scale, r.Size.X, 3f * _scale), m.Color);
-                DrawRect(new Rect2(r.Position.X, top + 2f * _scale, 2f * _scale, r.Size.Y - 4f * _scale), m.Color);
-                DrawRect(new Rect2(r.End.X - 2f * _scale, top + 2f * _scale, 2f * _scale, r.Size.Y - 4f * _scale), m.Color);
-                DrawString(_font, new Vector2(r.Position.X + 5f * _scale, textY + 2f * _scale), m.Label, HorizontalAlignment.Left, r.Size.X - 8f * _scale, _fontSize - 1, m.Color);
+                DrawRect(new Rect2(r.Position.X, top + 2f * UiScale, r.Size.X, 3f * UiScale), m.Color);
+                DrawRect(new Rect2(r.Position.X, top + 2f * UiScale, 2f * UiScale, r.Size.Y - 4f * UiScale), m.Color);
+                DrawRect(new Rect2(r.End.X - 2f * UiScale, top + 2f * UiScale, 2f * UiScale, r.Size.Y - 4f * UiScale), m.Color);
+                DrawString(_font, new Vector2(r.Position.X + 5f * UiScale, textY + 2f * UiScale), m.Label, HorizontalAlignment.Left, r.Size.X - 8f * UiScale, FontSize - 1, m.Color);
             }
             else
             {
                 // Flag: line down through the tracks plus a label box.
                 DrawLine(new Vector2(r.Position.X, top), new Vector2(r.Position.X, Size.Y), Alpha(m.Color, 0.5f));
-                float labelWidth = _font.GetStringSize(m.Label, HorizontalAlignment.Left, -1, _fontSize - 1).X + 10f * _scale;
-                DrawRect(new Rect2(r.Position.X, top + 3f * _scale, labelWidth, r.Size.Y - 6f * _scale), m.Color);
-                DrawString(_font, new Vector2(r.Position.X + 5f * _scale, textY + 1f * _scale), m.Label, HorizontalAlignment.Left, -1, _fontSize - 1, Background);
+                float labelWidth = _font.GetStringSize(m.Label, HorizontalAlignment.Left, -1, FontSize - 1).X + 10f * UiScale;
+                DrawRect(new Rect2(r.Position.X, top + 3f * UiScale, labelWidth, r.Size.Y - 6f * UiScale), m.Color);
+                DrawString(_font, new Vector2(r.Position.X + 5f * UiScale, textY + 1f * UiScale), m.Label, HorizontalAlignment.Left, -1, FontSize - 1, Background);
             }
-            if (m.Selected) DrawRect(new Rect2(r.Position.X - 1, top + 1, (m.Region ? r.Size.X : 10f * _scale) + 2, MarkerLaneHeight - 2), SelectionColor, false, 1.5f);
+            if (m.Selected) DrawRect(new Rect2(r.Position.X - 1, top + 1, (m.Region ? r.Size.X : 10f * UiScale) + 2, MarkerLaneHeight - 2), SelectionColor, false, 1.5f);
         }
         DrawLine(new Vector2(HeaderWidth, top + MarkerLaneHeight), new Vector2(Size.X, top + MarkerLaneHeight), BorderColor);
     }
@@ -469,8 +473,8 @@ public sealed partial class TimelineCanvas : Control
         {
             TempoGeom t = _tempos[i];
             DrawRect(t.Rect, BarColor);
-            DrawRect(new Rect2(t.Rect.Position.X - 16f * _scale, t.Rect.Position.Y, 2f * _scale, t.Rect.Size.Y), AccentColor);
-            DrawString(_font, new Vector2(t.Rect.Position.X + 4f * _scale, t.Rect.Position.Y + t.Rect.Size.Y - 3f * _scale), t.Label, HorizontalAlignment.Left, -1, _fontSize - 2, TextColor);
+            DrawRect(new Rect2(t.Rect.Position.X - 16f * UiScale, t.Rect.Position.Y, 2f * UiScale, t.Rect.Size.Y), AccentColor);
+            DrawString(_font, new Vector2(t.Rect.Position.X + 4f * UiScale, t.Rect.Position.Y + t.Rect.Size.Y - 3f * UiScale), t.Label, HorizontalAlignment.Left, -1, FontSize - 2, TextColor);
         }
     }
 
@@ -498,14 +502,14 @@ public sealed partial class TimelineCanvas : Control
             if (r.End.X < HeaderWidth || r.Position.X > Size.X || r.End.Y < TracksTop) continue;
             Color fill = b.Selected ? b.Color.Lightened(0.15f) : b.Color;
             DrawRect(r, Alpha(fill, 0.85f));
-            DrawRect(new Rect2(r.Position, new Vector2(r.Size.X, 3f * _scale)), b.Color.Lightened(0.3f));
-            if (b.Natural) DrawRect(new Rect2(r.End.X - 3f * _scale, r.Position.Y, 3f * _scale, r.Size.Y), Alpha(Background, 0.5f));
-            if (r.Size.X > 24f * _scale)
+            DrawRect(new Rect2(r.Position, new Vector2(r.Size.X, 3f * UiScale)), b.Color.Lightened(0.3f));
+            if (b.Natural) DrawRect(new Rect2(r.End.X - 3f * UiScale, r.Position.Y, 3f * UiScale, r.Size.Y), Alpha(Background, 0.5f));
+            if (r.Size.X > 24f * UiScale)
             {
-                float textX = r.Position.X + 5f * _scale;
-                float clip = r.Size.X - 8f * _scale;
-                DrawString(_font, new Vector2(textX, r.Position.Y + 4f * _scale + _fontSize), b.Label, HorizontalAlignment.Left, clip, _fontSize, Colors.White);
-                DrawString(_font, new Vector2(textX, r.End.Y - 6f * _scale), b.Sub, HorizontalAlignment.Left, clip, _fontSize - 1, Alpha(Colors.White, 0.7f));
+                float textX = r.Position.X + 5f * UiScale;
+                float clip = r.Size.X - 8f * UiScale;
+                DrawString(_font, new Vector2(textX, r.Position.Y + 4f * UiScale + FontSize), b.Label, HorizontalAlignment.Left, clip, FontSize, Colors.White);
+                DrawString(_font, new Vector2(textX, r.End.Y - 6f * UiScale), b.Sub, HorizontalAlignment.Left, clip, FontSize - 1, Alpha(Colors.White, 0.7f));
                 // Waveform placeholder: a centre line band.
                 float mid = r.Position.Y + r.Size.Y * 0.55f;
                 DrawLine(new Vector2(r.Position.X + 2, mid), new Vector2(r.End.X - 2, mid), Alpha(Colors.White, 0.25f));
@@ -523,8 +527,8 @@ public sealed partial class TimelineCanvas : Control
             RowGeom row = _rows[i];
             if (row.Rect.End.Y < TracksTop || row.Rect.Position.Y > Size.Y) continue;
             if (row.Selected) DrawRect(new Rect2(0, row.Rect.Position.Y, HeaderWidth, row.Rect.Size.Y), Alpha(AccentColor, 0.18f));
-            DrawString(_font, new Vector2(8f * _scale, row.Rect.Position.Y + 6f * _scale + _fontSize), row.Label, HorizontalAlignment.Left, HeaderWidth - 16f * _scale, _fontSize, TextColor);
-            DrawString(_font, new Vector2(8f * _scale, row.Rect.End.Y - 8f * _scale), row.Volume, HorizontalAlignment.Left, -1, _fontSize - 1, MutedColor);
+            DrawString(_font, new Vector2(8f * UiScale, row.Rect.Position.Y + 6f * UiScale + FontSize), row.Label, HorizontalAlignment.Left, HeaderWidth - 16f * UiScale, FontSize, TextColor);
+            DrawString(_font, new Vector2(8f * UiScale, row.Rect.End.Y - 8f * UiScale), row.Volume, HorizontalAlignment.Left, -1, FontSize - 1, MutedColor);
             DrawLine(new Vector2(0, row.Rect.End.Y), new Vector2(HeaderWidth, row.Rect.End.Y), BorderColor);
         }
         DrawLine(new Vector2(HeaderWidth, TabsHeight), new Vector2(HeaderWidth, Size.Y), BorderColor);
@@ -540,7 +544,7 @@ public sealed partial class TimelineCanvas : Control
         if (x < HeaderWidth || x > Size.X) return;
         DrawLine(new Vector2(x, RulerTop), new Vector2(x, Size.Y), PlayheadColor, 2f);
         // Head triangle in the ruler.
-        float s = 6f * _scale;
+        float s = 6f * UiScale;
         DrawColoredPolygon(_playheadPolygon.Fill(x, RulerTop, s), PlayheadColor);
     }
 
@@ -567,9 +571,16 @@ public sealed partial class TimelineCanvas : Control
 
     // ---- playback following --------------------------------------------------------------------------------------------
 
+    private const double FollowInterval = 1.0 / 30.0;
+    private double _followClock;
+
     public override void _Process(double delta)
     {
         if (_state.Event is null) { if (_playhead >= 0 || !double.IsNaN(_sheetValue)) { _playhead = -1; _sheetValue = double.NaN; QueueRedraw(); } return; }
+        // The playhead moves every audio tick; redrawing the whole timeline more than 30 times a second buys nothing visible.
+        _followClock += delta;
+        if (_followClock < FollowInterval) return;
+        _followClock = Math.Min(_followClock - FollowInterval, FollowInterval);
         EventInstance? instance = RunningInstance();
         double playhead = instance is null ? -1 : instance.TimelinePosition;
         double sheetValue = double.NaN;

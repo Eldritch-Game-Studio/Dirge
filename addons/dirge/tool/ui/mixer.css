@@ -121,10 +121,12 @@ button.tog.bypass.on { background-color: var(--bypass, #d26b2f); border-color: v
 }
 
 .meter { position: relative; width: 22px; height: 150px; flex-shrink: 0; background-color: var(--input, #15161a); border: 1px solid var(--border, #33353c); border-radius: 2px; }
-.meter .bar { position: absolute; bottom: 0; width: 8px; height: 0; background-color: var(--meter, #3fb950); }
+/* Bars and hold are driven from C# through inline transforms (scaleY/translateY), which NecronomiDOM applies through its
+   retained compositor without relayout; height/top/class writes would relayout the whole document per meter tick. */
+.meter .bar { position: absolute; bottom: 0; width: 8px; height: 148px; background-color: var(--meter, #3fb950); transform-origin: 50% 100%; }
 .meter .bar.l { left: 2px; }
 .meter .bar.r { left: 11px; }
-.meter .bar.hot { background-color: var(--meter-hot, #e0b94a); }
+.meter .bar.hot { bottom: 121px; height: 27px; background-color: var(--meter-hot, #e0b94a); }
 .meter .hold { position: absolute; left: 2px; width: 17px; height: 2px; top: 146px; background-color: var(--meter-hold, #e6e8ef); }
 .meter .clip { position: absolute; left: 2px; top: 2px; width: 17px; height: 4px; border-radius: 1px; background-color: #3a1d1d; cursor: pointer; }
 .meter .clip.on { background-color: var(--meter-clip, #ff3b3b); }

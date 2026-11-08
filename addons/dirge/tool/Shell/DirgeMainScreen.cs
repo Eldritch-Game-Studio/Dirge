@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using Dirge.Project;
 using Dirge.Tool.Core;
+using Dirge.Tool.Events;
 using Godot;
 using NecronomiDom.Dom;
 using NecronomiDom.Runtime;
@@ -31,6 +32,9 @@ public partial class DirgeMainScreen : Control
     private DocumentHost _menu = null!;
     private DocumentHost _status = null!;
     private TabContainer _bottomTabs = null!;
+    private HSplitContainer _mainSplit = null!;
+    private VSplitContainer _centerSplit = null!;
+    private PaneFrame _transportFrame = null!;
     private ValidationPanel _validation = null!;
     private IToolPane _browser = null!;
     private IToolPane _transport = null!;
@@ -58,7 +62,9 @@ public partial class DirgeMainScreen : Control
     private string _message = "";
     private bool _messageIsError;
     private double _messageTtl;
-    private string _lastInstances = "", _lastVoices = "", _lastMs = "", _lastBuses = "", _lastLive = "";
+    private int _lastInstances = -1, _lastVoices = -1, _lastBuses = -1;
+    private double _lastMs = double.NaN;
+    private string _lastLive = "";
 
     public ProjectDocument Document => _document;
     public Selection Selection => _selection;
@@ -80,7 +86,9 @@ public partial class DirgeMainScreen : Control
         _context = new ToolContext(_document, _selection, _audition, this);
         _live = new LiveUpdateBridge(this, _document);
 
+        ToolScale.Watch(this);
         BuildLayout();
+        ToolScale.Changed += OnScaleChanged;
         BindMenu();
         BindStatus();
         CreateDialogs();
@@ -119,6 +127,7 @@ public partial class DirgeMainScreen : Control
             }
         }
 
+        ToolScale.Changed -= OnScaleChanged;
         _document.Changed -= OnDocumentChanged;
         _audition.Dispose();
         _live.Dispose();
@@ -149,46 +158,53 @@ public partial class DirgeMainScreen : Control
 
     private void BuildLayout()
     {
-        float scale = ToolDocuments.EditorScale();
         var layout = new VBoxContainer { Name = "Layout" };
         layout.SetAnchorsPreset(LayoutPreset.FullRect);
         layout.AddThemeConstantOverride("separation", 0);
         AddChild(layout);
 
-        var menuBar = new Control { Name = "MenuBar", CustomMinimumSize = new Vector2(0, 28 * scale), SizeFlagsHorizontal = SizeFlags.ExpandFill };
+        // Minimum sizes are authored at tool scale 1 (ToolDocuments.SetAuthoredMinimumSize) and re-applied on scale changes.
         _menu = ToolDocuments.Create("shell.html");
-        menuBar.AddChild(_menu);
+        Control menuBar = ToolDocuments.Slot(_menu, "MenuBar", new Vector2(0, 28));
+        menuBar.SizeFlagsVertical = SizeFlags.Fill;
         layout.AddChild(menuBar);
 
         // SplitContainer measures its offset from the non-expanding child's minimum size, so the browser (left) and the
         // bottom tabs are Fill-only with a minimum size; the center/top areas take the remaining space. Every pane sits in a
-        // PaneFrame whose minimum size is the shell's, not the pane's.
-        var main = new HSplitContainer { Name = "Main", SizeFlagsVertical = SizeFlags.ExpandFill, SizeFlagsHorizontal = SizeFlags.ExpandFill };
-        layout.AddChild(main);
+        // PaneFrame whose minimum size is the shell's, not the pane's. The browser/center and top/bottom offsets persist in
+        // editor settings (authored pixels, see RestoreSplits).
+        _mainSplit = new HSplitContainer { Name = "Main", SizeFlagsVertical = SizeFlags.ExpandFill, SizeFlagsHorizontal = SizeFlags.ExpandFill };
+        layout.AddChild(_mainSplit);
+        _mainSplit.Dragged += offset => ToolSettings.Set(ToolSettings.BrowserSplit, offset / ToolScale.Current);
 
         _browser = AddPane(PaneRegistry.Browser, "Browser");
-        PaneFrame browserFrame = Frame(_browser, new Vector2(260 * scale, 0));
+        PaneFrame browserFrame = Frame(_browser, new Vector2(260, 0));
         browserFrame.SizeFlagsHorizontal = SizeFlags.Fill;
-        main.AddChild(browserFrame);
+        _mainSplit.AddChild(browserFrame);
 
-        var center = new VSplitContainer { Name = "Center", SizeFlagsHorizontal = SizeFlags.ExpandFill, SizeFlagsVertical = SizeFlags.ExpandFill };
-        main.AddChild(center);
+        _centerSplit = new VSplitContainer { Name = "Center", SizeFlagsHorizontal = SizeFlags.ExpandFill, SizeFlagsVertical = SizeFlags.ExpandFill };
+        _mainSplit.AddChild(_centerSplit);
+        _centerSplit.Dragged += offset => ToolSettings.Set(ToolSettings.BottomSplit, offset / ToolScale.Current);
+        _centerSplit.Resized += DefaultBottomSplit;
 
         // Transport docked above the event editor; the transport keeps a fixed (draggable) height, the editor takes the rest.
         var top = new VSplitContainer { Name = "Top", SizeFlagsVertical = SizeFlags.ExpandFill, SizeFlagsHorizontal = SizeFlags.ExpandFill };
-        center.AddChild(top);
+        _centerSplit.AddChild(top);
 
         _transport = AddPane(PaneRegistry.Transport, "Transport");
-        float transportHeight = Mathf.Clamp(_transport.Root.GetCombinedMinimumSize().Y, 136 * scale, 200 * scale);
-        PaneFrame transportFrame = Frame(_transport, new Vector2(0, transportHeight));
-        transportFrame.SizeFlagsVertical = SizeFlags.Fill;
-        top.AddChild(transportFrame);
+        float scale = ToolScale.Current;
+        float transportHeight = Mathf.Clamp(_transport.Root.GetCombinedMinimumSize().Y / scale, 136, 200);
+        _transportFrame = Frame(_transport, new Vector2(0, transportHeight));
+        _transportFrame.SizeFlagsVertical = SizeFlags.Fill;
+        top.AddChild(_transportFrame);
 
         _events = AddPane(PaneRegistry.Events, "Events");
-        top.AddChild(Frame(_events, new Vector2(0, 120 * scale)));
+        top.AddChild(Frame(_events, new Vector2(0, 120)));
 
-        _bottomTabs = new TabContainer { Name = "Bottom", SizeFlagsVertical = SizeFlags.Fill, SizeFlagsHorizontal = SizeFlags.ExpandFill, CustomMinimumSize = new Vector2(0, 280 * scale), TabAlignment = TabBar.AlignmentMode.Left };
-        center.AddChild(_bottomTabs);
+        _bottomTabs = new TabContainer { Name = "Bottom", SizeFlagsVertical = SizeFlags.Fill, SizeFlagsHorizontal = SizeFlags.ExpandFill, TabAlignment = TabBar.AlignmentMode.Left };
+        ToolDocuments.SetAuthoredMinimumSize(_bottomTabs, new Vector2(0, 180));
+        _centerSplit.AddChild(_bottomTabs);
+        RestoreSplits();
 
         _mixer = AddPane(PaneRegistry.Mixer, "Mixer");
         _profiler = AddPane(PaneRegistry.Profiler, "Profiler");
@@ -198,10 +214,47 @@ public partial class DirgeMainScreen : Control
         AddTab(_profiler);
         AddTab(_validation);
 
-        var statusBar = new Control { Name = "StatusBar", CustomMinimumSize = new Vector2(0, 22 * scale), SizeFlagsHorizontal = SizeFlags.ExpandFill };
         _status = ToolDocuments.Create("shell-status.html");
-        statusBar.AddChild(_status);
+        Control statusBar = ToolDocuments.Slot(_status, "StatusBar", new Vector2(0, 22));
+        statusBar.SizeFlagsVertical = SizeFlags.Fill;
         layout.AddChild(statusBar);
+    }
+
+    /// <summary>Documents and canvases rescale themselves; the shell re-applies every authored minimum size and split offset.</summary>
+    private void OnScaleChanged()
+    {
+        ToolDocuments.ApplyMinimumSizes(this);
+        RestoreSplits();
+    }
+
+    /// <summary>Applies the persisted split offsets (authored pixels) at the current scale; the bottom split falls back to
+    /// <see cref="DefaultBottomSplit"/> when the user never dragged it.</summary>
+    private void RestoreSplits()
+    {
+        float scale = ToolScale.Current;
+        if (ToolSettings.TryGet(ToolSettings.BrowserSplit, out Variant browser)) _mainSplit.SplitOffsets = new[] { Mathf.RoundToInt(browser.AsSingle() * scale) };
+        if (ToolSettings.TryGet(ToolSettings.BottomSplit, out Variant bottom)) _centerSplit.SplitOffsets = new[] { Mathf.RoundToInt(bottom.AsSingle() * scale) };
+        else DefaultBottomSplit();
+    }
+
+    /// <summary>
+    /// Default top/bottom split: the timeline (the event editor minus its header and automation chrome, under the transport)
+    /// gets at least 40 % of the center column; whatever remains above the bottom tabs' minimum goes to the tabs. Follows
+    /// the center's size (and scale changes) until the user drags the split, which persists an offset instead.
+    /// </summary>
+    private void DefaultBottomSplit()
+    {
+        if (_centerSplit is null || _bottomTabs is null || ToolSettings.TryGet(ToolSettings.BottomSplit, out _)) return;
+        float height = _centerSplit.Size.Y;
+        if (height <= 0f) return;
+        float separation = _centerSplit.GetThemeConstant("separation");
+        float chrome = _events is EventEditorPane events ? events.ChromeHeight : 0f;
+        float fixedTop = _transportFrame.CustomMinimumSize.Y + separation + chrome;
+        float maxTop = height - separation - _bottomTabs.CustomMinimumSize.Y;
+        float wishedTop = Mathf.Min(fixedTop + 0.4f * height, maxTop);
+        // Nothing after the dragger expands, so offset 0 is the end of the container: the dragger sits at size + offset and
+        // the top child ends one separation before it. The container clamps to the bottom tabs' minimum.
+        _centerSplit.SplitOffsets = new[] { Mathf.RoundToInt(wishedTop + separation - height) };
     }
 
     private IToolPane AddPane(string typeName, string title)
@@ -212,15 +265,16 @@ public partial class DirgeMainScreen : Control
         return pane;
     }
 
+    /// <param name="minimum">Frame minimum size authored at tool scale 1.</param>
     private static PaneFrame Frame(IToolPane pane, Vector2 minimum)
     {
         var frame = new PaneFrame
         {
             Name = pane.Title + "Frame",
-            FrameMinimumSize = minimum,
             SizeFlagsHorizontal = SizeFlags.ExpandFill,
             SizeFlagsVertical = SizeFlags.ExpandFill,
         };
+        ToolDocuments.SetAuthoredMinimumSize(frame, minimum);
         frame.AddChild(pane.Root);
         return frame;
     }
@@ -324,13 +378,22 @@ public partial class DirgeMainScreen : Control
     private void RefreshLiveStatus()
     {
         Runtime.DirgeSystem? system = _audition.System;
-        SetIfChanged(_statusInstances, ref _lastInstances, (system?.InstanceCount ?? 0).ToString());
-        SetIfChanged(_statusVoices, ref _lastVoices, (system?.RealVoiceCount ?? 0).ToString());
-        SetIfChanged(_statusMs, ref _lastMs, _audition.LastUpdateMs.ToString("0.00") + " ms");
-        SetIfChanged(_statusBuses, ref _lastBuses, AudioServer.GetBusCount().ToString());
+        int instances = system?.InstanceCount ?? 0;
+        int voices = system?.RealVoiceCount ?? 0;
+        // 0.1 ms steps: idle-stable, and a change is a same-width digit swap the document host applies without relayout.
+        double ms = Math.Round(_audition.LastUpdateMs, 1);
+        int buses = AudioServer.GetBusCount();
+        if (instances != _lastInstances) { _lastInstances = instances; _statusInstances.TextContent = instances.ToString(); }
+        if (voices != _lastVoices) { _lastVoices = voices; _statusVoices.TextContent = voices.ToString(); }
+        if (ms != _lastMs) { _lastMs = ms; _statusMs.TextContent = ms.ToString("0.0") + " ms"; }
+        if (buses != _lastBuses) { _lastBuses = buses; _statusBuses.TextContent = buses.ToString(); }
         string live = _live.StatusText;
-        SetIfChanged(_statusLive, ref _lastLive, live);
-        ((HTMLElement)_statusLive).Hidden = live.Length == 0;
+        if (live != _lastLive)
+        {
+            _lastLive = live;
+            _statusLive.TextContent = live;
+            ((HTMLElement)_statusLive).Hidden = live.Length == 0;
+        }
     }
 
     private void OnLiveStateChanged()
@@ -352,15 +415,6 @@ public partial class DirgeMainScreen : Control
         _messageTtl = text.Length == 0 ? 0 : 10;
         _statusMessage.TextContent = text;
         _statusMessage.ClassList.Toggle("error", error);
-    }
-
-    private static void SetIfChanged(Element element, ref string last, string text)
-    {
-        if (last != text)
-        {
-            last = text;
-            element.TextContent = text;
-        }
     }
 
     private static void Listen(Document document, string id, Action action)

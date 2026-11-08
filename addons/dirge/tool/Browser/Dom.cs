@@ -68,6 +68,16 @@ internal static class Dom
     public static string F(float value, int decimals = 2) => value.ToString("F" + decimals, CultureInfo.InvariantCulture);
     public static string F(double value, int decimals = 2) => value.ToString("F" + decimals, CultureInfo.InvariantCulture);
 
+    private static readonly string?[] ScaleXStrings = new string?[1001];
+
+    /// <summary>"scaleX(0.123)" for a 0..1 fraction in 1/1000 steps, cached: fills/meters write one of these per tick and
+    /// NecronomiDOM composites the inline transform without relayout.</summary>
+    public static string ScaleX(float fraction)
+    {
+        int permille = Math.Clamp((int)MathF.Round(fraction * 1000f), 0, 1000);
+        return ScaleXStrings[permille] ??= "scaleX(" + (permille / 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + ")";
+    }
+
     /// <summary>mm:ss.d for asset lengths and playback positions.</summary>
     public static string Time(double seconds)
     {

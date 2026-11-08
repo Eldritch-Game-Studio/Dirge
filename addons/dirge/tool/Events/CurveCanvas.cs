@@ -21,13 +21,16 @@ public sealed partial class CurveCanvas : Control
     private const int MenuLinear = 1, MenuSmooth = 2, MenuStepped = 3, MenuDelete = 4;
     private const float PointRadiusBase = 5f;
     private const float PadLeftBase = 44f, PadBottomBase = 18f, PadTopBase = 8f, PadRightBase = 8f;
+    private const float FontSizeBase = 11f;
 
     private readonly EventEditorState _state;
     private readonly EventEdits _edits;
     private readonly IAudition _audition;
-    private float _scale = 1f;
+    /// <summary>Read on every layout/draw/hit test so the canvas never holds a stale scale.</summary>
+    private static float UiScale => ToolScale.Current;
     private Font _font = null!;
-    private int _fontSize = 12;
+    /// <summary>Label size in pixels at the current tool scale.</summary>
+    public int FontSize => ToolScale.Px(FontSizeBase);
     private PopupMenu _menu = null!;
 
     private AutomationLane? _lane;
@@ -64,19 +67,21 @@ public sealed partial class CurveCanvas : Control
         MouseFilter = MouseFilterEnum.Stop;
         SizeFlagsHorizontal = SizeFlags.ExpandFill;
         SizeFlagsVertical = SizeFlags.ExpandFill;
-        CustomMinimumSize = new Vector2(240, 120);
+        ToolDocuments.SetAuthoredMinimumSize(this, new Vector2(240, 120));
     }
 
     public override void _Ready()
     {
         _font = GetThemeDefaultFont();
-        _fontSize = Math.Clamp(GetThemeDefaultFontSize() - 3, 10, 14);
-        _scale = ToolDocuments.EditorScale();
         _menu = new PopupMenu();
         _menu.IdPressed += OnMenu;
         AddChild(_menu);
         SetProcess(true);
     }
+
+    public override void _EnterTree() => ToolScale.Changed += QueueRedraw;
+
+    public override void _ExitTree() => ToolScale.Changed -= QueueRedraw;
 
     public void Invalidate() => QueueRedraw();
 
@@ -95,10 +100,10 @@ public sealed partial class CurveCanvas : Control
 
     // ---- layout ------------------------------------------------------------------------------------------------------
 
-    private float PadLeft => PadLeftBase * _scale;
-    private float PadRight => PadRightBase * _scale;
-    private float PadTop => PadTopBase * _scale;
-    private float PadBottom => PadBottomBase * _scale;
+    private float PadLeft => PadLeftBase * UiScale;
+    private float PadRight => PadRightBase * UiScale;
+    private float PadTop => PadTopBase * UiScale;
+    private float PadBottom => PadBottomBase * UiScale;
     private float PlotWidth => Math.Max(1, Size.X - PadLeft - PadRight);
     private float PlotHeight => Math.Max(1, Size.Y - PadTop - PadBottom);
 
@@ -185,7 +190,7 @@ public sealed partial class CurveCanvas : Control
         DrawRect(new Rect2(Vector2.Zero, Size), Background);
         if (_lane is null)
         {
-            DrawString(_font, new Vector2(12f * _scale, Size.Y * 0.5f), "Select an automation lane to edit its curve.", HorizontalAlignment.Left, -1, _fontSize, TextColor);
+            DrawString(_font, new Vector2(12f * UiScale, Size.Y * 0.5f), "Select an automation lane to edit its curve.", HorizontalAlignment.Left, -1, FontSize, TextColor);
             return;
         }
         var plot = new Rect2(PadLeft, PadTop, PlotWidth, PlotHeight);
@@ -201,16 +206,16 @@ public sealed partial class CurveCanvas : Control
             DrawLine(new Vector2(x, PadTop), new Vector2(x, PadTop + PlotHeight), GridColor);
         }
         DrawRect(plot, AxisColor, false, 1f);
-        DrawString(_font, new Vector2(2f * _scale, PadTop + _fontSize), _yMaxLabel, HorizontalAlignment.Left, PadLeft - 4, _fontSize - 2, TextColor);
-        DrawString(_font, new Vector2(2f * _scale, PadTop + PlotHeight), _yMinLabel, HorizontalAlignment.Left, PadLeft - 4, _fontSize - 2, TextColor);
-        DrawString(_font, new Vector2(PadLeft, Size.Y - 4f * _scale), _parameter is null ? "" : _parameter.Minimum.ToString("0.##", CultureInfo.InvariantCulture), HorizontalAlignment.Left, -1, _fontSize - 2, TextColor);
-        DrawString(_font, new Vector2(PadLeft + PlotWidth - 40f * _scale, Size.Y - 4f * _scale), _parameter is null ? "" : _parameter.Maximum.ToString("0.##", CultureInfo.InvariantCulture), HorizontalAlignment.Right, 40f * _scale, _fontSize - 2, TextColor);
-        DrawString(_font, new Vector2(PadLeft + 6f * _scale, PadTop + _fontSize + 2f * _scale), _title, HorizontalAlignment.Left, PlotWidth - 12f * _scale, _fontSize, LineColor);
+        DrawString(_font, new Vector2(2f * UiScale, PadTop + FontSize), _yMaxLabel, HorizontalAlignment.Left, PadLeft - 4, FontSize - 2, TextColor);
+        DrawString(_font, new Vector2(2f * UiScale, PadTop + PlotHeight), _yMinLabel, HorizontalAlignment.Left, PadLeft - 4, FontSize - 2, TextColor);
+        DrawString(_font, new Vector2(PadLeft, Size.Y - 4f * UiScale), _parameter is null ? "" : _parameter.Minimum.ToString("0.##", CultureInfo.InvariantCulture), HorizontalAlignment.Left, -1, FontSize - 2, TextColor);
+        DrawString(_font, new Vector2(PadLeft + PlotWidth - 40f * UiScale, Size.Y - 4f * UiScale), _parameter is null ? "" : _parameter.Maximum.ToString("0.##", CultureInfo.InvariantCulture), HorizontalAlignment.Right, 40f * UiScale, FontSize - 2, TextColor);
+        DrawString(_font, new Vector2(PadLeft + 6f * UiScale, PadTop + FontSize + 2f * UiScale), _title, HorizontalAlignment.Left, PlotWidth - 12f * UiScale, FontSize, LineColor);
 
         List<CurvePoint> points = _lane.Curve.Points;
         if (points.Count == 0)
         {
-            DrawString(_font, new Vector2(PadLeft + 6f * _scale, PadTop + PlotHeight * 0.5f), "Double-click to add points.", HorizontalAlignment.Left, -1, _fontSize - 1, TextColor);
+            DrawString(_font, new Vector2(PadLeft + 6f * UiScale, PadTop + PlotHeight * 0.5f), "Double-click to add points.", HorizontalAlignment.Left, -1, FontSize - 1, TextColor);
         }
         else
         {
@@ -218,7 +223,7 @@ public sealed partial class CurveCanvas : Control
             DrawLine(new Vector2(PadLeft, ToScreenY(points[0].Y)), new Vector2(ToScreenX(points[0].X), ToScreenY(points[0].Y)), LineColor, 1.5f);
             DrawLine(new Vector2(ToScreenX(points[^1].X), ToScreenY(points[^1].Y)), new Vector2(PadLeft + PlotWidth, ToScreenY(points[^1].Y)), LineColor, 1.5f);
             for (int i = 0; i + 1 < points.Count; i++) DrawSegment(points[i], points[i + 1]);
-            float radius = PointRadiusBase * _scale;
+            float radius = PointRadiusBase * UiScale;
             for (int i = 0; i < points.Count; i++)
             {
                 var p = new Vector2(ToScreenX(points[i].X), ToScreenY(points[i].Y));
@@ -233,7 +238,7 @@ public sealed partial class CurveCanvas : Control
             {
                 DrawLine(new Vector2(x, PadTop), new Vector2(x, PadTop + PlotHeight), CursorColor, 1.5f);
                 float value = CurveMath.Evaluate(_lane.Curve, (float)_cursorValue);
-                DrawCircle(new Vector2(x, ToScreenY(value)), 4f * _scale, CursorColor);
+                DrawCircle(new Vector2(x, ToScreenY(value)), 4f * UiScale, CursorColor);
             }
         }
     }
@@ -330,7 +335,7 @@ public sealed partial class CurveCanvas : Control
     private int PointAt(Vector2 p)
     {
         List<CurvePoint> points = _lane!.Curve.Points;
-        float r = PointRadiusBase * _scale + 3f;
+        float r = PointRadiusBase * UiScale + 3f;
         for (int i = points.Count - 1; i >= 0; i--)
         {
             var sp = new Vector2(ToScreenX(points[i].X), ToScreenY(points[i].Y));

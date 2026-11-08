@@ -2,6 +2,17 @@
 
 All notable changes to Dirge. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
+## 1.0.2 — Unreleased
+
+### Fixed
+- Hi-DPI editors: the Event editor header, inspector and automation documents (and the Profiler document) rendered at scale 1 because their Godot container parents reset the host's `scale` and size on every layout pass; the timeline, curve, profiler and 3D-panner canvases clamped or hard-coded their label sizes. Every tool document and canvas now follows one `ToolScale` (editor display scale × main font size / 14, or the new `dirge/ui_scale` editor setting when non-zero; 0 = auto), hosts mount in plain `ToolDocuments.Slot` controls, authored minimum sizes rescale, and changing the setting (or the window DPI) re-scales live.
+
+### Changed
+- Event editor layout budget on small or hi-DPI screens: the header's Macros/Parameters/Tempo sections start collapsed (header costs one toolbar row; the toggles persist in editor setting `dirge/header_sections`), the bottom Mixer/Profiler/Validation tabs' minimum height is 180 px (was 280), the default top/bottom split gives the timeline at least 40 % of the center column, and the browser/center and top/bottom split positions persist across sessions (`dirge/split_browser`, `dirge/split_bottom`, in scale-1 pixels).
+
+### Performance
+- The tool is cheap when idle and no longer relayouts its documents every frame while auditioning. Measured in an offscreen editor with a KK-shaped project (250 events, 9 buses): idle `_Process` cost of the whole editor fell from ≈3.8 ms/frame (Dirge ≈2.4 ms, 23 document relayouts/s, ≈110 KB allocated per frame) to ≈0.6 ms/frame (Dirge within noise of 0, 0.1 relayouts/s, <1 KB/frame); auditioning fell from ≈100 ms to ≈10 ms/frame (median 1 ms) and the Profiler tab from ≈240 ms to ≈4 ms/frame. Changes: mixer meter bars, hold lines, profiler bus meters and transport slider fills are driven through inline `transform`s (NecronomiDOM composites them without relayout) instead of `height`/`width`/class writes; dB and timing readouts use fixed-width formats, 0.1 ms / 0.5 dB quantization and change-only writes so a changed digit is an in-place text swap; the transport readouts are single-text blocks; the Profiler pane stops processing while its bottom tab is hidden, the Mixer skips meter writes while hidden, the profiler feed only rebuilds its row lists at the document refresh rate (no per-frame enum/string allocation); the timeline playhead and the update graph redraw at most 30 times a second; validation re-runs 500 ms after the last edit instead of on every `Changed` (a fader drag fires one per frame); the Event editor ignores value-only mixer/snapshot edits (it only shows bus and snapshot names).
+
 ## 1.0.1 — 2026-11-07
 
 ### Fixed

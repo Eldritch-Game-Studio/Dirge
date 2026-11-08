@@ -4,33 +4,19 @@ using Godot;
 namespace Dirge.Tool.Shell;
 
 /// <summary>
-/// Hosts a pane's <c>Root</c> at the frame's full size while reporting only the shell's own minimum size, so a pane's
-/// intrinsic minimum (long labels, wide strips) can never push the status bar or sibling areas off screen; overflow is clipped
-/// and left to the pane's own scrolling.
+/// Hosts a pane's <c>Root</c> at the frame's full size while reporting only the shell's own minimum size (its
+/// <c>CustomMinimumSize</c>, authored through <c>ToolDocuments.SetAuthoredMinimumSize</c>), so a pane's intrinsic minimum
+/// (long labels, wide strips) can never push the status bar or sibling areas off screen; overflow is clipped and left to the
+/// pane's own scrolling.
 /// </summary>
 [Tool]
 public partial class PaneFrame : Container
 {
-    private Vector2 _minimum;
-
     public PaneFrame()
     {
         ClipContents = true;
         MouseFilter = MouseFilterEnum.Pass;
     }
-
-    /// <summary>Minimum size the frame asks of its parent layout (independent of the pane inside).</summary>
-    public Vector2 FrameMinimumSize
-    {
-        get => _minimum;
-        set
-        {
-            _minimum = value;
-            UpdateMinimumSize();
-        }
-    }
-
-    public override Vector2 _GetMinimumSize() => _minimum;
 
     public override void _Notification(int what)
     {

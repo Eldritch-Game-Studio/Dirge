@@ -280,7 +280,9 @@ public static partial class ToolTheme
 
     private static ToolPalette _current = ToolPalette.DirgeDark;
     private static bool _known;
+#if TOOLS
     private static string? _warnedCustom;
+#endif
 
     /// <summary>Current palette. Computed on first use.</summary>
     public static ToolPalette Current

@@ -4,7 +4,7 @@ A ten-minute walkthrough: install the addon, author a bus, an event with a clip,
 
 ## 1. Install (2 minutes)
 
-1. Copy `addons/dirge/` from the [release ZIP](https://github.com/Eldritch-Game-Studio/Dirge/releases/latest) into your project, and NecronomiDOM ≥ 1.1.4 into `addons/necronomidom/` from [its release ZIP](https://github.com/Eldritch-Game-Studio/NecronomiDOM/releases/latest).
+1. Copy `addons/dirge/` from the [release ZIP](https://github.com/Eldritch-Game-Studio/Dirge/releases/latest) into your project, and NecronomiDOM ≥ 1.1.5 into `addons/necronomidom/` from [its release ZIP](https://github.com/Eldritch-Game-Studio/NecronomiDOM/releases/latest).
 2. Add to your `.csproj`, before `</Project>`:
    ```xml
    <Import Project="addons/necronomidom/NecronomiDom.targets" />

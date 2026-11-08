@@ -8,7 +8,7 @@ The native GDExtension in `native/` is built against godot-cpp (`native/godot-cp
 
 ## NecronomiDOM (MIT) — runtime dependency
 
-The editor tool and the in-game overlay render through NecronomiDOM ≥ 1.1.4, which is installed separately into `addons/necronomidom/` (release ZIP or `scripts/fetch-deps.sh`) and is not bundled in the Dirge addon ZIP. Copyright (c) 2026 Eldritch Game Studio. License: `addons/necronomidom/LICENSE`. NecronomiDOM itself bundles AngleSharp (MIT), W3C webref data (MIT), Unicode bidi data (Unicode License v3) and the font below; see its README.
+The editor tool and the in-game overlay render through NecronomiDOM ≥ 1.1.5, which is installed separately into `addons/necronomidom/` (release ZIP or `scripts/fetch-deps.sh`) and is not bundled in the Dirge addon ZIP. Copyright (c) 2026 Eldritch Game Studio. License: `addons/necronomidom/LICENSE`. NecronomiDOM itself bundles AngleSharp (MIT), W3C webref data (MIT), Unicode bidi data (Unicode License v3) and the font below; see its README.
 
 ## Noto Sans (SIL Open Font License 1.1) — via NecronomiDOM
 

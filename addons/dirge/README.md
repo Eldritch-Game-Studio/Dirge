@@ -7,7 +7,7 @@ Full documentation lives in the source repository: `README.md`, `docs/getting-st
 ## Installation
 
 1. Copy this `addons/dirge/` folder into your project.
-2. Install NecronomiDOM ≥ 1.1.4 into `addons/necronomidom/` (required by the editor tool and the in-game overlay; the runtime does not use it).
+2. Install NecronomiDOM ≥ 1.1.5 into `addons/necronomidom/` (required by the editor tool and the in-game overlay; the runtime does not use it).
 3. Add both imports to your project's `.csproj`, before `</Project>`, and build:
    ```xml
    <Import Project="addons/necronomidom/NecronomiDom.targets" />

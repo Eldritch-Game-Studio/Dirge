@@ -2,7 +2,7 @@
 # Installs the NecronomiDOM release the tool UI depends on into addons/necronomidom (git-ignored).
 set -euo pipefail
 cd "$(dirname "$0")/.."
-VERSION="${NECRONOMIDOM_VERSION:-1.1.4}"
+VERSION="${NECRONOMIDOM_VERSION:-1.1.5}"
 URL="https://github.com/Eldritch-Game-Studio/NecronomiDOM/releases/download/v${VERSION}/NecronomiDOM-v${VERSION}.zip"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT

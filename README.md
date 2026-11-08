@@ -91,7 +91,7 @@ The recordings use the stock Godot 4.7.2 .NET editor with Forward+ rendering; ca
 ## Requirements
 
 - Godot **4.7.2 .NET** (stock build) and a .NET SDK able to target `net8.0` (`global.json` pins 10.x with roll-forward).
-- **NecronomiDOM ≥ 1.1.4** for the editor tool and the in-game overlay. The runtime alone (`DirgeServer`,
+- **NecronomiDOM ≥ 1.1.5** for the editor tool and the in-game overlay. The runtime alone (`DirgeServer`,
   `AudioDriver`, banks, loudness, live update) does not use it.
 - Native effects: prebuilt binaries ship in the release ZIP under `addons/dirge/bin/<platform>/` (Linux x64, Windows
   x64, macOS universal); building them yourself needs a C++17 compiler and SCons.

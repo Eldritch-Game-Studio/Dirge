@@ -2,7 +2,9 @@
 
 All notable changes to Dirge. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
-## 1.0.2 — Unreleased
+## 1.0.2 — 2026-11-07
+
+Requires NecronomiDOM ≥ 1.1.5: its layout engine is ~6× faster on large documents and inline `transform` writes no longer trigger full relayouts, which is what makes the Dirge mixer meters cheap.
 
 ### Added
 - Themes: the tool follows one `ToolTheme` palette selected by the new `dirge/theme` editor setting (also **View › Theme** in the menu bar, which cycles presets and reports the change in the status bar). **Editor** (default) derives the palette from the running Godot editor theme — base/dark/font/accent/error/warning/success colors — so a Light editor theme gets a light Dirge; **Dirge Dark** is the previous look; **Dirge Light** and **High Contrast** are built in; **Custom** derives from `dirge/theme_background`, `dirge/theme_foreground` and `dirge/theme_accent`. Derived palettes keep text at ≥ 4.5:1 and accent/semantic colors at ≥ 3:1 against the background; a Custom pair below the floor is corrected and warned about once. Documents receive the palette as inline custom properties on their root (`theme.css` keeps the Dirge Dark values as defaults and every pane stylesheet now uses variables only — new `--grid`, `--grid-strong`, `--playhead`, `--cursor`, `--on-dark`, `--on-light`, `--accent-hover`, `--accent-dim`, `--danger-dim`, `--success`, `--info`, `--meter-hold`, `--panel-master`, `--panel-snapshot`, mixer and `--type-*` tokens), and the timeline, curve, 3D panner, profiler graph and recording canvases draw from the same palette (instrument types are a themed palette of eight). Switching re-themes everything live without reopening the screen.

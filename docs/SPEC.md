@@ -1,6 +1,6 @@
 # Dirge — adaptive audio authoring for Godot
 
-Named Dirge. Standalone MIT addon for stock Godot 4.7.2 .NET. UI via NecronomiDOM ≥ 1.1.4. Reference: FMOD Studio 2.03 feature set. Target: parity on everything a game team uses day to day, better on authoring ergonomics, testability and version control.
+Named Dirge. Standalone MIT addon for stock Godot 4.7.2 .NET. UI via NecronomiDOM ≥ 1.1.5. Reference: FMOD Studio 2.03 feature set. Target: parity on everything a game team uses day to day, better on authoring ergonomics, testability and version control.
 
 ## 1. Principles
 
@@ -186,4 +186,4 @@ All identity by GUID + stable path; renames don't break references.
 - Every P0 row has a T0/T1 test or a T2 render fixture; CI green headless on Linux/Windows/macOS.
 - Demo project: 3D sandbox with ambience scatterer, adaptive music with beat-quantized transitions, ducking snapshot, programmer dialogue with audio table.
 - Profiler recording of the demo replays bit-identical command stream (seeded).
-- Addon ZIP installs into a fresh stock 4.7.2 .NET project alongside NecronomiDOM 1.1.4 with no warnings.
+- Addon ZIP installs into a fresh stock 4.7.2 .NET project alongside NecronomiDOM 1.1.5 with no warnings.

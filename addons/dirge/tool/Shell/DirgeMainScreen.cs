@@ -47,6 +47,7 @@ public partial class DirgeMainScreen : Control
     private Element _connectButton = null!;
     private HTMLElement _liveState = null!;
     private Element _projectName = null!;
+    private Element _themeButton = null!;
     private Element _statusDirty = null!;
     private Element _statusPath = null!;
     private Element _statusErrors = null!;
@@ -87,8 +88,10 @@ public partial class DirgeMainScreen : Control
         _live = new LiveUpdateBridge(this, _document);
 
         ToolScale.Watch(this);
+        ToolTheme.Watch(this);
         BuildLayout();
         ToolScale.Changed += OnScaleChanged;
+        ToolTheme.Changed += OnThemeChanged;
         BindMenu();
         BindStatus();
         CreateDialogs();
@@ -128,6 +131,7 @@ public partial class DirgeMainScreen : Control
         }
 
         ToolScale.Changed -= OnScaleChanged;
+        ToolTheme.Changed -= OnThemeChanged;
         _document.Changed -= OnDocumentChanged;
         _audition.Dispose();
         _live.Dispose();
@@ -328,11 +332,33 @@ public partial class DirgeMainScreen : Control
         Listen(document, "project-validate", ValidateProject);
         Listen(document, "project-build-banks", BuildBanks);
         Listen(document, "live-connect", ToggleLiveConnection);
+        Listen(document, "view-theme", CycleTheme);
         _undoButton = Required(document, "edit-undo");
         _redoButton = Required(document, "edit-redo");
         _connectButton = Required(document, "live-connect");
         _liveState = (HTMLElement)Required(document, "live-state");
         _projectName = Required(document, "project-name");
+        _themeButton = Required(document, "view-theme");
+        UpdateThemeButton();
+    }
+
+    /// <summary>View › Theme: advances <c>dirge/theme</c> to the next preset; the watcher applies it and reports via <see cref="OnThemeChanged"/>.</summary>
+    private void CycleTheme()
+    {
+        int index = Array.IndexOf(ToolTheme.Presets, ToolTheme.Preset);
+        ToolTheme.SetPreset(ToolTheme.Presets[(index + 1) % ToolTheme.Presets.Length]);
+    }
+
+    private void OnThemeChanged()
+    {
+        UpdateThemeButton();
+        SetMessage("Theme: " + ToolTheme.Current.Name, false);
+    }
+
+    private void UpdateThemeButton()
+    {
+        _themeButton.TextContent = "Theme: " + ToolTheme.PresetName(ToolTheme.Preset);
+        ((HTMLElement)_themeButton).Title = "Switch to the next theme preset (Editor Settings › Dirge › Theme for the full list and custom colors)";
     }
 
     private void BindStatus()

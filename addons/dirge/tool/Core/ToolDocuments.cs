@@ -5,7 +5,7 @@ using NecronomiDom.Runtime;
 namespace Dirge.Tool.Core;
 
 /// <summary>Creates NecronomiDOM hosts for tool documents under <c>res://addons/dirge/tool/ui/</c> and mounts them at
-/// <see cref="ToolScale.Current"/>. Implemented by the shell.</summary>
+/// <see cref="ToolScale.Current"/> with the <see cref="ToolTheme.Current"/> palette. Implemented by the shell.</summary>
 public static partial class ToolDocuments
 {
     public const string UiRoot = "res://addons/dirge/tool/ui/";
@@ -14,6 +14,9 @@ public static partial class ToolDocuments
 
     /// <summary>Host configured with the tool font, theme stylesheet and tool text scale; fills its parent Control.</summary>
     public static partial DocumentHost Create(string documentName);
+
+    /// <summary>Writes <see cref="ToolTheme.Current"/> as inline custom properties on the host's document root.</summary>
+    public static partial void ApplyTheme(DocumentHost host);
 
     /// <summary>Plain Control wrapping <paramref name="host"/> so a Godot container never resets the host's scale.</summary>
     public static partial Control Slot(DocumentHost host, string name, Vector2 minimumSize);

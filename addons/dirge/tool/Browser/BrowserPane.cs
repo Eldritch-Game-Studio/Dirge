@@ -615,7 +615,7 @@ public sealed partial class BrowserPane : IToolPane, IToolPaneCommands
         };
         if (payload is null) return default;
         var preview = new Label { Text = row!.QuerySelector(".name")?.TextContent ?? "" };
-        preview.AddThemeColorOverride("font_color", Colors.White);
+        preview.AddThemeColorOverride("font_color", ToolTheme.Current.Fg);
         _host.SetDragPreview(preview);
         return ToolDrag.Wrap(payload);
     }

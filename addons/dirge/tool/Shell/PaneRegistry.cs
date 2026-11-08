@@ -103,7 +103,7 @@ public sealed class MissingPane : IToolPane
             ClipText = true,
         };
         label.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-        label.AddThemeColorOverride("font_color", new Color(0.54f, 0.56f, 0.6f));
+        label.AddThemeColorOverride("font_color", ToolTheme.Current.Muted);
         _root.AddChild(label);
     }
 

@@ -28,7 +28,7 @@
 .bar button, .bar input { flex-shrink: 0; }
 button.selected { border-color: var(--accent); color: var(--accent); background-color: var(--selection); }
 button.record { color: var(--danger); }
-button.record.active { background-color: #5a1f1f; border-color: var(--danger); }
+button.record.active { background-color: var(--danger-dim); border-color: var(--danger); }
 button.small { height: 18px; padding: 0 6px; font-size: 10px; line-height: 14px; }
 input { width: 150px; font-size: var(--font-size-small); }
 #rec-path { width: 190px; }

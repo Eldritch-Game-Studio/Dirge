@@ -25,7 +25,6 @@ public sealed partial class PreviewPanner : Control
     private float _minDistance = 1f, _maxDistance = 20f;
     private bool _dragging;
     private Font _font = ThemeDB.FallbackFont;
-    private Color _bg = new(0.09f, 0.10f, 0.12f), _grid = new(0.18f, 0.20f, 0.24f), _fg = new(0.85f, 0.86f, 0.88f), _muted = new(0.5f, 0.53f, 0.58f), _accent = new(0.96f, 0.62f, 0.26f);
     private float _lastScale = 1f;
     private readonly Vector2[] _arrow = new Vector2[3];
 
@@ -66,15 +65,17 @@ public sealed partial class PreviewPanner : Control
         QueueRedraw();
     }
 
-    public void SetColors(Color bg, Color grid, Color fg, Color muted, Color accent)
+    public override void _EnterTree()
     {
-        _bg = bg; _grid = grid; _fg = fg; _muted = muted; _accent = accent;
-        QueueRedraw();
+        ToolScale.Changed += QueueRedraw;
+        ToolTheme.Changed += QueueRedraw;
     }
 
-    public override void _EnterTree() => ToolScale.Changed += QueueRedraw;
-
-    public override void _ExitTree() => ToolScale.Changed -= QueueRedraw;
+    public override void _ExitTree()
+    {
+        ToolScale.Changed -= QueueRedraw;
+        ToolTheme.Changed -= QueueRedraw;
+    }
 
     public override void _Notification(int what)
     {
@@ -160,17 +161,19 @@ public sealed partial class PreviewPanner : Control
         Vector2 center = size * 0.5f;
         float ui = UiScale;
         _lastScale = PixelsPerMetre();
-        DrawRect(new Rect2(Vector2.Zero, size), _bg);
+        ToolPalette p = ToolTheme.Current;
+        Color bg = p.Bg, grid = p.Grid, fg = p.Fg, muted = p.Muted, accent = p.Accent;
+        DrawRect(new Rect2(Vector2.Zero, size), bg);
 
         // Grid every metre (thinned when dense).
         float step = _lastScale;
         while (step < 14f * ui) step *= 2f;
-        for (float gx = center.X % step; gx < size.X; gx += step) DrawLine(new Vector2(gx, 0), new Vector2(gx, size.Y), _grid);
-        for (float gy = center.Y % step; gy < size.Y; gy += step) DrawLine(new Vector2(0, gy), new Vector2(size.X, gy), _grid);
+        for (float gx = center.X % step; gx < size.X; gx += step) DrawLine(new Vector2(gx, 0), new Vector2(gx, size.Y), grid);
+        for (float gy = center.Y % step; gy < size.Y; gy += step) DrawLine(new Vector2(0, gy), new Vector2(size.X, gy), grid);
 
         // Distance rings.
-        DrawArc(center, _minDistance * _lastScale, 0, MathF.Tau, 64, _accent with { A = 0.6f }, 1f, true);
-        DrawArc(center, _maxDistance * _lastScale, 0, MathF.Tau, 96, _muted, 1f, true);
+        DrawArc(center, _minDistance * _lastScale, 0, MathF.Tau, 64, accent with { A = 0.6f }, 1f, true);
+        DrawArc(center, _maxDistance * _lastScale, 0, MathF.Tau, 96, muted, 1f, true);
 
         // Listener: dot + forward arrow.
         SysVector3 f = _listener.Forward;
@@ -179,20 +182,20 @@ public sealed partial class PreviewPanner : Control
         forward = forward.Normalized();
         Vector2 tip = center + forward * (26f * ui);
         Vector2 right = new(-forward.Y, forward.X);
-        DrawLine(center, tip, _fg, 2f * ui, true);
+        DrawLine(center, tip, fg, 2f * ui, true);
         _arrow[0] = tip + forward * (6f * ui); _arrow[1] = tip - right * (5f * ui); _arrow[2] = tip + right * (5f * ui);
-        DrawColoredPolygon(_arrow, _fg);
-        DrawCircle(center, 5f * ui, _fg);
+        DrawColoredPolygon(_arrow, fg);
+        DrawCircle(center, 5f * ui, fg);
 
         // Emitter dot and its forward.
         Vector2 emitter = ToScreen(_emitter.Position);
         SysVector3 ef = _emitter.Forward;
         var emitterForward = new Vector2(ef.X, ef.Z);
-        if (emitterForward.LengthSquared() > 1e-6f) DrawLine(emitter, emitter + emitterForward.Normalized() * (12f * ui), _accent, 1f, true);
-        DrawLine(center, emitter, _accent with { A = 0.35f }, 1f, true);
+        if (emitterForward.LengthSquared() > 1e-6f) DrawLine(emitter, emitter + emitterForward.Normalized() * (12f * ui), accent, 1f, true);
+        DrawLine(center, emitter, accent with { A = 0.35f }, 1f, true);
         float handle = HandleRadiusBase * ui;
-        DrawCircle(emitter, handle, _accent);
-        DrawCircle(emitter, handle, _bg, false, 1.5f, true);
+        DrawCircle(emitter, handle, accent);
+        DrawCircle(emitter, handle, bg, false, 1.5f, true);
 
         // Readouts.
         PreviewReadout r = Readout;
@@ -200,10 +203,10 @@ public sealed partial class PreviewPanner : Control
         float line = fontSize + 4f * ui;
         float x = 6f * ui;
         float y = line;
-        DrawString(_font, new Vector2(x, y), "dist " + r.Distance.ToString("F2") + " m   norm " + r.DistanceNormalized.ToString("F2"), HorizontalAlignment.Left, -1, fontSize, _fg); y += line;
-        DrawString(_font, new Vector2(x, y), "dir " + r.Direction.ToString("F1") + "°   elev " + r.Elevation.ToString("F1") + "°", HorizontalAlignment.Left, -1, fontSize, _fg); y += line;
-        DrawString(_font, new Vector2(x, y), "cone " + r.ConeAngle.ToString("F1") + "°   orient " + r.Orientation.ToString("F1") + "°", HorizontalAlignment.Left, -1, fontSize, _fg); y += line;
-        DrawString(_font, new Vector2(x, y), "speed " + r.Speed.ToString("F2") + "   |v| " + r.SpeedAbsolute.ToString("F2"), HorizontalAlignment.Left, -1, fontSize, _muted);
-        DrawString(_font, new Vector2(x, size.Y - x), "x " + _emitter.Position.X.ToString("F1") + "  z " + _emitter.Position.Z.ToString("F1") + "   min/max " + _minDistance.ToString("F1") + "/" + _maxDistance.ToString("F1"), HorizontalAlignment.Left, -1, fontSize, _muted);
+        DrawString(_font, new Vector2(x, y), "dist " + r.Distance.ToString("F2") + " m   norm " + r.DistanceNormalized.ToString("F2"), HorizontalAlignment.Left, -1, fontSize, fg); y += line;
+        DrawString(_font, new Vector2(x, y), "dir " + r.Direction.ToString("F1") + "°   elev " + r.Elevation.ToString("F1") + "°", HorizontalAlignment.Left, -1, fontSize, fg); y += line;
+        DrawString(_font, new Vector2(x, y), "cone " + r.ConeAngle.ToString("F1") + "°   orient " + r.Orientation.ToString("F1") + "°", HorizontalAlignment.Left, -1, fontSize, fg); y += line;
+        DrawString(_font, new Vector2(x, y), "speed " + r.Speed.ToString("F2") + "   |v| " + r.SpeedAbsolute.ToString("F2"), HorizontalAlignment.Left, -1, fontSize, muted);
+        DrawString(_font, new Vector2(x, size.Y - x), "x " + _emitter.Position.X.ToString("F1") + "  z " + _emitter.Position.Z.ToString("F1") + "   min/max " + _minDistance.ToString("F1") + "/" + _maxDistance.ToString("F1"), HorizontalAlignment.Left, -1, fontSize, muted);
     }
 }

@@ -6,22 +6,23 @@ using Godot;
 
 namespace Dirge.Tool.Profiler;
 
-/// <summary>Colors shared by the profiler's Godot canvases; mirrors the dark theme of the documents.</summary>
+/// <summary>Colors shared by the profiler's Godot canvases; views of <see cref="ToolTheme.Current"/>, so canvases read them
+/// inside <c>_Draw</c> (after a redraw queued by <see cref="ToolTheme.Changed"/>).</summary>
 internal static class ProfilerPalette
 {
-    public static readonly Color Background = new("1a1b1e");
-    public static readonly Color Panel = new("222327");
-    public static readonly Color Grid = new("2f3137");
-    public static readonly Color Border = new("3a3c44");
-    public static readonly Color Text = new("d8d9dc");
-    public static readonly Color Muted = new("8a8d96");
-    public static readonly Color Accent = new("f2a93b");
-    public static readonly Color Series2 = new("5bb8f5");
-    public static readonly Color BarPlaying = new("3f8f5a");
-    public static readonly Color BarStopping = new("8f6a3f");
-    public static readonly Color BarVirtual = new("4a4d57");
-    public static readonly Color Selection = new("ffffff");
-    public static readonly Color Playhead = new("e05a5a");
+    public static Color Background => ToolTheme.Current.Bg;
+    public static Color Panel => ToolTheme.Current.Panel;
+    public static Color Grid => ToolTheme.Current.Grid;
+    public static Color Border => ToolTheme.Current.Border;
+    public static Color Text => ToolTheme.Current.Fg;
+    public static Color Muted => ToolTheme.Current.Muted;
+    public static Color Accent => ToolTheme.Current.Accent;
+    public static Color Series2 => ToolTheme.Current.Info;
+    public static Color BarPlaying => ToolTheme.Current.BarPlaying;
+    public static Color BarStopping => ToolTheme.Current.BarStopping;
+    public static Color BarVirtual => ToolTheme.Current.BarVirtual;
+    public static Color Selection => ToolTheme.Current.SelectionOutline;
+    public static Color Playhead => ToolTheme.Current.Playhead;
 }
 
 /// <summary>
@@ -71,9 +72,17 @@ public sealed partial class UpdateGraph : Control
     /// <summary>Label size in pixels at the current tool scale.</summary>
     public int FontSize => ToolScale.Px(FontSizeBase);
 
-    public override void _EnterTree() => ToolScale.Changed += QueueRedraw;
+    public override void _EnterTree()
+    {
+        ToolScale.Changed += QueueRedraw;
+        ToolTheme.Changed += QueueRedraw;
+    }
 
-    public override void _ExitTree() => ToolScale.Changed -= QueueRedraw;
+    public override void _ExitTree()
+    {
+        ToolScale.Changed -= QueueRedraw;
+        ToolTheme.Changed -= QueueRedraw;
+    }
 
     public int SampleCount => _count;
 

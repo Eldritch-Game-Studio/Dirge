@@ -48,14 +48,16 @@ public sealed partial class CurveCanvas : Control
     private readonly Vector2[] _segment = new Vector2[2];
     private double _cursorValue = double.NaN;
 
-    private static readonly Color Background = new("1b1c20");
-    private static readonly Color GridColor = new("2f3238");
-    private static readonly Color AxisColor = new("565b66");
-    private static readonly Color TextColor = new("8a8f9a");
-    private static readonly Color LineColor = new("f08a3c");
-    private static readonly Color PointColor = new("ffffff");
-    private static readonly Color SelectedColor = new("9ad0ff");
-    private static readonly Color CursorColor = new("ff4b4b");
+    /// <summary>Palette cached at the start of each redraw.</summary>
+    private ToolPalette _p = ToolTheme.Current;
+    private Color Background => _p.Bg;
+    private Color GridColor => _p.Grid;
+    private Color AxisColor => _p.GridStrong;
+    private Color TextColor => _p.Muted;
+    private Color LineColor => _p.Accent;
+    private Color PointColor => _p.SelectionOutline;
+    private Color SelectedColor => _p.Cursor;
+    private Color CursorColor => _p.Playhead;
 
     public CurveCanvas(EventEditorState state, EventEdits edits, IAudition audition)
     {
@@ -79,9 +81,17 @@ public sealed partial class CurveCanvas : Control
         SetProcess(true);
     }
 
-    public override void _EnterTree() => ToolScale.Changed += QueueRedraw;
+    public override void _EnterTree()
+    {
+        ToolScale.Changed += QueueRedraw;
+        ToolTheme.Changed += QueueRedraw;
+    }
 
-    public override void _ExitTree() => ToolScale.Changed -= QueueRedraw;
+    public override void _ExitTree()
+    {
+        ToolScale.Changed -= QueueRedraw;
+        ToolTheme.Changed -= QueueRedraw;
+    }
 
     public void Invalidate() => QueueRedraw();
 
@@ -187,6 +197,7 @@ public sealed partial class CurveCanvas : Control
     public override void _Draw()
     {
         EnsureLayout();
+        _p = ToolTheme.Current;
         DrawRect(new Rect2(Vector2.Zero, Size), Background);
         if (_lane is null)
         {

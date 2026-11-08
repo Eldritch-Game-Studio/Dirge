@@ -1,6 +1,7 @@
 #nullable enable
 using Godot;
 using NecronomiDom.Runtime;
+using HTMLElement = NecronomiDom.Dom.HTMLElement;
 
 namespace Dirge.Tool.Core;
 
@@ -13,7 +14,9 @@ public static partial class ToolDocuments
     /// The document is parsed immediately so <c>host.Document</c> is bindable before the host enters the tree; layout and paint
     /// resources are created by the host itself on <c>_Ready</c>. <see cref="ToolScale.Current"/> is applied once the host has
     /// mounted (and again on every re-entry, because <see cref="DocumentHost"/> withdraws its text scale on exit) and whenever
-    /// <see cref="ToolScale.Changed"/> fires while the host is in the tree.
+    /// <see cref="ToolScale.Changed"/> fires while the host is in the tree. <see cref="ToolTheme.Current"/> is written as inline
+    /// custom properties on the root element (<c>theme.css</c> holds the Dirge Dark defaults) at creation and on every
+    /// <see cref="ToolTheme.Changed"/> while the host is in the tree.
     /// </summary>
     public static partial DocumentHost Create(string documentName)
     {
@@ -31,17 +34,31 @@ public static partial class ToolDocuments
         host.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         host.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
         host.LoadDocument(host.DocumentPath);
+        ApplyTheme(host);
 
         void Apply() => host.ApplyTextScale(ToolScale.Current);
+        void Theme() => ApplyTheme(host);
         host.Ready += Apply;
         host.TreeEntered += () =>
         {
             ToolScale.Changed += Apply;
+            ToolTheme.Changed += Theme;
             if (host.IsNodeReady()) Apply();
+            Theme();
         };
-        host.TreeExited += () => ToolScale.Changed -= Apply;
+        host.TreeExited += () =>
+        {
+            ToolScale.Changed -= Apply;
+            ToolTheme.Changed -= Theme;
+        };
 
         return host;
+    }
+
+    /// <summary>Writes the current palette as inline custom properties on the document root (one cascade invalidation).</summary>
+    public static partial void ApplyTheme(DocumentHost host)
+    {
+        if (host.Document?.DocumentElement is HTMLElement root) root.Style.CssText = ToolTheme.Current.CssText;
     }
 
     /// <summary>

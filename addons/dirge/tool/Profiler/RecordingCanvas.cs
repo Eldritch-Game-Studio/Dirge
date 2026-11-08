@@ -82,9 +82,17 @@ public sealed partial class RecordingCanvas : Control
     /// <summary>Label size in pixels at the current tool scale.</summary>
     public int FontSize => ToolScale.Px(FontSizeBase);
 
-    public override void _EnterTree() => ToolScale.Changed += QueueRedraw;
+    public override void _EnterTree()
+    {
+        ToolScale.Changed += QueueRedraw;
+        ToolTheme.Changed += QueueRedraw;
+    }
 
-    public override void _ExitTree() => ToolScale.Changed -= QueueRedraw;
+    public override void _ExitTree()
+    {
+        ToolScale.Changed -= QueueRedraw;
+        ToolTheme.Changed -= QueueRedraw;
+    }
 
     /// <summary>Replaces the shown recording (null clears) and fits the whole length into the view.</summary>
     public void SetRecording(Recording? recording, string title)

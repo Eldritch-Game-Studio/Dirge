@@ -34,6 +34,9 @@ public sealed partial class TimelineCanvas : Control
 
     /// <summary>Read on every layout/draw/hit test so the canvas never holds a stale scale.</summary>
     private static float UiScale => ToolScale.Current;
+    /// <summary>Palette cached at the start of each redraw; layout caches block/marker colors from it.</summary>
+    private ToolPalette _p = ToolTheme.Current;
+    private ToolPalette? _layoutPalette;
     private float TabsHeight => TabsHeightBase * UiScale;
     private float RulerHeight => RulerHeightBase * UiScale;
     private float BeatsHeight => _hasTempo && _state.Sheet.IsNone ? BeatsHeightBase * UiScale : 0f;
@@ -105,9 +108,17 @@ public sealed partial class TimelineCanvas : Control
     /// <summary>Call after any change of the edited event's content or view selection.</summary>
     public void Invalidate() => QueueRedraw();
 
-    public override void _EnterTree() => ToolScale.Changed += QueueRedraw;
+    public override void _EnterTree()
+    {
+        ToolScale.Changed += QueueRedraw;
+        ToolTheme.Changed += QueueRedraw;
+    }
 
-    public override void _ExitTree() => ToolScale.Changed -= QueueRedraw;
+    public override void _ExitTree()
+    {
+        ToolScale.Changed -= QueueRedraw;
+        ToolTheme.Changed -= QueueRedraw;
+    }
 
     public override void _Notification(int what)
     {
@@ -138,8 +149,9 @@ public sealed partial class TimelineCanvas : Control
             else FitSheet();
             _scrollY = 0;
         }
+        _p = ToolTheme.Current;
         if (_layoutRevision == _state.Revision && _layoutSize == Size && _layoutZoom == _zoom && _layoutScrollX == _scrollX
-            && _layoutScrollY == _scrollY && _layoutScale == UiScale)
+            && _layoutScrollY == _scrollY && _layoutScale == UiScale && ReferenceEquals(_layoutPalette, _p))
             return;
         _layoutRevision = _state.Revision;
         _layoutSize = Size;
@@ -147,6 +159,7 @@ public sealed partial class TimelineCanvas : Control
         _layoutScrollX = _scrollX;
         _layoutScrollY = _scrollY;
         _layoutScale = UiScale;
+        _layoutPalette = _p;
 
         _tabs.Clear(); _rows.Clear(); _blocks.Clear(); _markers.Clear(); _tempos.Clear(); _ticks.Clear(); _beats.Clear();
         if (ev is null) return;
@@ -320,47 +333,48 @@ public sealed partial class TimelineCanvas : Control
         return value.ToString("0.###", CultureInfo.InvariantCulture);
     }
 
-    // ---- colors ------------------------------------------------------------------------------------------------------
+    // ---- colors (ToolTheme palette, cached in _p by EnsureLayout) -------------------------------------------------------
 
-    private static readonly Color Background = new("1b1c20");
-    private static readonly Color PanelColor = new("24262b");
-    private static readonly Color HeaderColor = new("2a2d33");
-    private static readonly Color BorderColor = new("3a3d45");
-    private static readonly Color TextColor = new("d8dae0");
-    private static readonly Color MutedColor = new("8a8f9a");
-    private static readonly Color AccentColor = new("f08a3c");
-    private static readonly Color SelectionColor = new("ffffff");
-    private static readonly Color PlayheadColor = new("ff4b4b");
-    private static readonly Color CursorColor = new("9ad0ff");
-    private static readonly Color GridColor = new("2f3238");
-    private static readonly Color BeatColor = new("3b3f48");
-    private static readonly Color BarColor = new("565b66");
-    private static readonly Color BandColor = new(0.6f, 0.75f, 1f, 0.2f);
+    private Color Background => _p.Bg;
+    private Color PanelColor => _p.Panel;
+    private Color HeaderColor => _p.Panel2;
+    private Color BorderColor => _p.Border;
+    private Color TextColor => _p.Fg;
+    private Color MutedColor => _p.Muted;
+    private Color AccentColor => _p.Accent;
+    private Color SelectionColor => _p.SelectionOutline;
+    private Color PlayheadColor => _p.Playhead;
+    private Color CursorColor => _p.Cursor;
+    private Color GridColor => _p.Grid;
+    private Color BeatColor => _p.Border;
+    private Color BarColor => _p.GridStrong;
+    private Color BlockTextColor => _p.OnDark;
+    private Color BandColor => Alpha(_p.Cursor, 0.2f);
 
     private static Color Alpha(Color color, float alpha) => new(color.R, color.G, color.B, alpha);
 
-    private static Color InstrumentColor(Instrument inst) => inst switch
+    private Color InstrumentColor(Instrument inst) => inst switch
     {
-        ClipInstrument => new Color("3d7bd9"),
-        MultiInstrument => new Color("8a5bd6"),
-        ScattererInstrument => new Color("3fa36a"),
-        SilenceInstrument => new Color("5c6068"),
-        EventInstrument => new Color("e0853a"),
-        ProgrammerInstrument => new Color("2fa8a3"),
-        CommandInstrument => new Color("c9b43a"),
-        SnapshotInstrument => new Color("d65b9b"),
-        _ => new Color("777777"),
+        ClipInstrument => _p.TypeClip,
+        MultiInstrument => _p.TypeMulti,
+        ScattererInstrument => _p.TypeScatterer,
+        SilenceInstrument => _p.TypeSilence,
+        EventInstrument => _p.TypeEvent,
+        ProgrammerInstrument => _p.TypeProgrammer,
+        CommandInstrument => _p.TypeCommand,
+        SnapshotInstrument => _p.TypeSnapshot,
+        _ => _p.TypeOther,
     };
 
-    private static Color MarkerColor(LogicMarker m) => m switch
+    private Color MarkerColor(LogicMarker m) => m switch
     {
-        LoopRegion => new Color("4fb0ff"),
-        TransitionMarker => new Color("ffb347"),
-        TransitionRegion => new Color("ffb347"),
-        SustainPoint => new Color("ff6b6b"),
-        DestinationMarker => new Color("7ee787"),
-        MagnetRegion => new Color("d2a8ff"),
-        _ => new Color("aaaaaa"),
+        LoopRegion => _p.MarkerLoop,
+        TransitionMarker => _p.MarkerTransition,
+        TransitionRegion => _p.MarkerTransition,
+        SustainPoint => _p.MarkerSustain,
+        DestinationMarker => _p.MarkerDestination,
+        MagnetRegion => _p.MarkerMagnet,
+        _ => _p.MarkerOther,
     };
 
     // ---- drawing -----------------------------------------------------------------------------------------------------
@@ -508,11 +522,11 @@ public sealed partial class TimelineCanvas : Control
             {
                 float textX = r.Position.X + 5f * UiScale;
                 float clip = r.Size.X - 8f * UiScale;
-                DrawString(_font, new Vector2(textX, r.Position.Y + 4f * UiScale + FontSize), b.Label, HorizontalAlignment.Left, clip, FontSize, Colors.White);
-                DrawString(_font, new Vector2(textX, r.End.Y - 6f * UiScale), b.Sub, HorizontalAlignment.Left, clip, FontSize - 1, Alpha(Colors.White, 0.7f));
+                DrawString(_font, new Vector2(textX, r.Position.Y + 4f * UiScale + FontSize), b.Label, HorizontalAlignment.Left, clip, FontSize, BlockTextColor);
+                DrawString(_font, new Vector2(textX, r.End.Y - 6f * UiScale), b.Sub, HorizontalAlignment.Left, clip, FontSize - 1, Alpha(BlockTextColor, 0.7f));
                 // Waveform placeholder: a centre line band.
                 float mid = r.Position.Y + r.Size.Y * 0.55f;
-                DrawLine(new Vector2(r.Position.X + 2, mid), new Vector2(r.End.X - 2, mid), Alpha(Colors.White, 0.25f));
+                DrawLine(new Vector2(r.Position.X + 2, mid), new Vector2(r.End.X - 2, mid), Alpha(BlockTextColor, 0.25f));
             }
             if (b.Selected) DrawRect(r.Grow(1), SelectionColor, false, 2f);
             else DrawRect(r, Alpha(Background, 0.6f), false, 1f);

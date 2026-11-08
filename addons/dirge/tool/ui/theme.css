@@ -1,23 +1,56 @@
 /* Dirge tool theme — shared by every pane document. Dark, dense, FMOD-Studio-like.
    Stay inside the NecronomiDOM profile (addons/necronomidom/core/Css/Data/runtime-capabilities.json):
-   flex/absolute layout only, solid borders, background-color, no shadows/grid/z-index. */
+   flex/absolute layout only, solid borders, background-color, no shadows/grid/z-index.
+   Colors: the :root values below are the Dirge Dark preset and act as defaults; the shell overrides every color
+   variable inline on the document root from ToolTheme (tool/Core/ToolTheme.cs — keep the two lists in sync).
+   Pane stylesheets use variables only, never literal colors. */
 :root {
     --bg: #1b1d21;
     --panel: #24272c;
     --panel-2: #2c3036;
+    --panel-master: #24262e;
+    --panel-snapshot: #23202c;
+    --hover: #30353c;
+    --selection: #3b4b63;
+    --border: #3a3f47;
+    --grid: #2f3238;
+    --grid-strong: #565b66;
+    --meter-bg: #15171a;
     --fg: #d8dbe0;
     --muted: #8a9099;
+    --on-dark: #ffffff;
+    --on-light: #1b1d21;
     --accent: #e8a33d;
     --accent-fg: #1b1d21;
-    --border: #3a3f47;
-    --selection: #3b4b63;
-    --hover: #30353c;
+    --accent-hover: #f0b355;
+    --accent-dim: #2d5f91;
     --danger: #e0584f;
+    --danger-dim: #5a1f1f;
     --warning: #e3b341;
-    --meter-bg: #15171a;
+    --success: #4caf50;
+    --info: #4fb0ff;
     --meter-low: #4caf50;
     --meter-mid: #e3b341;
     --meter-high: #e0584f;
+    --meter-hold: #e6e8ef;
+    --playhead: #ff4b4b;
+    --cursor: #9ad0ff;
+    --snapshot: #7a4bd6;
+    --snapshot-fg: #c9b3ff;
+    --fader: #b8bcc8;
+    --mute: #c9a227;
+    --solo: #3fb950;
+    --bypass: #d26b2f;
+    --type-clip: #3d7bd9;
+    --type-multi: #8a5bd6;
+    --type-scatterer: #3fa36a;
+    --type-silence: #5c6068;
+    --type-event: #e0853a;
+    --type-programmer: #2fa8a3;
+    --type-command: #c9b43a;
+    --type-snapshot: #d65b9b;
+    --type-marker: #4fb0ff;
+    --type-track: #8a9099;
     --space-1: 4px;
     --space-2: 8px;
     --space-3: 12px;
@@ -83,7 +116,7 @@ body { width: 100%; height: 100%; overflow: hidden; background-color: var(--bg);
 .btn:focus-visible, button:focus-visible, input:focus, textarea:focus { outline: 1px solid var(--accent); outline-offset: 0px; }
 .btn:disabled, button:disabled, .btn.disabled { color: var(--muted); background-color: var(--panel); border-color: var(--border); cursor: default; }
 .btn.primary, button.primary { background-color: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
-.btn.primary:hover, button.primary:hover { background-color: #f0b355; }
+.btn.primary:hover, button.primary:hover { background-color: var(--accent-hover); }
 .btn.flat, button.flat { background-color: var(--panel); border-color: var(--panel); }
 .btn.flat:hover, button.flat:hover { background-color: var(--hover); border-color: var(--hover); }
 .btn.toggle.active, button.toggle.active { background-color: var(--selection); border-color: var(--accent); color: var(--accent); }

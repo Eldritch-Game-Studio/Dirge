@@ -204,6 +204,10 @@ bus, an event, a parameter with automation and a snapshot in ten minutes.
   between the editor audition and a live game.
 - **Validation** (bottom tab) and the **Validate** menu item list `ProjectValidator` diagnostics with stable codes; the
   status bar shows error/warning counts, instance/voice counts and the live-update state.
+- **View › Theme** cycles the color theme; **Editor Settings › Dirge › Theme** picks it directly: **Editor** (default —
+  derived from the running Godot editor theme, so a Light editor gets a light Dirge), **Dirge Dark**, **Dirge Light**,
+  **High Contrast**, or **Custom** from `Theme Background`/`Theme Foreground`/`Theme Accent` (text contrast is kept at
+  or above 4.5:1; a failing pair is corrected and warned about once). Every document and canvas re-themes live.
 - Shortcuts: `Ctrl+Z`/`Ctrl+Shift+Z`/`Ctrl+Y` undo/redo, `Ctrl+S` save, `Ctrl+C`/`Ctrl+V`/`Ctrl+D`
   copy/paste/duplicate, `Ctrl+A` select all, `Space` play/stop, `Delete`.
 

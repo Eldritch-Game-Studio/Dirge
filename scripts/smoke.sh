@@ -32,6 +32,10 @@ if ! "$GODOT" --headless --audio-driver Dummy --path . --import >/tmp/dirge-impo
   "$GODOT" --headless --audio-driver Dummy --path . --import >/tmp/dirge-import.log 2>&1 || {
     echo "smoke: import failed"; cat /tmp/dirge-import.log; exit 1; }
 fi
+# The plugin must leave an existing project's settings as authored (Godot normalizes project.godot on every save).
+if git rev-parse --is-inside-work-tree >/dev/null 2>&1 && ! git diff --quiet -- project.godot; then
+  echo "smoke: import rewrote project.godot"; git --no-pager diff -- project.godot; exit 1
+fi
 echo "smoke: run demo"
 set +e
 "$GODOT" --headless --audio-driver Dummy --path . res://demo/demo.tscn -- --smoke 2>&1 | tee /tmp/dirge-smoke.log

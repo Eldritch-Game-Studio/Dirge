@@ -5,8 +5,12 @@ using Godot;
 namespace Dirge.Driver;
 
 /// <summary>
-/// Editor plugin: registers the <see cref="DirgeServer"/> and <see cref="DirgeOverlay"/> autoloads while enabled and adds the
-/// "Dirge" main screen (<see cref="DirgeMainScreen"/>). The main screen restores the editor's bus layout when it leaves the tree.
+/// Editor plugin: registers the <see cref="DirgeServer"/> and <see cref="DirgeOverlay"/> autoloads and adds the "Dirge" main
+/// screen (<see cref="DirgeMainScreen"/>). The main screen restores the editor's bus layout when it leaves the tree.
+/// <para><see cref="EditorPlugin.AddAutoloadSingleton"/> and <see cref="EditorPlugin.RemoveAutoloadSingleton"/> can save
+/// <c>project.godot</c>, and a save normalizes the whole file (drops comments and default-valued settings, reorders keys,
+/// rewrites autoload paths as <c>uid://</c>). The autoloads are therefore added only when missing and removed only when the
+/// plugin is disabled, so opening or headlessly importing a project that already has them leaves its settings as authored.</para>
 /// </summary>
 [Tool]
 public partial class DirgePlugin : EditorPlugin
@@ -36,8 +40,8 @@ public partial class DirgePlugin : EditorPlugin
             });
         }
 
-        AddAutoloadSingleton(AutoloadName, AutoloadScript);
-        AddAutoloadSingleton(OverlayAutoloadName, OverlayAutoloadScript);
+        RegisterAutoload(AutoloadName, AutoloadScript);
+        RegisterAutoload(OverlayAutoloadName, OverlayAutoloadScript);
 
         _mainScreen = new DirgeMainScreen { Visible = false };
         EditorInterface.Singleton.GetEditorMainScreen().AddChild(_mainScreen);
@@ -52,9 +56,21 @@ public partial class DirgePlugin : EditorPlugin
             _mainScreen.QueueFree();
             _mainScreen = null;
         }
+    }
 
+    /// <summary>Only an explicit disable in Project Settings → Plugins removes the autoloads (editor exit keeps them).</summary>
+    public override void _DisablePlugin()
+    {
         RemoveAutoloadSingleton(OverlayAutoloadName);
         RemoveAutoloadSingleton(AutoloadName);
+    }
+
+    /// <summary>Whether <paramref name="name"/> still needs registering; an existing entry is left as authored.</summary>
+    public static bool NeedsAutoload(string name) => !ProjectSettings.HasSetting("autoload/" + name);
+
+    private void RegisterAutoload(string name, string script)
+    {
+        if (NeedsAutoload(name)) AddAutoloadSingleton(name, script);
     }
 
     public override bool _HasMainScreen() => true;

@@ -5,6 +5,7 @@ All notable changes to Dirge. The format follows [Keep a Changelog](https://keep
 ## 1.0.2 — Unreleased
 
 ### Fixed
+- The editor plugin re-added both autoloads every time the editor opened or a headless `--import` ran, and removed them whenever it left the tree. Each call can save `project.godot`, and a save normalizes the file (drops comments and default-valued settings, reorders keys, rewrites autoload paths as `uid://`); with a patched 4.7.2 engine every import rewrote a hand-maintained `project.godot`. The autoloads are now added only when missing and removed only when the plugin is disabled (`_DisablePlugin`). `scripts/smoke.sh` fails if an import changes the committed `project.godot`.
 - Hi-DPI editors: the Event editor header, inspector and automation documents (and the Profiler document) rendered at scale 1 because their Godot container parents reset the host's `scale` and size on every layout pass; the timeline, curve, profiler and 3D-panner canvases clamped or hard-coded their label sizes. Every tool document and canvas now follows one `ToolScale` (editor display scale × main font size / 14, or the new `dirge/ui_scale` editor setting when non-zero; 0 = auto), hosts mount in plain `ToolDocuments.Slot` controls, authored minimum sizes rescale, and changing the setting (or the window DPI) re-scales live.
 
 ### Changed

@@ -450,15 +450,26 @@ internal sealed class InstrumentState
     }
 
     /// <summary>Timeline jumped to <paramref name="position"/> inside this (synchronous, active) instrument: re-seek its voices.</summary>
-    public void OnJump(double position)
+    public void OnJump(double position, bool deferSeek = false)
     {
         double offset = Info.Instrument.StartOffset + (position - Info.RegionStart);
         for (Voice? v = Head; v is not null; v = v.NextInOwner)
         {
             if (v.Finished) continue;
             v.Position = v.Loop && v.LengthKnown && v.Length > 0 ? offset % v.Length : offset;
-            if (v.IsReal && v.HasPlayed) _system.Commands.Add(new VoiceSeek(v.Id, v.Position));
+            if (v.IsReal && v.HasPlayed)
+            {
+                if (deferSeek) v.WantsSeek = true;
+                else _system.Commands.Add(new VoiceSeek(v.Id, v.Position));
+            }
         }
+    }
+
+    /// <summary>Voices entered by a clocked start/seek precede this tick's timeline advance.</summary>
+    public void AdvanceInitialVoices(double elapsed)
+    {
+        for (Voice? v = Head; v is not null; v = v.NextInOwner)
+            if (v.Fresh) v.InitialAdvance = elapsed;
     }
 
     /// <summary>Stop from the owning instance: Immediate cuts; AllowFadeout fades over max(instrument fade, AHDSR releases).</summary>
@@ -804,15 +815,19 @@ internal sealed class InstrumentState
                 v = next;
                 continue;
             }
+            double voiceDt = dt;
+            bool advanceVoice = !v.Fresh || v.InitialAdvance > 0;
             if (v.Fresh)
             {
-                // Triggered during this tick: its offset already matches the playhead; advancing again would double count.
+                // Region entries already include this tick's offset; clocked Begin entries do not.
+                voiceDt = v.InitialAdvance;
+                v.InitialAdvance = 0;
                 v.Fresh = false;
             }
-            else if (!paused)
+            if (!paused && advanceVoice)
             {
-                v.Age += dt;
-                v.Position += dt * v.Pitch;
+                v.Age += voiceDt;
+                v.Position += voiceDt * v.Pitch;
                 if (v.LengthKnown)
                 {
                     if (v.Loop) { if (v.Length > 0) v.Position %= v.Length; }
@@ -820,7 +835,7 @@ internal sealed class InstrumentState
                 }
                 if (v.FadingOut)
                 {
-                    v.FadeOutRemaining -= (float)dt;
+                    v.FadeOutRemaining -= (float)voiceDt;
                     if (v.FadeOutRemaining <= 0f) { StopVoice(prev, v); v = next; continue; }
                 }
             }
@@ -894,6 +909,7 @@ internal sealed class InstrumentState
                 EventMacros macros = _instance.Description.Event.Macros;
                 commands.Add(new VoicePlay(v.Id, v.Asset, v.Bus, v.Position, v.Loop, v.VolumeDb, v.Pitch, v.Spatial, v.Attributes, v.MinDistance, v.MaxDistance, Info.Instrument.SyncGroup, macros.Rolloff, macros.Doppler, macros.DopplerScale));
                 v.WantsPlay = false;
+                v.WantsSeek = false;
                 v.HasPlayed = true;
                 v.LastVolumeDb = v.VolumeDb;
                 v.LastPitch = v.Pitch;
@@ -906,6 +922,11 @@ internal sealed class InstrumentState
                 }
                 _instance.RaiseSoundPlayed(v);
                 continue;
+            }
+            if (v.WantsSeek)
+            {
+                commands.Add(new VoiceSeek(v.Id, v.Position));
+                v.WantsSeek = false;
             }
             if (v.VolumeDb != v.LastVolumeDb)
             {

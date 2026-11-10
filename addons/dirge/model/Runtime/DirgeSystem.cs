@@ -56,6 +56,8 @@ public sealed class DirgeSystem
     private int _totalInstances;
     private int _maxRealVoices = 64;
     private string _locale = "";
+    private readonly Func<double>? _elapsedSinceLastUpdate;
+    private bool _updating;
 
     public AudioProject Project { get; }
     public MixerState Mixer { get; }
@@ -109,11 +111,19 @@ public sealed class DirgeSystem
     internal IAssetCatalog Assets { get; }
     internal VoicePool Voices { get; }
 
-    public DirgeSystem(AudioProject project, int seed = 0, IAssetCatalog? assets = null, string? platform = null)
+    // Mutations inside Update already occur on the model's tick, not between driver ticks.
+    internal double? MutationUpdateOffset => _updating ? null : _elapsedSinceLastUpdate?.Invoke();
+
+    /// <param name="elapsedSinceLastUpdate">Optional driver clock: real seconds since the start of its last Update,
+    /// or zero before its first tick/after resetting its clock. Starts and seeks exclude that preceding interval.
+    /// Omit for deterministic callers whose mutations occur at tick boundaries.</param>
+    public DirgeSystem(AudioProject project, int seed = 0, IAssetCatalog? assets = null, string? platform = null,
+        Func<double>? elapsedSinceLastUpdate = null)
     {
         Project = project ?? throw new ArgumentNullException(nameof(project));
         Seed = seed;
         Platform = platform;
+        _elapsedSinceLastUpdate = elapsedSinceLastUpdate;
         Random = new DirgeRandom(seed);
         Assets = assets ?? new ProjectAssetCatalog(project);
         GlobalParameters = new ParameterBank(project.GlobalParameters);
@@ -305,6 +315,13 @@ public sealed class DirgeSystem
     /// voice command emission → <see cref="MixerState.Update"/>.
     /// </summary>
     public void Update(double dt)
+    {
+        _updating = true;
+        try { UpdateInternal(dt); }
+        finally { _updating = false; }
+    }
+
+    private void UpdateInternal(double dt)
     {
         if (dt < 0) dt = 0;
         IApiSink? recorder = Recorder;

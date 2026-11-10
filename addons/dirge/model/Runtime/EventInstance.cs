@@ -42,6 +42,9 @@ public sealed class EventInstance
     private bool _isVirtual;
     private bool _seekPending;
     private double _seekTo;
+    private double? _updateOffset;
+    private bool _clockedStart;
+    private bool _deferNativeSeek;
     private float _volumeDb;
     private float _pitch = 1f;
     private AssetRef _programmerAsset;
@@ -77,6 +80,7 @@ public sealed class EventInstance
             _seekTo = Math.Max(0, value);
             if (_state == PlaybackState.Stopped || _state == PlaybackState.Starting) _timeline.Reset(_seekTo);
             else _seekPending = true;
+            CaptureUpdateBoundary();
         }
     }
 
@@ -134,6 +138,9 @@ public sealed class EventInstance
         _isVirtual = false;
         _seekPending = false;
         _seekTo = 0;
+        _updateOffset = null;
+        _clockedStart = false;
+        _deferNativeSeek = false;
         _volumeDb = 0f;
         _pitch = 1f;
         _programmerAsset = default;
@@ -173,24 +180,46 @@ public sealed class EventInstance
         if (macros.MaxInstances > 0 && _description.Started.Count >= macros.MaxInstances && !Steal(macros.Stealing)) return;
         _description.LastStartTime = _system.Time;
         _startTime = _system.Time;
-        _startDelay = QuantizedStartDelay(macros);
+        _updateOffset = null;
+        _clockedStart = false;
         _state = PlaybackState.Starting;
+        if (!CaptureUpdateBoundary()) _startDelay = QuantizedStartDelay(macros);
         ModEval.Init(_description.EventModulators, _eventMods, _system.Random);
         _description.OnStarted(this);
     }
 
-    private double QuantizedStartDelay(EventMacros macros)
+    private bool CaptureUpdateBoundary()
+    {
+        if (_system.MutationUpdateOffset is not { } elapsed) return false;
+        SetUpdateOffset(elapsed);
+        return true;
+    }
+
+    // Recorded separately from Start/Seek so replay needs no live clock.
+    internal void SetUpdateOffset(double elapsed)
+    {
+        _updateOffset = elapsed;
+        if (_state == PlaybackState.Starting)
+        {
+            _clockedStart = true;
+            _startDelay = QuantizedStartDelay(_description.Event.Macros, elapsed);
+        }
+        _system.Recorder?.Call(this, "SetUpdateOffset", null, null, elapsed, false, 0);
+    }
+
+    private double QuantizedStartDelay(EventMacros macros, double elapsed = 0)
     {
         if (macros.StartQuantization == Quantization.None) return 0;
         EventInstance? conductor = _system.Conductor;
         if (conductor is null || ReferenceEquals(conductor, this) || !conductor.CanTrigger) return 0;
-        return conductor.DelayToNextGrid(macros.StartQuantization, macros.ScheduleLookahead);
+        return conductor.DelayToNextGrid(macros.StartQuantization, macros.ScheduleLookahead, elapsed);
     }
 
-    /// <summary>Seconds from this instance's playhead to its next grid point at least <paramref name="lookahead"/> seconds away; 0 when it has no grid.</summary>
-    internal double DelayToNextGrid(Quantization quantization, float lookahead)
+    /// <summary>Seconds from the playhead projected to the mutation boundary to its next grid point
+    /// at least <paramref name="lookahead"/> seconds away; 0 when it has no grid.</summary>
+    internal double DelayToNextGrid(Quantization quantization, float lookahead, double elapsed = 0)
     {
-        double position = _timeline.Position;
+        double position = _timeline.Position + elapsed;
         if (!_description.NextGrid(position, quantization, false, out double at)) return 0;
         double delay = Math.Max(0, at - position);
         int guard = 0;
@@ -400,6 +429,9 @@ public sealed class EventInstance
     internal void UpdateInternal(double dt)
     {
         if (_destroyed || _state == PlaybackState.Stopped) return;
+        bool clockedMutation = _updateOffset.HasValue;
+        if (_updateOffset is { } elapsed) dt = Math.Max(0, dt - elapsed);
+        _updateOffset = null;
         bool justStarted = false;
         double advance = dt;
         if (_state == PlaybackState.Starting)
@@ -412,6 +444,9 @@ public sealed class EventInstance
                 advance = Math.Min(dt, -_startDelay);
                 _startDelay = 0;
             }
+            // A quantized start may wait across ticks after its mutation offset was consumed.
+            clockedMutation |= _clockedStart;
+            _clockedStart = false;
             _state = PlaybackState.Playing;
             justStarted = true;
             if (_description.Event.IsConductor && Parent is null) _system.OnConductorPlaying(this);
@@ -434,7 +469,21 @@ public sealed class EventInstance
         EventVolumeDb = macros.VolumeDb + _volumeDb + ModEval.SumLanes(_description.EventVolumeLanes, _eventVolumeLaneParams) + modVolume + InheritedVolumeDb;
         EventPitch = macros.Pitch * _pitch * ModEval.ProductLanes(_description.EventPitchLanes, _eventPitchLaneParams) * modPitch * InheritedPitch;
 
-        if (justStarted && CanTrigger && !_timeline.Begin()) OnTimelineJump(_timeline.Position);
+        if (justStarted && CanTrigger)
+        {
+            // Begin can itself jump through transition regions. Its nested OnTimelineJump calls
+            // must use the same native-seek boundary as the ordinary initial-position path.
+            _deferNativeSeek = clockedMutation;
+            try
+            {
+                if (!_timeline.Begin()) OnTimelineJump(_timeline.Position);
+            }
+            finally { _deferNativeSeek = false; }
+        }
+        // Begin enters instruments at the mutation's position, unlike later region entries whose
+        // offsets already include this tick's advance. Only the former still need that elapsed time.
+        if (clockedMutation && justStarted)
+            for (int i = 0; i < _instruments.Length; i++) _instruments[i].AdvanceInitialVoices(advance);
         if (!_paused && CanTrigger) _timeline.Advance(advance);
         if (CanTrigger) EvaluateParameterInstruments();
 
@@ -550,7 +599,7 @@ public sealed class EventInstance
             bool inRegion = position >= s.Info.RegionStart && position < s.Info.RegionEnd;
             if (inRegion && !s.Active) s.OnEnter(position - s.Info.RegionStart);
             else if (!inRegion && s.Active) s.OnExit();
-            else if (inRegion && !s.Info.Instrument.Async) s.OnJump(position);
+            else if (inRegion && !s.Info.Instrument.Async) s.OnJump(position, _deferNativeSeek);
         }
     }
 

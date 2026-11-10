@@ -47,9 +47,13 @@ internal sealed class Voice
     public bool WantsPlay;
     /// <summary>A <see cref="VoicePlay"/> has been emitted since the last stop/virtualization.</summary>
     public bool HasPlayed;
+    /// <summary>Emit a seek after this tick advances the voice, not from the pre-advance jump position.</summary>
+    public bool WantsSeek;
     public bool Finished;
     /// <summary>Created during the current tick; not advanced until the next one.</summary>
     public bool Fresh;
+    /// <summary>Elapsed time owed by a voice entered at a clocked start/seek boundary.</summary>
+    public double InitialAdvance;
 
     public float VolumeDb;
     public float Pitch = 1f;
@@ -72,13 +76,13 @@ internal sealed class Voice
         OwnAttributes = false;
         MinDistance = MaxDistance = 0f;
         Priority = 0;
-        Position = Length = Age = 0;
+        Position = Length = Age = InitialAdvance = 0;
         LengthKnown = false;
         RandomVolumeDb = 0f;
         RandomPitch = 1f;
         FadeIn = FadeOutDuration = FadeOutRemaining = 0f;
         FadingOut = false;
-        IsReal = WantsPlay = HasPlayed = Finished = Fresh = false;
+        IsReal = WantsPlay = HasPlayed = WantsSeek = Finished = Fresh = false;
         VolumeDb = LastVolumeDb = 0f;
         Pitch = LastPitch = 1f;
         LastAttributes = default;
@@ -201,6 +205,7 @@ internal sealed class VoicePool
             v.IsReal = false;
             v.WantsPlay = false;
             v.HasPlayed = false;
+            v.WantsSeek = false;
             // A one-shot whose length the model does not know cannot be resumed at the right offset; drop it.
             if (!v.Loop && !v.LengthKnown) v.Finished = true;
         }

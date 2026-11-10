@@ -4,6 +4,9 @@ All notable changes to Dirge. The format follows [Keep a Changelog](https://keep
 
 ## Unreleased
 
+### Fixed
+- Drive runtime audio from a monotonic wall clock, resetting on load and pause/disable, rather than the engine's smoothed/scaled frame delta. Starts and seeks exclude time before their mutation boundary without shortening other instances' ticks; native voice positions, quantized starts and profiler replay preserve that boundary. Engine-free callers retain deterministic tick-boundary timing unless they provide the optional `DirgeSystem` driver clock.
+
 ### Performance
 - Keep browser selection/tag chips, event toolbar/empty automation views, transport parameter controls and mixer effect rows alive when their structure is unchanged; skip unrelated selection/project refreshes. Together with NecronomiDOM's companion style-reuse fixes, a 317-event/9-bus Eldritch editor workload reduced browser `selectionUpdate` p95 from 945.4 ms to 57.8 ms and transport p95 from 51.9 ms to 4.25 ms. These are main-thread document timings, not whole-editor FPS; native GUI hover/click, Play/Stop and fader undo/redo were exercised in that integration.
 

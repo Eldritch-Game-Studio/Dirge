@@ -29,7 +29,13 @@ GDScript: `DirgeServer.StartEvent("Ambience/Wind")` returns a handle for `SetPar
 
 C#: `GetNode<DirgeServer>("/root/DirgeServer").System` is the `DirgeSystem`; `GetEvent(path).CreateInstance()` gives an `EventInstance` with `Start`, `Stop`, `SetParameter`, `Set3DAttributes`, `Callback` and `Release`; `System.Mixer.StartSnapshot(name)` returns a `SnapshotInstance`.
 
+The server uses a monotonic wall clock rather than the engine's smoothed/scaled frame delta. Starts and seeks are stamped at the mutation boundary: only subsequent elapsed time advances that instance on its next tick; other instances keep the whole interval. The first tick after load or pause/disable still advances zero seconds. Native play/seek commands use the resulting voice position, and profiler replay records the boundary offset without requiring a live clock. Engine-free `DirgeSystem.Update(dt)` callers retain tick-boundary timing unless they supply the driver's `elapsedSinceLastUpdate` clock.
+
 Live update: run the game with `-- --dirge-live` and use **Live → Connect…** in the editor. In-game overlay: **F9** in debug builds.
+
+Editor responsiveness: browser selection updates only the old/new rows; unchanged tag chips, transport parameters, event-toolbar controls and effect rows stay mounted. Mixer refreshes follow mixer/snapshot change scopes instead of rebuilding for unrelated edits. Retained controls resolve their current event when invoked, so selection changes and undo/redo do not leave stale edit targets. NecronomiDOM rematches selectors while reusing computed values only when their source generation, inputs and dependencies remain valid.
+
+For UI profiling, launch the editor with `NECRONOMIDOM_UPDATE_TIMING=1`. Thresholded per-document reconciliation, layout, paint and allocation records are written to `user://necronomidom-document-updates-*.log`; these measure main-thread document work, not whole-frame/GPU latency.
 
 ## Compatibility
 

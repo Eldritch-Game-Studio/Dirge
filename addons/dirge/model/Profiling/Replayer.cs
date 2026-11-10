@@ -129,6 +129,7 @@ public static class Replayer
                 case "SetProgrammerSound": instance.SetProgrammerSound(new AssetRef(call.Name ?? "")); break;
                 case "Release": instance.Release(); break;
                 case "Seek": instance.TimelinePosition = call.Value; break;
+                case "SetUpdateOffset": instance.SetUpdateOffset(call.Value); break;
             }
         }
 

@@ -13,6 +13,15 @@ dotnet build Dirge.slnx
 
 Godot **4.7.2 .NET** (stock build) is the supported editor; put its binary on `PATH` as `godot` or export `GODOT=/path/to/Godot_v4.7.2-stable_mono_linux.x86_64`.
 
+For a .NET host that already supplies native audio effects (such as Eldritch), commit source changes
+and run `python3 scripts/package-managed.py`. It rebuilds the Release demo and writes a deterministic
+`dist/dirge-managed-<commit>.zip` containing the exact committed addon source, its per-file hashes,
+and upstream revision in `addon-package.json`. The host compiles the C# addon through `Dirge.targets`;
+the package deliberately omits GDExtension registration and native binaries. Standalone users should
+continue using the regular release package. Install the matching NecronomiDOM addon before building;
+`unzip -oq <necronomidom-managed-package.zip> 'addons/necronomidom/*' -d .` installs a source package.
+Host-generated `.import` files are excluded; installing this package preserves the host's asset-import settings.
+
 ## Before opening a pull request
 
 ```sh

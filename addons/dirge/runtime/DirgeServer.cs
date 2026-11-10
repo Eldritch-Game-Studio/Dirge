@@ -64,6 +64,7 @@ public partial class DirgeServer : Node
     private readonly string _platform = MapPlatform(OS.GetName());
     private AudioDriver? _driver;
     private DirgeSystem? _system;
+    private long _lastUpdateTimestamp;
     private LiveUpdateHost? _live;
     private LoudnessCapture? _loudness;
     private int _nextHandle = 1;
@@ -286,7 +287,9 @@ public partial class DirgeServer : Node
         Unload();
 
         _driver.LoadMixer(project.Mixer);
-        _system = new DirgeSystem(project, Seed, _assets, platform: _platform) { Locale = TranslationServer.GetLocale() };
+        _system = new DirgeSystem(project, Seed, _assets, platform: _platform,
+            elapsedSinceLastUpdate: ElapsedSinceLastUpdate) { Locale = TranslationServer.GetLocale() };
+        _lastUpdateTimestamp = 0;
         _loudness?.Reset();
         if (_pendingLivePort > 0)
         {
@@ -382,6 +385,14 @@ public partial class DirgeServer : Node
         }
     }
 
+    public override void _Notification(int what)
+    {
+        if (what == NotificationPaused || what == NotificationDisabled) _lastUpdateTimestamp = 0;
+    }
+
+    private double ElapsedSinceLastUpdate() => _lastUpdateTimestamp == 0 ? 0
+        : Stopwatch.GetElapsedTime(_lastUpdateTimestamp).TotalSeconds;
+
     public override void _Process(double delta)
     {
         _banks.Poll();
@@ -392,7 +403,13 @@ public partial class DirgeServer : Node
         }
 
         _updateWatch.Restart();
-        _system.Update(delta);
+        // Native streams advance in real time, not the engine's smoothed/scaled frame delta.
+        // Startup loading can surface as a large delta on a later frame and otherwise stop
+        // a short voice before its first audio mix. Paused/disabled intervals start a fresh clock.
+        long now = Stopwatch.GetTimestamp();
+        double elapsed = _lastUpdateTimestamp == 0 ? 0 : Stopwatch.GetElapsedTime(_lastUpdateTimestamp, now).TotalSeconds;
+        _lastUpdateTimestamp = now;
+        _system.Update(elapsed);
         _updateWatch.Stop();
         LastUpdateMs = _updateWatch.Elapsed.TotalMilliseconds;
         Flush();

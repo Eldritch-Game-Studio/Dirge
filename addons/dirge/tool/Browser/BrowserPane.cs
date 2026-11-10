@@ -45,6 +45,8 @@ public sealed partial class BrowserPane : IToolPane, IToolPaneCommands
     private Element? _dropHover;
     private Action? _pendingConfirm;
     private RenameState? _rename;
+    private readonly Dictionary<(string Kind, string Key), Element> _selectionRows = new();
+    private Element? _selectedRow;
 
     public string Title => "Browser";
     public Control Root => _root;
@@ -101,6 +103,9 @@ public sealed partial class BrowserPane : IToolPane, IToolPaneCommands
         _host = null;
         _doc = null;
         _rename = null;
+        _selectionRows.Clear();
+        _selectedRow = null;
+        _shownTags.Clear();
         _ctx = null;
     }
 
@@ -189,6 +194,8 @@ public sealed partial class BrowserPane : IToolPane, IToolPaneCommands
         if (_ctx is null || _doc is null) return;
         _rename = null;
         _dropHover = null;
+        _selectionRows.Clear();
+        _selectedRow = null;
         ClearChildren(_tree);
         switch (_tab)
         {
@@ -198,6 +205,13 @@ public sealed partial class BrowserPane : IToolPane, IToolPaneCommands
             case Tab.Parameters: BuildParameters(); break;
             case Tab.Banks: BuildBanks(); break;
         }
+        foreach (Element row in _tree.QuerySelectorAll(".node"))
+        {
+            string? kind = row.GetAttribute("data-kind");
+            string? key = row.GetAttribute("data-id") ?? row.GetAttribute("data-path");
+            if (kind is not null && key is not null) _selectionRows[(kind, key)] = row;
+        }
+        UpdateStatus();
         ApplySelection();
         if (_tab == Tab.Events) BuildTagEditor();
     }
@@ -238,27 +252,20 @@ public sealed partial class BrowserPane : IToolPane, IToolPaneCommands
     {
         if (_ctx is null) return;
         Selection selection = _ctx.Selection;
-        foreach (Element row in _tree.QuerySelectorAll(".node"))
+        (string Kind, string Key) key = _tab == Tab.Banks ? ("bank", _selectedBank.ToString()) : selection.Kind switch
         {
-            bool selected = IsSelected(selection, row);
-            Dom.SetClass(row, "selected", selected);
-        }
-        UpdateStatus();
-    }
-
-    private bool IsSelected(Selection selection, Element row)
-    {
-        string? kind = row.GetAttribute("data-kind");
-        switch (kind)
-        {
-            case "folder": return selection.Kind == SelectionKind.None && _selectedFolder.Length > 0 && row.GetAttribute("data-path") == _selectedFolder;
-            case "event": return selection.Kind == SelectionKind.Event && row.GetAttribute("data-id") == selection.Id.ToString();
-            case "asset": return selection.Kind == SelectionKind.Asset && row.GetAttribute("data-path") == selection.AssetPath;
-            case "snapshot": return selection.Kind == SelectionKind.Snapshot && row.GetAttribute("data-id") == selection.Id.ToString();
-            case "parameter": return selection.Kind == SelectionKind.Parameter && selection.Owner.IsNone && row.GetAttribute("data-id") == selection.Id.ToString();
-            case "bank": return row.GetAttribute("data-id") == _selectedBank.ToString();
-            default: return false;
-        }
+            SelectionKind.None => ("folder", _selectedFolder),
+            SelectionKind.Event => ("event", selection.Id.ToString()),
+            SelectionKind.Asset => ("asset", selection.AssetPath ?? ""),
+            SelectionKind.Snapshot => ("snapshot", selection.Id.ToString()),
+            SelectionKind.Parameter when selection.Owner.IsNone => ("parameter", selection.Id.ToString()),
+            _ => ("", ""),
+        };
+        _selectionRows.TryGetValue(key, out Element? selected);
+        if (ReferenceEquals(selected, _selectedRow)) return;
+        if (_selectedRow is not null) Dom.SetClass(_selectedRow, "selected", false);
+        _selectedRow = selected;
+        if (selected is not null) Dom.SetClass(selected, "selected", true);
     }
 
     // ---- rows ---------------------------------------------------------------------------------------------------------
@@ -590,15 +597,7 @@ public sealed partial class BrowserPane : IToolPane, IToolPaneCommands
         }
     }
 
-    private Element? SelectedRow()
-    {
-        if (_ctx is null) return null;
-        foreach (Element row in _tree.QuerySelectorAll(".node"))
-        {
-            if (IsSelected(_ctx.Selection, row)) return row;
-        }
-        return null;
-    }
+    private Element? SelectedRow() => _selectedRow;
 
     // ---- drag and drop ----------------------------------------------------------------------------------------------
 

@@ -200,9 +200,10 @@ public sealed class EventEditorPane : IToolPane, IToolPaneCommands
 
     private void OnToolSelectionChanged()
     {
-        if (_syncingSelection) return;
+        if (_syncingSelection || _state is null) return;
+        int revision = _state.Revision;
         AdoptToolSelection();
-        QueueRender(0);
+        if (_state.Revision != revision) QueueRender(0);
     }
 
     /// <summary>Follow the tool-wide selection: events open; instruments/tracks/markers open their owner and select in-pane.</summary>

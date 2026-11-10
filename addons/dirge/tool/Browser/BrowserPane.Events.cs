@@ -10,6 +10,7 @@ namespace Dirge.Tool.Browser;
 public sealed partial class BrowserPane
 {
     private string _selectedFolder = "";
+    private readonly List<string> _shownTags = new();
 
     private void BuildEvents()
     {
@@ -80,12 +81,20 @@ public sealed partial class BrowserPane
         }
         bool typing = _doc is not null && ReferenceEquals(_doc.FocusedElement, _tagInput);
         _tagEditor.Hidden = false;
-        ClearChildren(_tagChips);
-        for (int i = 0; i < ev.Tags.Count; i++)
+        bool sameTags = _shownTags.Count == ev.Tags.Count;
+        for (int i = 0; sameTags && i < ev.Tags.Count; i++) sameTags = _shownTags[i] == ev.Tags[i];
+        if (!sameTags)
         {
-            HTMLElement chip = Dom.Add(_tagChips, "button", "chip", ev.Tags[i] + " ×");
-            chip.SetAttribute("data-tag", ev.Tags[i]);
-            chip.Title = "Remove tag '" + ev.Tags[i] + "'";
+            ClearChildren(_tagChips);
+            _shownTags.Clear();
+            for (int i = 0; i < ev.Tags.Count; i++)
+            {
+                string tag = ev.Tags[i];
+                HTMLElement chip = Dom.Add(_tagChips, "button", "chip", tag + " ×");
+                chip.SetAttribute("data-tag", tag);
+                chip.Title = "Remove tag '" + tag + "'";
+                _shownTags.Add(tag);
+            }
         }
         if (!typing && _tagInput.Value.Length > 0) _tagInput.Value = "";
     }
@@ -181,10 +190,7 @@ public sealed partial class BrowserPane
     {
         _selectedFolder = path;
         _ctx!.Selection.Clear();
-        foreach (Element row in _tree.QuerySelectorAll(".node.folder"))
-        {
-            Dom.SetClass(row, "selected", row.GetAttribute("data-path") == path);
-        }
+        ApplySelection();
     }
 
     /// <summary>Folder new items go into: the selected event's folder, else the last clicked folder.</summary>

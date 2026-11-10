@@ -5,6 +5,7 @@ using Dirge.Project;
 using Dirge.Tool.Core;
 using NecronomiDom.Dom;
 using NecronomiDom.Runtime;
+using Dom = Dirge.Tool.Browser.Dom;
 
 namespace Dirge.Tool.Events;
 
@@ -25,6 +26,12 @@ internal sealed class EventHeaderView
     private bool _showMacros;
     private bool _showParameters;
     private bool _showTempo;
+    private Element? _playButton;
+    private Element _snapButton = null!, _busButton = null!, _conductorButton = null!;
+    private Element _macrosButton = null!, _parametersButton = null!, _tempoButton = null!;
+    private HTMLInputElement _pathInput = null!;
+    private AudioEvent? _toolbarEvent;
+    private string _shownPath = "";
 
     public DocumentHost Host { get; }
 
@@ -76,11 +83,13 @@ internal sealed class EventHeaderView
         Element? content = doc.GetElementById("content");
         if (toolbar is null || content is null) return;
         var form = new DomForm(doc);
-        toolbar.ReplaceChildren();
-        content.ReplaceChildren();
+        if (content.FirstChild is not null) content.ReplaceChildren();
         AudioEvent? ev = _state.Event;
         if (ev is null)
         {
+            if (toolbar.FirstChild is not null) toolbar.ReplaceChildren();
+            _playButton = null;
+            _toolbarEvent = null;
             form.Note(content, "No event selected.");
             return;
         }
@@ -93,27 +102,58 @@ internal sealed class EventHeaderView
 
     private void RenderToolbar(DomForm form, Element toolbar, AudioEvent ev)
     {
-        form.Button(toolbar, Playing ? "Stop" : "Play", _playToggle, Playing ? "btn accent" : "btn");
-        form.ToggleButton(toolbar, "Snap", _state.SnapToGrid, v => { _state.SnapToGrid = v; _state.Bump(); Render(); });
+        if (_playButton is null) BuildToolbar(form, toolbar);
+        Dom.SetText(_playButton!, Playing ? "Stop" : "Play");
+        Dom.SetClass(_playButton!, "accent", Playing);
+        Dom.SetClass(_snapButton, "on", _state.SnapToGrid);
+        if ((!ReferenceEquals(_toolbarEvent, ev) || _shownPath != ev.Path) && _pathInput.Value != ev.Path)
+            _pathInput.Value = ev.Path;
+        _toolbarEvent = ev;
+        _shownPath = ev.Path;
+        Dom.SetText(_busButton, _state.FindBus(ev.Bus)?.Name ?? "(master)");
+        Dom.SetClass(_conductorButton, "on", ev.IsConductor);
+        Dom.SetClass(_macrosButton, "on", _showMacros);
+        Dom.SetClass(_parametersButton, "on", _showParameters);
+        Dom.SetClass(_tempoButton, "on", _showTempo);
+    }
+
+    private void BuildToolbar(DomForm form, Element toolbar)
+    {
+        _playButton = form.Button(toolbar, "Play", _playToggle);
+        _snapButton = form.Button(toolbar, "Snap", () => { _state.SnapToGrid = !_state.SnapToGrid; _state.Bump(); Render(); }, "toggle");
         form.Button(toolbar, "Fit", _zoomFit);
         form.Span(toolbar, "Event", "label");
-        HTMLInputElement path = form.TextInput(toolbar, ev.Path, v =>
+        _pathInput = form.TextInput(toolbar, "", value =>
         {
-            string trimmed = v.Trim().Trim('/');
-            if (trimmed.Length == 0) { Render(); return; }
+            if (_state.Event is not { } ev) return;
+            string trimmed = value.Trim().Trim('/');
+            if (trimmed.Length == 0) { _pathInput.Value = ev.Path; return; }
             _edits.Set("Rename event", ev.Path, trimmed, p => ev.Path = p, ChangeScope.Events);
         });
-        path.ClassName = "field path";
+        _pathInput.ClassName = "field path";
         form.Span(toolbar, "Bus", "label");
-        List<Bus> buses = _state.Project.Mixer.Buses;
-        var names = new string[buses.Count];
-        int selected = -1;
-        for (int i = 0; i < buses.Count; i++) { names[i] = buses[i].Name; if (buses[i].Id == ev.Bus) selected = i; }
-        form.ChoiceButton(toolbar, names, selected, i => _edits.Set("Route event", ev.Bus, buses[i].Id, b => ev.Bus = b), "(master)");
-        form.ToggleButton(toolbar, "Conductor", ev.IsConductor, v => _edits.Set("Conductor", ev.IsConductor, v, b => ev.IsConductor = b));
-        form.ToggleButton(toolbar, "Macros", _showMacros, v => SetSections(v, _showParameters, _showTempo));
-        form.ToggleButton(toolbar, "Parameters", _showParameters, v => SetSections(_showMacros, v, _showTempo));
-        form.ToggleButton(toolbar, "Tempo", _showTempo, v => SetSections(_showMacros, _showParameters, v));
+        _busButton = Host.Document.CreateElement("button");
+        _busButton.ClassName = "choice";
+        _busButton.TextContent = "(master)";
+        toolbar.AppendChild(_busButton);
+        DomForm.On(_busButton, "click", e =>
+        {
+            if (_state.Event is not { } ev) return;
+            List<Bus> buses = _state.Project.Mixer.Buses;
+            var names = new string[buses.Count];
+            int selected = -1;
+            for (int i = 0; i < buses.Count; i++) { names[i] = buses[i].Name; if (buses[i].Id == ev.Bus) selected = i; }
+            var mouse = e as MouseEvent;
+            DomMenu.Show(Host.Document, mouse?.ClientX ?? 0, mouse?.ClientY ?? 0, names, selected,
+                i => _edits.Set("Route event", ev.Bus, buses[i].Id, b => ev.Bus = b));
+        });
+        _conductorButton = form.Button(toolbar, "Conductor", () =>
+        {
+            if (_state.Event is { } ev) _edits.Set("Conductor", ev.IsConductor, !ev.IsConductor, b => ev.IsConductor = b);
+        }, "toggle");
+        _macrosButton = form.Button(toolbar, "Macros", () => SetSections(!_showMacros, _showParameters, _showTempo), "toggle");
+        _parametersButton = form.Button(toolbar, "Parameters", () => SetSections(_showMacros, !_showParameters, _showTempo), "toggle");
+        _tempoButton = form.Button(toolbar, "Tempo", () => SetSections(_showMacros, _showParameters, !_showTempo), "toggle");
     }
 
     private void RenderMacros(DomForm form, Element content, AudioEvent ev)

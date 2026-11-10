@@ -46,7 +46,6 @@ public sealed partial class MixerPane
         private bool _clipOn;
         private float _holdDb = -80f;
         private double _holdAge;
-        private string _effectSignature = "";
         private string _dbTextValue = "";
 
         public BusStrip(Dom dom, DirgeId id, bool isMaster)
@@ -158,22 +157,23 @@ public sealed partial class MixerPane
                 if (MaxVoices.Value != voices) MaxVoices.Value = voices;
             }
         }
-        /// <summary>True when the effect chain's identity (types, order, enabled) differs from what the DOM shows.</summary>
-        public bool EffectChainChanged(Bus bus, Snapshot? editing, int selectedIndex)
+        /// <summary>Only structural changes replace rows; selection, enabled and scoped states update in place.</summary>
+        public bool EffectChainChanged(Bus bus)
         {
-            var signature = new System.Text.StringBuilder();
-            for (int i = 0; i < bus.Effects.Count; i++)
+            if (Effects.Count != bus.Effects.Count + 1) return true;
+            int faderSlot = FaderSlot(bus);
+            for (int slot = 0; slot < Effects.Count; slot++)
             {
-                BusEffect effect = bus.Effects[i];
-                signature.Append(effect.Id.ToString()).Append(effect.Enabled ? '+' : '-');
-                if (editing is not null) signature.Append(HasScopedParameter(editing, bus.Id, i) ? 's' : 'u');
-                signature.Append(i == selectedIndex ? '*' : ' ');
+                EffectRow row = Effects[slot];
+                if (slot == faderSlot)
+                {
+                    if (!row.IsFader) return true;
+                    continue;
+                }
+                int index = slot < faderSlot ? slot : slot - 1;
+                if (row.IsFader || row.EffectId != bus.Effects[index].Id || row.TypeName != bus.Effects[index].TypeName) return true;
             }
-            signature.Append('F').Append(FaderSlot(bus));
-            string next = signature.ToString();
-            if (next == _effectSignature) return false;
-            _effectSignature = next;
-            return true;
+            return false;
         }
 
         public void UpdateMeter(float leftDb, float rightDb, double delta)
@@ -283,7 +283,8 @@ public sealed partial class MixerPane
             strip.Refresh(bus, parent, editing, selectedBus && selectedId == bus.Id);
             RefreshLfoButton(strip, bus);
             int selectedEffect = Selection.Kind == SelectionKind.Effect && Selection.Owner == bus.Id ? Selection.Index : -1;
-            if (strip.EffectChainChanged(bus, editing, selectedEffect)) RebuildEffectRows(strip, bus, editing, selectedEffect);
+            if (strip.EffectChainChanged(bus)) RebuildEffectRows(strip, bus, editing, selectedEffect);
+            else RefreshEffectRows(strip, bus, editing, selectedEffect);
         }
     }
 

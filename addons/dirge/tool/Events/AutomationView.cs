@@ -14,6 +14,7 @@ internal sealed class AutomationView
     private readonly EventEditorState _state;
     private readonly EventEdits _edits;
     private readonly CurveCanvas _curve;
+    private bool _emptyEventView;
 
     public DocumentHost Host { get; }
 
@@ -31,11 +32,15 @@ internal sealed class AutomationView
         DomMenu.Close(doc);
         Element? root = doc.GetElementById("content");
         if (root is null) return;
+        AudioEvent? ev = _state.Event;
+        Instrument? instrument = _state.PrimaryInstrument;
+        bool emptyEvent = ev is not null && instrument is null && ev.Automation.Count == 0 && ev.Modulators.Count == 0;
+        // Empty events share the same actions; their pickers resolve the current event when opened.
+        if (_emptyEventView && emptyEvent) return;
+        _emptyEventView = emptyEvent;
         var form = new DomForm(doc);
         root.ReplaceChildren();
-        AudioEvent? ev = _state.Event;
         if (ev is null) { form.Note(root, "No event."); return; }
-        Instrument? instrument = _state.PrimaryInstrument;
 
         RenderLanes(form, root, ev, instrument);
         RenderModulators(form, root, ev, instrument);
@@ -56,20 +61,29 @@ internal sealed class AutomationView
         }
         Element actions = form.Div(body, "actions");
         form.Span(actions, "Add lane", "label short");
-        var targets = TargetOptions(ev, instrument);
-        var targetNames = new string[targets.Count];
-        for (int i = 0; i < targets.Count; i++) targetNames[i] = targets[i].Label;
-        form.ChoiceButton(actions, targetNames, -1, i =>
+        Element addLane = form.Document.CreateElement("button");
+        addLane.ClassName = "choice";
+        addLane.TextContent = "target…";
+        actions.AppendChild(addLane);
+        DomForm.On(addLane, "click", e =>
         {
-            PropertyRef target = targets[i].Target;
-            var lane = new AutomationLane { Target = target, Parameter = DefaultParameter(ev) };
-            float neutral = Neutral(target, ev);
-            ParameterDefinition? p = _state.FindParameter(lane.Parameter);
-            lane.Curve.Points.Add(new CurvePoint(p?.Minimum ?? 0f, neutral));
-            lane.Curve.Points.Add(new CurvePoint(p?.Maximum ?? 1f, neutral));
-            _edits.ListAdd("Add automation lane", ev.Automation, lane);
-            _state.SelectLane(lane.Id);
-        }, "target…");
+            if (_state.Event is not { } currentEvent) return;
+            var targets = TargetOptions(currentEvent, _state.PrimaryInstrument);
+            var targetNames = new string[targets.Count];
+            for (int i = 0; i < targets.Count; i++) targetNames[i] = targets[i].Label;
+            var mouse = e as MouseEvent;
+            DomMenu.Show(form.Document, mouse?.ClientX ?? 0, mouse?.ClientY ?? 0, targetNames, -1, i =>
+            {
+                PropertyRef target = targets[i].Target;
+                var lane = new AutomationLane { Target = target, Parameter = DefaultParameter(currentEvent) };
+                float neutral = Neutral(target, currentEvent);
+                ParameterDefinition? p = _state.FindParameter(lane.Parameter);
+                lane.Curve.Points.Add(new CurvePoint(p?.Minimum ?? 0f, neutral));
+                lane.Curve.Points.Add(new CurvePoint(p?.Maximum ?? 1f, neutral));
+                _edits.ListAdd("Add automation lane", currentEvent.Automation, lane);
+                _state.SelectLane(lane.Id);
+            });
+        });
     }
 
     private void RenderLane(DomForm form, Element list, AudioEvent ev, AutomationLane lane, Instrument? owner)
@@ -220,16 +234,20 @@ internal sealed class AutomationView
         Element actions = form.Div(body, "actions");
         string[] kinds = { "Random", "AHDSR", "LFO", "Autopitch" };
         form.Span(actions, "Add", "label short");
+        bool eventModulators = ReferenceEquals(modulators, ev.Modulators);
         form.ChoiceButton(actions, kinds, -1, k =>
         {
+            if (_state.Event is not { } currentEvent) return;
+            PropertyRef currentVolume = eventModulators ? PropertyRef.EventVolume(currentEvent.Id) : volume;
+            PropertyRef currentPitch = eventModulators ? PropertyRef.EventPitch(currentEvent.Id) : pitch;
             Modulator mod = k switch
             {
-                0 => new RandomModulator { Target = volume, Amount = 3f },
-                1 => new AhdsrModulator { Target = volume, Amount = 0f, Envelope = { Attack = 0.1f, Release = 0.5f } },
-                2 => new LfoModulator { Target = volume, Amount = 3f },
-                _ => NewAutopitch(ev, pitch),
+                0 => new RandomModulator { Target = currentVolume, Amount = 3f },
+                1 => new AhdsrModulator { Target = currentVolume, Amount = 0f, Envelope = { Attack = 0.1f, Release = 0.5f } },
+                2 => new LfoModulator { Target = currentVolume, Amount = 3f },
+                _ => NewAutopitch(currentEvent, currentPitch),
             };
-            _edits.ListAdd("Add modulator", modulators, mod);
+            _edits.ListAdd("Add modulator", eventModulators ? currentEvent.Modulators : modulators, mod);
         }, "modulator…");
     }
 

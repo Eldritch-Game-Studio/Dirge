@@ -41,6 +41,8 @@ public sealed partial class MixerPane : IToolPane, IToolPaneCommands
     private bool _bound;
     private bool _refreshQueued;
     private ChangeScope _pendingScope;
+    private DirgeId _selectedStripId;
+    private DirgeId _selectedEffectId;
 
     private Popup _popup = null!;
     private HTMLElement _masterSlot = null!;
@@ -169,6 +171,9 @@ public sealed partial class MixerPane : IToolPane, IToolPaneCommands
         BindSide();
         BindModulators();
         _bound = true;
+        _selectedStripId = Selection.Kind == SelectionKind.Bus ? Selection.Id
+            : Selection.Kind == SelectionKind.Effect ? Selection.Owner : DirgeId.None;
+        _selectedEffectId = Selection.Kind == SelectionKind.Effect ? Selection.Id : DirgeId.None;
         Refresh(ChangeScope.All);
     }
 
@@ -183,11 +188,17 @@ public sealed partial class MixerPane : IToolPane, IToolPaneCommands
         _strips.Clear();
         _stripOrder.Clear();
         _dom?.DetachAll();
+        _pendingScope = ChangeScope.None;
+        _refreshQueued = false;
+        _selectedStripId = DirgeId.None;
+        _selectedEffectId = DirgeId.None;
         _dom = null;
     }
 
     private void OnProjectChanged(ChangeScope scope, DirgeId subject)
     {
+        scope &= ChangeScope.Mixer | ChangeScope.Snapshots;
+        if (scope == ChangeScope.None) return;
         // Coalesce: a drag produces many Changed events per frame; refresh once at the next tick.
         _pendingScope |= scope;
         _refreshQueued = true;
@@ -197,8 +208,16 @@ public sealed partial class MixerPane : IToolPane, IToolPaneCommands
     {
         // Selecting a snapshot anywhere in the tool enters editing mode; selecting buses/effects afterwards keeps it
         // (FMOD behaviour), so a fader press that also selects its strip still writes the snapshot. "Done" leaves it.
-        if (Selection.Kind == SelectionKind.Snapshot) _editingSnapshotId = Selection.Id;
-        _pendingScope |= ChangeScope.Snapshots | ChangeScope.Mixer;
+        DirgeId stripId = Selection.Kind == SelectionKind.Bus ? Selection.Id
+            : Selection.Kind == SelectionKind.Effect ? Selection.Owner : DirgeId.None;
+        DirgeId effectId = Selection.Kind == SelectionKind.Effect ? Selection.Id : DirgeId.None;
+        bool snapshotChanged = Selection.Kind == SelectionKind.Snapshot && _editingSnapshotId != Selection.Id;
+        if (snapshotChanged) _editingSnapshotId = Selection.Id;
+        if (stripId == _selectedStripId && effectId == _selectedEffectId && !snapshotChanged) return;
+        _selectedStripId = stripId;
+        _selectedEffectId = effectId;
+        _pendingScope |= ChangeScope.Mixer;
+        if (snapshotChanged) _pendingScope |= ChangeScope.Snapshots;
         _refreshQueued = true;
     }
 
@@ -211,14 +230,14 @@ public sealed partial class MixerPane : IToolPane, IToolPaneCommands
     private void Refresh(ChangeScope scope)
     {
         if (!_bound || _context is null) return;
-        bool mixer = (scope & (ChangeScope.Mixer | ChangeScope.All)) != 0;
-        bool snapshots = (scope & (ChangeScope.Snapshots | ChangeScope.All)) != 0;
+        bool mixer = (scope & ChangeScope.Mixer) != 0;
+        bool snapshots = (scope & ChangeScope.Snapshots) != 0;
         Snapshot? editing = EditingSnapshot();
         if (snapshots) RefreshSnapshotList(editing);
         if (mixer || snapshots)
         {
             RefreshStrips(editing);
-            RefreshVcaList();
+            if (mixer) RefreshVcaList();
             RefreshPopover(editing);
             RefreshLfoPopover();
         }
@@ -246,8 +265,9 @@ public sealed partial class MixerPane : IToolPane, IToolPaneCommands
     private void LeaveSnapshotEditing()
     {
         _editingSnapshotId = DirgeId.None;
+        _pendingScope |= ChangeScope.Snapshots | ChangeScope.Mixer;
+        _refreshQueued = true;
         if (Selection.Kind == SelectionKind.Snapshot) Selection.Clear();
-        else { _pendingScope |= ChangeScope.Snapshots | ChangeScope.Mixer; _refreshQueued = true; }
     }
 
     // ---- edit helpers -------------------------------------------------------------------------------------------------

@@ -32,6 +32,7 @@ internal static class Dom
 
     public static void SetClass(Element element, string className, bool on)
     {
+        if (element.ClassList.Contains(className) == on) return;
         if (on) element.ClassList.Add(className);
         else element.ClassList.Remove(className);
     }

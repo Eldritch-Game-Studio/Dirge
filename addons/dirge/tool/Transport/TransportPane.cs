@@ -43,6 +43,8 @@ public sealed partial class TransportPane : IToolPane, IToolPaneCommands
     private SliderRow? _dropdownFor;
     private int _lastInstances = -1, _lastVoices = -1;
     private double _lastMs = double.NaN;
+    private bool _parametersBound;
+    private bool _localEventAvailable;
 
     public string Title => "Transport";
     public Control Root => _root;
@@ -78,7 +80,7 @@ public sealed partial class TransportPane : IToolPane, IToolPaneCommands
         _panner.Emitter = context.Audition.PreviewEmitter;
         _panner.Listener = context.Audition.PreviewListener;
         OnSelectionChanged();
-        RebuildParameters();
+        RefreshParameters();
         RefreshInstances(force: true);
     }
 
@@ -95,6 +97,9 @@ public sealed partial class TransportPane : IToolPane, IToolPaneCommands
         _host = null;
         _doc = null;
         _sliders.Clear();
+        _parametersBound = false;
+        _lastInstances = _lastVoices = -1;
+        _lastMs = double.NaN;
         _instanceRows.Clear();
         _shown.Clear();
         _restart.Clear();
@@ -140,12 +145,11 @@ public sealed partial class TransportPane : IToolPane, IToolPaneCommands
 
     private void OnProjectChanged(ChangeScope scope, DirgeId subject)
     {
-        if ((scope & (ChangeScope.GlobalParameters | ChangeScope.Events | ChangeScope.EventContent)) != 0 || scope == ChangeScope.All)
-        {
-            if (scope == ChangeScope.All) _localValues.Clear();
-            OnSelectionChanged();
-            RebuildParameters();
-        }
+        if (scope == ChangeScope.All) _localValues.Clear();
+        bool eventChanged = (scope & ChangeScope.Events) != 0
+            || (scope & ChangeScope.EventContent) != 0 && (subject.IsNone || subject == _selectedEvent);
+        if (eventChanged) OnSelectionChanged();
+        if (eventChanged || (scope & ChangeScope.GlobalParameters) != 0) RefreshParameters();
     }
 
     private void OnRebuilt()
@@ -154,7 +158,7 @@ public sealed partial class TransportPane : IToolPane, IToolPaneCommands
         _userStopped.Clear();
         _shown.Clear();
         RefreshInstances(force: true);
-        RebuildParameters();
+        RefreshParameters();
     }
 
     private void OnSelectionChanged()
@@ -186,7 +190,7 @@ public sealed partial class TransportPane : IToolPane, IToolPaneCommands
         }
         ((HTMLElement)_play).ToggleAttribute("disabled", ev is null);
         ((HTMLElement)_stop).ToggleAttribute("disabled", ev is null);
-        if (changed) RebuildParameters();
+        if (changed) RefreshParameters();
     }
 
     private AudioEvent? FindEvent(DirgeId id)
@@ -388,6 +392,12 @@ public sealed partial class TransportPane : IToolPane, IToolPaneCommands
         public SliderRow(ParameterDefinition definition, bool global, Element row, Element? slider, Element? fill, Element? value, HTMLElement? dropdown)
         {
             Definition = definition; Global = global; Row = row; Slider = slider; Fill = fill; Value = value; Dropdown = dropdown;
+            _name = definition.Name;
+            _kind = definition.Kind;
+            _builtIn = definition.BuiltIn;
+            _minimum = definition.Minimum;
+            _maximum = definition.Maximum;
+            _labels = definition.Labels.ToArray();
         }
         public ParameterDefinition Definition { get; }
         public bool Global { get; }
@@ -398,30 +408,54 @@ public sealed partial class TransportPane : IToolPane, IToolPaneCommands
         public HTMLElement? Dropdown { get; }
         public float Shown { get; set; } = float.NaN;
         public bool ReadOnly => Definition.BuiltIn != BuiltInParameter.None;
+
+        private readonly string _name;
+        private readonly ParameterKind _kind;
+        private readonly BuiltInParameter _builtIn;
+        private readonly float _minimum, _maximum;
+        private readonly string[] _labels;
+
+        public bool Matches(ParameterDefinition definition)
+        {
+            if (!ReferenceEquals(Definition, definition) || _name != definition.Name || _kind != definition.Kind
+                || _builtIn != definition.BuiltIn || _minimum != definition.Minimum || _maximum != definition.Maximum
+                || _labels.Length != definition.Labels.Count) return false;
+            for (int i = 0; i < _labels.Length; i++) if (_labels[i] != definition.Labels[i]) return false;
+            return true;
+        }
     }
 
-    private void RebuildParameters()
+    /// <summary>Keep unchanged controls (and active drags) alive; event selection never rebuilds global parameters.</summary>
+    private void RefreshParameters()
     {
         if (_ctx is null || _doc is null) return;
-        HideDropdown();
-        _activeSlider = null;
-        _sliders.Clear();
-        while (_globalList.FirstChild is { } g) _globalList.RemoveChild(g);
-        while (_localList.FirstChild is { } l) _localList.RemoveChild(l);
-
-        List<ParameterDefinition> globals = _ctx.Project.Project.GlobalParameters;
-        for (int i = 0; i < globals.Count; i++) AddSlider(_globalList, globals[i], global: true);
-        if (globals.Count == 0) Dom.Add(_globalList, "p", "empty", "No global parameters");
-
         AudioEvent? ev = FindEvent(_selectedEvent);
+        RefreshParameterList(_globalList, _ctx.Project.Project.GlobalParameters, global: true, "No global parameters");
+        RefreshParameterList(_localList, ev?.LocalParameters, global: false, ev is null ? "Select an event" : "No local parameters");
+        _parametersBound = true;
+        _localEventAvailable = ev is not null;
         Dom.SetText(_localHeading, ev is null ? "Event parameters" : "Event parameters · " + EventTree.NameOf(ev.Path));
-        if (ev is null) Dom.Add(_localList, "p", "empty", "Select an event");
-        else
-        {
-            for (int i = 0; i < ev.LocalParameters.Count; i++) AddSlider(_localList, ev.LocalParameters[i], global: false);
-            if (ev.LocalParameters.Count == 0) Dom.Add(_localList, "p", "empty", "No local parameters");
-        }
         RefreshSliderValues();
+    }
+
+    private void RefreshParameterList(Element list, List<ParameterDefinition>? definitions, bool global, string emptyText)
+    {
+        int count = definitions?.Count ?? 0;
+        int index = 0;
+        bool same = _parametersBound && (global || _localEventAvailable == (definitions is not null));
+        for (int i = 0; same && i < _sliders.Count; i++)
+        {
+            SliderRow slider = _sliders[i];
+            if (slider.Global != global) continue;
+            if (index >= count || !slider.Matches(definitions![index++])) same = false;
+        }
+        if (same && index == count) return;
+        if (_dropdownFor is not null && _dropdownFor.Global == global) HideDropdown();
+        if (_activeSlider is not null && _activeSlider.Global == global) _activeSlider = null;
+        for (int i = _sliders.Count - 1; i >= 0; i--) if (_sliders[i].Global == global) _sliders.RemoveAt(i);
+        while (list.FirstChild is { } child) list.RemoveChild(child);
+        for (int i = 0; i < count; i++) AddSlider(list, definitions![i], global);
+        if (count == 0) Dom.Add(list, "p", "empty", emptyText);
     }
 
     private void AddSlider(Element list, ParameterDefinition definition, bool global)

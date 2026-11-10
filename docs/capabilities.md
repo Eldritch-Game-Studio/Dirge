@@ -86,6 +86,10 @@ Priority tiers: P0 ships with 1.0, P1 in 1.x, P2 after; `—` is a deliberate no
 
 ### Tooling
 
+Selection updates reuse browser rows/tag chips, the event toolbar and empty automation controls, unchanged transport parameter lists, and structurally unchanged mixer effect rows. Pickers resolve the current event when opened; unrelated project changes do not refresh the mixer. Parameter-definition changes and structural effect-chain changes still rebuild their affected controls.
+
+The responsiveness measurements in the Unreleased changelog were collected with the companion NecronomiDOM style-reuse changes in the maintained Eldritch editor, not the stock-Godot smoke environment. To reproduce the combined improvements from source, use NecronomiDOM's matching source changes rather than the 1.1.5 release fetched by `scripts/fetch-deps.sh`; Dirge's stock Godot 4.7.2 .NET build target is unchanged.
+
 | FMOD Studio | Dirge | P | Status | Note |
 |---|---|---|---|---|
 | Event editor: timeline, tracks, instruments, parameter sheets, markers, automation | `EventEditorPane` | P0 | Done | |

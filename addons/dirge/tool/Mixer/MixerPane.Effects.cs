@@ -24,11 +24,16 @@ public sealed partial class MixerPane
         /// <summary>Display position in the chain list (effects and the fader share one sequence).</summary>
         public int Slot { get; }
         public DirgeId EffectId { get; }
+        public string? TypeName { get; }
+        public string? Sidechain { get; set; }
         public bool IsFader => Index < 0;
 
         public EffectRow(Dom dom, HTMLElement list, BusEffect effect, int index, int slot, bool selected, bool scoped)
         {
             Index = index; Slot = slot; EffectId = effect.Id;
+            TypeName = effect.TypeName;
+            effect.StringParameters.TryGetValue(EffectCatalog.DuckingSidechainParameter, out string? sidechain);
+            Sidechain = sidechain;
             Root = dom.El(list, "div", "fx-item");
             Root.Dataset["slot"] = slot.ToString(System.Globalization.CultureInfo.InvariantCulture);
             if (selected) Root.ClassList.Add("selected");
@@ -137,6 +142,27 @@ public sealed partial class MixerPane
                 Selection.Select(SelectionKind.Effect, effect.Id, strip.Id, index);
                 OpenPopover(strip.Id, index, e);
             });
+        }
+    }
+
+    private static void RefreshEffectRows(BusStrip strip, Bus bus, Snapshot? editing, int selectedIndex)
+    {
+        foreach (EffectRow row in strip.Effects)
+        {
+            if (row.IsFader) continue;
+            BusEffect effect = bus.Effects[row.Index];
+            Dom.SetClass(row.Root, "selected", row.Index == selectedIndex);
+            Dom.SetClass(row.Root, "scoped", editing is not null && HasScopedParameter(editing, bus.Id, row.Index));
+            Dom.SetClass(row.Enable!, "on", effect.Enabled);
+            Dom.SetClass(row.Name, "disabled", !effect.Enabled);
+            string title = effect.Enabled ? "Disable effect" : "Enable effect";
+            if (row.Enable!.Title != title) row.Enable.Title = title;
+            effect.StringParameters.TryGetValue(EffectCatalog.DuckingSidechainParameter, out string? sidechain);
+            if (row.Sidechain != sidechain)
+            {
+                row.Sidechain = sidechain;
+                Dom.SetText(row.Name, EffectCatalog.DisplayName(effect));
+            }
         }
     }
 

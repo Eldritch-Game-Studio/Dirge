@@ -2,6 +2,11 @@
 
 All notable changes to Dirge. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Performance
+- Keep browser selection/tag chips, event toolbar/empty automation views, transport parameter controls and mixer effect rows alive when their structure is unchanged; skip unrelated selection/project refreshes. Together with NecronomiDOM's companion style-reuse fixes, a 317-event/9-bus Eldritch editor workload reduced browser `selectionUpdate` p95 from 945.4 ms to 57.8 ms and transport p95 from 51.9 ms to 4.25 ms. These are main-thread document timings, not whole-editor FPS; native GUI hover/click, Play/Stop and fader undo/redo were exercised in that integration.
+
 ## 1.0.2 — 2026-11-07
 
 Requires NecronomiDOM ≥ 1.1.5: its layout engine is ~6× faster on large documents and inline `transform` writes no longer trigger full relayouts, which is what makes the Dirge mixer meters cheap.

@@ -91,7 +91,7 @@ public sealed class AudioDriver
     private readonly Dictionary<string, StringName> _parameterNames = new();
     private readonly StringName _master = new("Master");
     private LoudnessCapture? _capture;
-    private readonly int _thread = Environment.CurrentManagedThreadId;
+    private readonly int _thread = System.Environment.CurrentManagedThreadId;
     private readonly Dictionary<SpatialRegionId, RegionRoute> _regions = new();
     private readonly List<SpatialRegionId> _withdrawn = new();
 
@@ -176,7 +176,7 @@ public sealed class AudioDriver
 
     private void CheckThread()
     {
-        if (Environment.CurrentManagedThreadId != _thread)
+        if (System.Environment.CurrentManagedThreadId != _thread)
             throw new InvalidOperationException("AudioDriver node lifecycle must run on its scene-tree thread.");
     }
 

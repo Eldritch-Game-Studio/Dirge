@@ -2,7 +2,7 @@
 
 All notable changes to Dirge. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
-## Unreleased
+## 1.0.3 — 2026-11-11
 
 ### Changed
 - Move all CI/CD, including PRs, to local Apple/Linux runners through a main-defined reusable workflow and exact-head approval for reviewed forks. Portable jobs, universal Mac builds, packaging and release run on Apple; Linux acceptance remains native and Windows DLLs cross-build with MinGW ABI/dependency checks. Require both Mac runtime architectures and every debug/release native output, serialize Apple producer work, and explicitly withhold qualification from unapproved PRs. Packaging supports macOS's system Bash and rejects thin/incomplete full-release inputs; Linux diagnostics run directly without `act`.

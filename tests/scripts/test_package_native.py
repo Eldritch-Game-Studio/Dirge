@@ -76,7 +76,7 @@ class NativePackageTests(unittest.TestCase):
                     path.write_bytes(b"test fixture")
                     files.append(path)
                 name = f"libdirge_native.macos.{target}"
-                path = root / "macos" / f"{name}.framework" / f"{name}.dylib"
+                path = root / "macos" / f"{name}.framework" / name
                 path.parent.mkdir(parents=True)
                 path.write_bytes(universal())
                 files.append(path)

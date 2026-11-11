@@ -6,10 +6,14 @@ cd "$(dirname "$0")/.."
 touch native/godot-cpp/.gdignore
 for target in template_debug template_release; do
   (cd native && scons platform=macos target="$target" arch=universal -j"${JOBS:-4}")
-  binary="addons/dirge/bin/macos/libdirge_native.macos.${target}.framework/libdirge_native.macos.${target}.dylib"
-  lipo -verify_arch arm64 x86_64 "$binary"
+  binary="addons/dirge/bin/macos/libdirge_native.macos.${target}.framework/libdirge_native.macos.${target}"
+  for architecture in arm64 x86_64; do
+    lipo "$binary" -verify_arch "$architecture"
+  done
 done
-lipo -verify_arch arm64 x86_64 "$GODOT"
+for architecture in arm64 x86_64; do
+  lipo "$GODOT" -verify_arch "$architecture"
+done
 scripts/fetch-deps.sh
 for architecture in arm64 x86_64; do
   export GODOT_ARCH="$architecture"

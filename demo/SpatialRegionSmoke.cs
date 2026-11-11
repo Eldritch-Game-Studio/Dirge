@@ -19,6 +19,7 @@ internal sealed class SpatialRegionSmoke
     private readonly VoiceId _voiceA;
     private readonly VoiceId _voiceB;
     private readonly VoiceId _oneShot;
+    private readonly VoiceId _pausedDuringStartup;
     private int _next = 1000;
 
     private sealed record Region(SpatialRegionId Id, SubViewport Viewport, Node3D Host, AudioListener3D Listener);
@@ -36,6 +37,10 @@ internal sealed class SpatialRegionSmoke
         Require(Player(_voiceA).GetWorld3D() == _a.Host.GetWorld3D(), "A player not in A world");
         Require(Player(_voiceB).GetWorld3D() == _b.Host.GetWorld3D(), "B player not in B world");
         Require(Player(_voiceA).GetWorld3D() != Player(_voiceB).GetWorld3D(), "same-coordinate voices share a world");
+        _pausedDuringStartup = Next();
+        _driver.Apply(Command(_pausedDuringStartup, _a.Id) with { StartSeconds = 0.25 });
+        _driver.Apply(new VoiceSetPaused(_pausedDuringStartup, true));
+        _driver.Apply(new VoiceSet3D(_pausedDuringStartup, Attributes(_b.Id)));
     }
 
     private Region CreateRegion(int id)
@@ -91,6 +96,13 @@ internal sealed class SpatialRegionSmoke
         try
         {
             Require(_finished.Contains(_oneShot) && _driver.PlayerOf(_oneShot) is null, "natural spatial finish did not release the voice");
+            Require(Player(_pausedDuringStartup).GetWorld3D() == _b.Host.GetWorld3D() &&
+                Player(_pausedDuringStartup).StreamPaused, "pending-start migration lost native pause after physics registration");
+            Require(Math.Abs(Player(_pausedDuringStartup).GetPlaybackPosition() - 0.25) < 0.01,
+                "paused startup advanced the native playback clock");
+            _driver.Apply(new VoiceSetPaused(_pausedDuringStartup, false));
+            Require(!Player(_pausedDuringStartup).StreamPaused, "migrated voice did not resume");
+            _driver.Apply(new VoiceStop(_pausedDuringStartup));
             AudioStreamPlayer3D old = Player(_voiceA);
             Require(_driver.UnregisterSpatialRegion(_a.Id), "A unregister failed");
             Require(_driver.PlayerOf(_voiceA) is null && _finished.Contains(_voiceA), "withdrawal did not finish A");
@@ -133,9 +145,13 @@ internal sealed class SpatialRegionSmoke
             batch.Add(Command(layerB, _a.Id, sync: 42));
             _driver.Apply(batch);
             Require(_driver.PlayerOf(layerA) == _driver.PlayerOf(layerB), "same-world sync no longer groups");
+            _driver.Apply(new VoiceSetPaused(layerA, true));
             _driver.Apply(new VoiceSet3D(layerA, Attributes(_b.Id)));
             Require(Player(layerA).GetWorld3D() == _b.Host.GetWorld3D(), "migrating sync layer not moved");
             Require(Player(layerB).GetWorld3D() == _a.Host.GetWorld3D(), "sync sibling dragged into unrelated world");
+            Require(Player(layerA).StreamPaused && Player(layerB).StreamPaused, "sync split lost native pause state");
+            _driver.Apply(new VoiceSetPaused(layerA, false));
+            Require(!Player(layerA).StreamPaused && Player(layerB).StreamPaused, "split layer resume affected its sibling");
 
             // A listener can exit while its host/viewport is traversing children. Such native slots must be retired,
             // not illegally reparented and later reused after their Godot objects have been freed.

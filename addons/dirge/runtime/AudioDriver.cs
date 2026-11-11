@@ -40,6 +40,8 @@ public sealed class AudioDriver
         public Node Player = null!;
         public bool Spatial;
         public SpatialRegionId Region;
+        // Commanded pause survives native stop/reparent/start and pending physics registration.
+        public bool Paused;
         /// <summary>Voice currently bound (the leading member for a sync slot); -1 when idle so a late <c>finished</c> is ignored.</summary>
         public int Voice = -1;
         /// <summary>Non-null for a synchronized slot; the player's stream.</summary>
@@ -689,6 +691,7 @@ public sealed class AudioDriver
                     break;
                 }
 
+                slot.Paused = paused.Paused;
                 if (slot.Spatial)
                 {
                     ((AudioStreamPlayer3D)slot.Player).StreamPaused = paused.Paused;
@@ -804,6 +807,7 @@ public sealed class AudioDriver
         }
 
         slot ??= Acquire(play.Voice, play.Spatial);
+        slot.Paused = false;
         if (play.Spatial)
         {
             ((AudioStreamPlayer3D)slot.Player).Stop();
@@ -896,6 +900,7 @@ public sealed class AudioDriver
         slot.MemberCount = _group.Count;
         slot.LiveMembers = 0;
         slot.Voice = -1;
+        slot.Paused = false;
         for (int k = 0; k < _group.Count; k++)
         {
             VoicePlay play = _group[k];
@@ -1116,6 +1121,7 @@ public sealed class AudioDriver
 
         slot.Voice = -1;
         slot.LiveMembers = 0;
+        slot.Paused = false;
         if (slot.Spatial)
         {
             var player = (AudioStreamPlayer3D)slot.Player;
@@ -1178,7 +1184,7 @@ public sealed class AudioDriver
         if (slot.Region != attributes.Region)
         {
             float position = player.GetPlaybackPosition();
-            bool paused = player.StreamPaused;
+            bool paused = slot.Paused || player.StreamPaused;
             bool playing = player.Playing;
             if (slot.Sync is not null)
             {
@@ -1205,6 +1211,7 @@ public sealed class AudioDriver
             player.Stop();
             MovePlayer(slot, host);
             slot.Region = attributes.Region;
+            slot.Paused = paused;
             player.GlobalTransform = ToTransform(attributes);
             if (playing || paused) player.Play(position);
             player.StreamPaused = paused;

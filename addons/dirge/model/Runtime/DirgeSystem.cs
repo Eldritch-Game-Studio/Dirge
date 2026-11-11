@@ -201,7 +201,7 @@ public sealed class DirgeSystem
 
     public float GetGlobalParameter(string name) => GlobalParameters.TryGet(name, out ParameterState state) ? state.Value : 0f;
 
-    /// <summary>Listener <paramref name="index"/> in 0..7. Weight 0 disables it. Built-ins use the nearest enabled listener.</summary>
+    /// <summary>Listener index 0..7; weight 0 disables. Built-ins select the nearest enabled listener in the emitter's region, not a weighted mix.</summary>
     public void SetListener(int index, Attributes3D attributes, float weight = 1f)
     {
         if (index < 0 || index >= MaxListeners) throw new ArgumentOutOfRangeException(nameof(index));
@@ -210,17 +210,20 @@ public sealed class DirgeSystem
         _listenerWeights[index] = MathF.Max(0f, weight);
     }
 
-    internal Attributes3D NearestListener(Vector3 position)
+    internal bool TryNearestListener(in Attributes3D emitter, out Attributes3D listener)
     {
         int best = -1;
         float bestDistance = float.PositiveInfinity;
         for (int i = 0; i < MaxListeners; i++)
         {
-            if (_listenerWeights[i] <= 0f) continue;
-            float d = Vector3.DistanceSquared(_listeners[i].Position, position);
+            if (_listenerWeights[i] <= 0f || _listeners[i].Region != emitter.Region) continue;
+            float d = Vector3.DistanceSquared(_listeners[i].Position, emitter.Position);
             if (d < bestDistance) { bestDistance = d; best = i; }
         }
-        return best < 0 ? _listeners[0] : _listeners[best];
+        // Preserve the legacy all-disabled fallback, but never borrow a different region's listener.
+        if (best < 0 && emitter.Region == default && _listeners[0].Region == default) best = 0;
+        listener = best < 0 ? default : _listeners[best];
+        return best >= 0;
     }
 
     // ---- lifecycle -----------------------------------------------------------------------------------------------

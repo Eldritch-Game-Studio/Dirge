@@ -612,7 +612,7 @@ internal sealed class InstrumentState
         if (position.HasValue)
         {
             Attributes3D a = _instance.Attributes;
-            v.Attributes = new Attributes3D(position.Value, a.Velocity, a.Forward, a.Up);
+            v.Attributes = a with { Position = position.Value };
             v.OwnAttributes = true;
         }
         else
@@ -841,7 +841,10 @@ internal sealed class InstrumentState
             }
             v.VolumeDb = eventVolume + ChainVolumeDb + v.RandomVolumeDb + v.FadeDb();
             v.Pitch = eventPitch * ChainPitch * v.RandomPitch;
-            if (v.Spatial && !v.OwnAttributes) v.Attributes = _instance.Attributes;
+            if (v.Spatial)
+                v.Attributes = v.OwnAttributes
+                    ? v.Attributes with { Region = _instance.Attributes.Region }
+                    : _instance.Attributes;
             prev = v;
             v = next;
         }

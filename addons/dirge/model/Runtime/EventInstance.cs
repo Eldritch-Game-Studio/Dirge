@@ -523,10 +523,12 @@ public sealed class EventInstance
     private void WriteBuiltIns()
     {
         if (_builtIns.Length == 0) return;
-        Attributes3D listener = _system.NearestListener(_attributes.Position);
+        bool hasListener = _system.TryNearestListener(_attributes, out Attributes3D listener);
         EventMacros macros = _description.Event.Macros;
         for (int i = 0; i < _builtIns.Length; i++)
-            _builtIns[i].Set(Spatial.Compute(_builtInKinds[i], _attributes, listener, macros.MinDistance, macros.MaxDistance), true);
+            _builtIns[i].Set(hasListener
+                ? Spatial.Compute(_builtInKinds[i], _attributes, listener, macros.MinDistance, macros.MaxDistance)
+                : Spatial.WithoutListener(_builtInKinds[i], _attributes), true);
     }
 
     private void EvaluateParameterInstruments()
@@ -714,8 +716,9 @@ public sealed class EventInstance
     internal double DistanceToNearestListener()
     {
         if (!_description.Is3D) return 0;
-        Attributes3D listener = _system.NearestListener(_attributes.Position);
-        return (listener.Position - _attributes.Position).Length();
+        return _system.TryNearestListener(_attributes, out Attributes3D listener)
+            ? (listener.Position - _attributes.Position).Length()
+            : double.PositiveInfinity;
     }
 
     internal void RaiseSoundPlayed(Voice v)

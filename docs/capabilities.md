@@ -58,7 +58,7 @@ Priority tiers: P0 ships with 1.0, P1 in 1.x, P2 after; `—` is a deliberate no
 | Local and global | `AudioEvent.LocalParameters`, `AudioProject.GlobalParameters` | P0 | Done | |
 | Seek speed (asymmetric), hold | `SeekSpeedUp`, `SeekSpeedDown`, `Hold` | P0 | Done | |
 | Velocity | `EventInstance.GetParameterVelocity` | P1 | Done | |
-| Built-ins: distance, distance normalized, direction, elevation, cone angle, orientation, speed, speed absolute | `BuiltInParameter` | P0 | Done | from the nearest weighted listener |
+| Built-ins: distance, distance normalized, direction, elevation, cone angle, orientation, speed, speed absolute | `BuiltInParameter` | P0 | Done | from the nearest enabled listener in the emitter's spatial region; positive weights enable, not weighted mixing |
 | Automation of any property (linear / smooth / stepped curves) | `AutomationLane`, `Curve`, `CurveShape`, `PropertyRef` | P0 | Done | mixer, event and instrument properties |
 | Modulators: random, AHDSR, LFO (sine / square / triangle / saw / noise, tempo sync), sidechain, autopitch | `RandomModulator`, `AhdsrModulator`, `LfoModulator`, `AutopitchModulator` (`AutopitchMath`); `AudioProject.MixerModulators` (LFO/Random on bus volume/pitch, VCA, effect parameters, evaluated by `MixerState`) | P0 (sidechain P2) | Done | sidechain modulator Planned (P2); mixer LFOs read `RateHz` as Hz (no tempo map) |
 | Conditions on instruments, transitions, logic markers | `TriggerCondition` | P0 | Done | |
@@ -113,6 +113,56 @@ The responsiveness measurements in the Unreleased changelog were collected with 
 ## Runtime API reference
 
 Namespaces: `Dirge.Driver` (`DirgeServer`, `DirgeStats`), `Dirge.Runtime` (model runtime), `Dirge.Project` (authored data). `Attributes3D(Position, Velocity, Forward, Up)` uses `System.Numerics.Vector3`.
+
+#### Explicit spatial worlds (source implementation; runtime qualification required)
+
+`SpatialRegionId(int Value)` identifies a coordinate/world domain, not a seat or mixer. `default`/zero keeps the
+legacy host world. The four-vector `Attributes3D` constructor and deconstruction remain unchanged; use
+`attributes with { Region = region }` or the additional five-argument constructor. Existing `VoicePlay`,
+`VoiceSet3D`, `Set3DAttributes` and `SetListener` signatures are unchanged and carry the region through attributes.
+This is **source compatibility**, not a binary ABI guarantee: rebuild managed consumers of the enlarged value type.
+There are no native ABI or precision changes.
+
+On the scene-tree/main thread, call
+`server.Driver.RegisterSpatialRegion(region, Node3D host, AudioListener3D listener)` for each nonzero region.
+The host and current listener must be live in the **same audio-enabled viewport**, with a current `Camera3D` in
+the same `World3D`. Godot's native spatial player enumerates world cameras before choosing each viewport's listener;
+a listener without a camera is insufficient. Each registered region must use a distinct world, separate from the
+default host world. Registration never creates listeners, rebuilds buses, or duplicates the mixer.
+Use one native listener context per region; extra cameras/audio-enabled viewports sharing that world retain Godot's
+native multi-listener maximum-volume semantics, not the model's nearest-listener selection or a weighted seat mix.
+Do not share a region's World3D with an unrelated view/world. Start each machine-audible event once, not per seat.
+
+Set the same region on the event's attributes and its model listener (`server.System.SetListener`); keep that model
+listener's transform synchronized with the native listener. Positive weight enables a model listener; zero disables it.
+The model never searches another region. Without an eligible listener, nondefault-region distance is maximally far
+(clamped to the authored parameter maximum), normalized distance is 1, relative angles/speed are 0, and absolute
+speed remains the emitter's own speed. Furthest stealing treats it as infinite distance. Legacy region zero retains
+its historical listener-zero fallback only when that listener also belongs to region zero.
+
+Call `UnregisterSpatialRegion(region)` **before** changing/freeing a world or withdrawing a view. It finishes its active
+voices, clears stream/transform/region ownership, and returns players to the host pool. Also disable that region's model
+listeners and stop/release its event instances (particularly persistent/scatter events); model listeners intentionally
+remain engine-free and are not mutated by driver registration. A host/listener tree exit synchronously invalidates the
+route and retires its native slots instead of reparenting while the tree is busy. Invalid/replaced worlds, disabled
+audio viewports, and loss of a current listener/camera are withdrawn before the next command batch (including an empty
+batch). Custom driver users must continue applying batches while idle. Re-register explicitly after withdrawal.
+Unknown nonzero spatial regions finish without fallback playback, including live attribute changes.
+Ordinary stop, natural finish, asset failure, and explicit withdrawal clear prior ownership before pool reuse.
+Do not reparent `PlayerOf` results yourself.
+
+Spatial attribute region changes move ordinary voices through the driver, preserving playback position and pause state;
+native reparent/restart is not promised sample-continuous. Sync groups only combine voices in the same region. Moving one
+sync layer to a different region splits that layer out; remaining layers stay in their world (cross-world layers no longer
+share sample-lock). Nonspatial/UI/music voices ignore region identity and remain shared under the default host.
+Recordings store integer `region` separately from the twelve coordinate floats; absent region loads as zero and default
+command text is unchanged. Replay reproduces model state, not engine host registration: a driver replay needs matching
+live region registrations supplied by the application. Audible-event/rewind deduplication remains application policy.
+
+Coverage to run: `SpatialRegionTests`, `RecordingTests`, and the demo `--smoke` path, which includes real native world
+membership, finish, withdrawal, migration, sync isolation and pool-reuse assertions. These are not evidence of audible
+speaker isolation, mixing quality or multi-world performance until exercised and measured in the target runtime.
+
 
 ### `DirgeServer` (`Node`, autoload)
 

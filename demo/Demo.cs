@@ -22,6 +22,7 @@ public partial class Demo : Node
     private ulong _startMsec;
     private SnapshotInstance? _muffled;
 
+    private SpatialRegionSmoke? _spatialRegions;
     private readonly Dictionary<Type, int> _commandCounts = new();
     private VoiceId? _windVoice;
     private VoiceId? _clickVoice;
@@ -73,6 +74,7 @@ public partial class Demo : Node
             switch (frame)
             {
                 case 0:
+                    _spatialRegions = new SpatialRegionSmoke(_server.Driver, this);
                     _server.StartEvent(DemoProject.WindEvent);
                     break;
                 case 10:
@@ -222,6 +224,16 @@ public partial class Demo : Node
         if (!(ambienceDb <= DemoProject.MuffledAmbienceDb + 1f))
         {
             Fail($"Ambience volume {ambienceDb:F2} dB, expected <= {DemoProject.MuffledAmbienceDb + 1f} dB after Muffled");
+            return;
+        }
+
+        try
+        {
+            _spatialRegions!.Finish();
+        }
+        catch (Exception e)
+        {
+            Fail(e.ToString());
             return;
         }
 

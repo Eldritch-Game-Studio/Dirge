@@ -40,7 +40,7 @@ public sealed class RecordedTick
 /// <c>CreateInstance</c>/<c>StartSnapshot</c> returned it; stored in <see cref="Result"/> on that creating call). Argument
 /// slots are generic: <see cref="Name"/> (event path, parameter, bus, VCA, asset, feedback kind), <see cref="Text"/> (label,
 /// failure reason), <see cref="Value"/> (number), <see cref="Flag"/> (immediate/paused/mute/solo), <see cref="Mode"/>
-/// (<see cref="StopMode"/>, listener index) and <see cref="Vector"/> (<see cref="Attributes3D"/> as 12 floats).
+/// (<see cref="StopMode"/>, listener index), <see cref="Vector"/> (<see cref="Attributes3D"/> as 12 floats) and <see cref="Region"/> (exact integer identity).
 /// </summary>
 public sealed class ApiCall
 {
@@ -54,6 +54,9 @@ public sealed class ApiCall
     public bool Flag { get; set; }
     public int Mode { get; set; }
     public float[]? Vector { get; set; }
+    /// <summary>Spatial region, kept as an integer (never packed into lossy float coordinates). Absent in legacy recordings = 0.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public int Region { get; set; }
 
     internal static float[] Pack(in Attributes3D a) => new[]
     {
@@ -63,14 +66,14 @@ public sealed class ApiCall
         a.Up.X, a.Up.Y, a.Up.Z,
     };
 
-    internal static Attributes3D Unpack(float[]? v)
+    internal static Attributes3D Unpack(float[]? v, int region = 0)
     {
-        if (v is null || v.Length < 12) return Attributes3D.Origin;
+        if (v is null || v.Length < 12) return Attributes3D.Origin with { Region = new SpatialRegionId(region) };
         return new Attributes3D(
             new System.Numerics.Vector3(v[0], v[1], v[2]),
             new System.Numerics.Vector3(v[3], v[4], v[5]),
             new System.Numerics.Vector3(v[6], v[7], v[8]),
-            new System.Numerics.Vector3(v[9], v[10], v[11]));
+            new System.Numerics.Vector3(v[9], v[10], v[11]), new SpatialRegionId(region));
     }
 }
 

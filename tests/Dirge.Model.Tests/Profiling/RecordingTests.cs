@@ -158,6 +158,44 @@ public sealed class RecordingTests
     }
 
     [Test]
+    public void SpatialRegions_RoundTripExactly_AndReplayRegionChanges()
+    {
+        AudioProject project = SessionProject();
+        var system = new DirgeSystem(project, 17);
+        var recorder = new Recorder(system);
+        // Above float's exact integer range: region IDs must never be packed into the coordinate vector.
+        var a = new SpatialRegionId(16777217);
+        var b = new SpatialRegionId(int.MaxValue);
+        system.SetListener(0, Attributes3D.Origin with { Region = a });
+        system.SetListener(1, Attributes3D.Origin with { Region = b });
+        EventInstance shot = system.GetEvent("SFX/Shot").CreateInstance();
+        shot.Set3DAttributes(Attributes3D.Origin with { Region = a });
+        shot.Start();
+        Tick(system);
+        shot.Set3DAttributes(Attributes3D.Origin with { Region = b });
+        Tick(system);
+        Recording recording = recorder.Stop();
+        Recording loaded = RecordingJson.Deserialize(RecordingJson.Serialize(recording));
+        Assert.That(loaded.Ticks[0].Calls.Find(c => c.Method == "Set3DAttributes")!.Region, Is.EqualTo(a.Value));
+        Assert.That(loaded.Ticks[1].Calls.Find(c => c.Method == "Set3DAttributes")!.Region, Is.EqualTo(b.Value));
+        Assert.That(Replayer.Compare(recording, Replayer.Replay(loaded, project)), Is.Null);
+        loaded.Ticks[1].Calls.Find(c => c.Method == "Set3DAttributes")!.Region = a.Value;
+        Assert.That(Replayer.Compare(recording, Replayer.Replay(loaded, project)), Is.Not.Null);
+    }
+
+    [Test]
+    public void LegacyRecordingWithoutRegion_LoadsAsZero_AndKeepsCommandText()
+    {
+        Recording loaded = RecordingJson.Deserialize(
+            """{"ticks":[{"calls":[{"method":"SetListener","vector":[0,0,0,0,0,0,0,0,-1,0,1,0]}]}]}""");
+        Assert.That(loaded.Ticks[0].Calls[0].Region, Is.Zero);
+        Assert.That(RecordingJson.Serialize(loaded), Does.Not.Contain("\"region\""));
+        var legacy = new Attributes3D(Vector3.Zero, Vector3.Zero, new Vector3(0, 0, -1), Vector3.UnitY);
+        Assert.That(CommandText.Format(new VoiceSet3D(new VoiceId(4), legacy)),
+            Is.EqualTo("VoiceSet3D(4, p=[0 0 0] v=[0 0 0] f=[0 0 -1] u=[0 1 0])"));
+    }
+
+    [Test]
     public void Recorder_IgnoresInternalCalls_AndDetachesOnStop()
     {
         var b = new ProjectBuilder();

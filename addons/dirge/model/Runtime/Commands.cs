@@ -10,9 +10,17 @@ public readonly record struct VoiceId(int Value)
     public override string ToString() => $"v{Value}";
 }
 
-/// <summary>3D attributes in engine world space.</summary>
+/// <summary>Application-owned spatial world identity. Zero is the legacy host world.</summary>
+public readonly record struct SpatialRegionId(int Value);
+
+/// <summary>3D attributes in region-local world space; omitted region preserves the legacy host world.</summary>
 public readonly record struct Attributes3D(Vector3 Position, Vector3 Velocity, Vector3 Forward, Vector3 Up)
 {
+    public SpatialRegionId Region { get; init; }
+
+    public Attributes3D(Vector3 position, Vector3 velocity, Vector3 forward, Vector3 up, SpatialRegionId region)
+        : this(position, velocity, forward, up) => Region = region;
+
     public static readonly Attributes3D Origin = new(Vector3.Zero, Vector3.Zero, -Vector3.UnitZ, Vector3.UnitY);
 }
 

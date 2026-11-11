@@ -45,6 +45,14 @@ done < <(
     -not -path 'addons/dirge/CHANGELOG.md' \
     -not -path 'addons/dirge/THIRD_PARTY_NOTICES.md' \
     -not -path '*/obj/*' \
+    -not -path '*/.git/*' \
+    -not -path '*/.github/*' \
+    -not -path '*/.godot/*' \
+    -not -path '*/__MACOSX/*' \
+    -not -path '*/__pycache__/*' \
+    -not -name '.gitignore' \
+    -not -name '.gitattributes' \
+    -not -name 'Thumbs.db' \
     -not -name '.DS_Store' \
     -not -name '*.import.tmp' | LC_ALL=C sort
 )

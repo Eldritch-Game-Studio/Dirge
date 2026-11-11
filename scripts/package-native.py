@@ -76,6 +76,13 @@ def validate_archive(archive, revision=None, partial=False):
         if any(not name.startswith("addons/dirge/") or ".." in PurePosixPath(name).parts
                for name in names):
             raise ValueError("all package members must be inside addons/dirge/")
+        for name in names:
+            path = PurePosixPath(name)
+            if path.suffix.lower() in {".exe", ".nupkg", ".snupkg"}:
+                raise ValueError(f"standalone executable or NuGet package is not an addon asset: {name}")
+            if set(path.parts) & {".git", ".github", ".godot", ".gitignore", ".gitattributes",
+                                  "Thumbs.db", ".DS_Store", "__MACOSX", "__pycache__", "obj"}:
+                raise ValueError(f"unnecessary package member: {name}")
         for document in ("LICENSE", "README.md", "CHANGELOG.md", "THIRD_PARTY_NOTICES.md"):
             name = f"addons/dirge/{document}"
             if name not in names or not package.read(name):

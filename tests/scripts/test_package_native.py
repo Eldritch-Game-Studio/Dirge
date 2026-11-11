@@ -139,7 +139,10 @@ class ArchivePackageTests(unittest.TestCase):
             (self.root / document).write_text(f"repository {document}\n")
             (self.root / "addons/dirge" / document).write_text("short addon copy\n")
         self.excluded = ("model/bin/generated.dll", "model/obj/generated.cs",
-                         "runtime/obj/generated.cs", ".DS_Store", "sample.import.tmp")
+                         "runtime/obj/generated.cs", ".DS_Store", "sample.import.tmp",
+                         ".git/config", ".github/workflows/ci.yml", ".godot/editor/cache",
+                         ".gitignore", ".gitattributes", "Thumbs.db", "__MACOSX/._resource",
+                         "__pycache__/generated.pyc")
         for relative in (*self.excluded, "runtime/source.cs", "runtime/source.cs.uid"):
             path = self.root / "addons/dirge" / relative
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -240,6 +243,14 @@ class ArchivePackageTests(unittest.TestCase):
                     package_native.validate_archive(archive, self.revision)
                 archive = self.rewrite_archive(omit=(f"addons/dirge/{document}",))
                 with self.assertRaisesRegex(ValueError, "missing package document"):
+                    package_native.validate_archive(archive, self.revision)
+
+    def test_archive_rejects_store_prohibited_payloads_and_junk(self):
+        for name in ("tool.exe", "library.nupkg", "symbols.snupkg", "tool.EXE",
+                     ".gitignore", "Thumbs.db", "__MACOSX/._resource", ".github/workflows/ci.yml"):
+            with self.subTest(name=name):
+                archive = self.rewrite_archive(extra={f"addons/dirge/{name}": b"unwanted"})
+                with self.assertRaisesRegex(ValueError, "not an addon asset|unnecessary package member"):
                     package_native.validate_archive(archive, self.revision)
 
     def test_archive_keeps_architecture_and_qualification_checks(self):

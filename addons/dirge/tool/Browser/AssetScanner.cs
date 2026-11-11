@@ -91,7 +91,7 @@ public sealed class AssetScanner
     private void Walk(string directory, AssetNode node)
     {
         using DirAccess? dir = DirAccess.Open(directory);
-        if (dir is null) return;
+        if (dir is null || dir.FileExists(".gdignore")) return;
         dir.IncludeHidden = false;
         dir.IncludeNavigational = false;
         if (dir.ListDirBegin() != Error.Ok) return;
@@ -99,6 +99,7 @@ public sealed class AssetScanner
         var files = new List<string>();
         for (string name = dir.GetNext(); name.Length > 0; name = dir.GetNext())
         {
+            if (dir.IsLink(name)) continue;
             if (dir.CurrentIsDir())
             {
                 if (name.StartsWith('.') || Array.IndexOf(SkippedFolders, name) >= 0) continue;

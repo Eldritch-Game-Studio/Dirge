@@ -225,8 +225,52 @@ public partial class Demo : Node
             return;
         }
 
+        try
+        {
+            VerifyAssetScanner();
+        }
+        catch (Exception error)
+        {
+            Fail($"asset scanner: {error.Message}");
+            return;
+        }
+
         GD.Print("DIRGE_SMOKE PASS");
         GetTree().Quit(0);
+    }
+
+    private static void VerifyAssetScanner()
+    {
+        string resource = "res://scanner-smoke-" + Guid.NewGuid().ToString("N");
+        string directory = ProjectSettings.GlobalizePath(resource);
+        string external = System.IO.Directory.CreateTempSubdirectory("dirge-scanner-").FullName;
+        System.IO.Directory.CreateDirectory(directory);
+        try
+        {
+            System.IO.File.WriteAllBytes(directory + "/visible.wav", Array.Empty<byte>());
+            System.IO.Directory.CreateDirectory(directory + "/ignored");
+            System.IO.File.WriteAllText(directory + "/ignored/.gdignore", "");
+            System.IO.File.WriteAllBytes(directory + "/ignored/hidden.wav", Array.Empty<byte>());
+            if (!OperatingSystem.IsWindows())
+            {
+                System.IO.File.WriteAllBytes(external + "/outside.wav", Array.Empty<byte>());
+                System.IO.Directory.CreateSymbolicLink(directory + "/linked", external);
+                System.IO.File.CreateSymbolicLink(directory + "/linked.wav", external + "/outside.wav");
+            }
+
+            var scanner = new Dirge.Tool.Browser.AssetScanner();
+            scanner.Scan();
+            var found = new List<string>();
+            foreach (string path in scanner.Files)
+                if (path.StartsWith(resource + "/", StringComparison.Ordinal)) found.Add(path);
+            if (found.Count != 1 || found[0] != resource + "/visible.wav")
+                throw new InvalidOperationException("Ignored or linked audio escaped the scan boundary: " + string.Join(", ", found));
+        }
+        finally
+        {
+            System.IO.Directory.Delete(directory, true);
+            System.IO.Directory.Delete(external, true);
+        }
     }
 
     private void Fail(string reason)

@@ -151,13 +151,21 @@ Unknown nonzero spatial regions finish without fallback playback, including live
 Ordinary stop, natural finish, asset failure, and explicit withdrawal clear prior ownership before pool reuse.
 Do not reparent `PlayerOf` results yourself.
 
-Spatial attribute region changes move ordinary voices through the driver, preserving playback position and pause state;
-native reparent/restart is not promised sample-continuous. Sync groups only combine voices in the same region. Moving one
+Spatial attribute region changes move ordinary voices through the driver, retaining playback position and commanded pause
+across native restart; native reparent/restart is not promised sample-continuous. Sync groups only combine voices in the same region. Moving one
 sync layer to a different region splits that layer out; remaining layers stay in their world (cross-world layers no longer
 share sample-lock). Nonspatial/UI/music voices ignore region identity and remain shared under the default host.
 Recordings store integer `region` separately from the twelve coordinate floats; absent region loads as zero and default
 command text is unchanged. Replay reproduces model state, not engine host registration: a driver replay needs matching
 live region registrations supplied by the application. Audible-event/rewind deduplication remains application policy.
+
+**Native pause prerequisite:** the engine must persist a spatial player's pause request until its deferred physics
+playback registration and start that playback paused. A native backend that only forwards pause to already-registered
+playbacks loses same-frame play/pause and restart/pause requests. Dirge retains command intent across migration and
+sync splitting, but cannot repair missing native persistence through the public managed audio API. Such a backend
+fails the native smoke contract and is not qualified for paused migration; do not replace native pause checks with
+managed state echoes or defer retries that could emit an unintended audio block. The smoke also checks the paused
+playback clock after multiple physics ticks, resume, and independent pause state after a sync split.
 
 Coverage to run: `SpatialRegionTests`, `RecordingTests`, and the demo `--smoke` path, which includes real native world
 membership, finish, withdrawal, migration, sync isolation and pool-reuse assertions. These are not evidence of audible

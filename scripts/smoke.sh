@@ -1,15 +1,22 @@
 #!/usr/bin/env bash
 # Headless smoke: import the project, build, run the demo scene and the sandbox scene in smoke mode with the Dummy audio driver.
-# Usage: GODOT=/path/to/Godot_v4.7.2-stable_mono_linux.x86_64 scripts/smoke.sh   (or have `godot` on PATH)
+# Usage: GODOT=/path/to/the/stock/Godot.NET/executable scripts/smoke.sh
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
 GODOT="${GODOT:-$(command -v godot || true)}"
 if [[ -z "$GODOT" || ! -x "$GODOT" ]]; then
-  echo "smoke: Godot .NET editor binary not found (set GODOT=/path/to/Godot_v4.7.2-stable_mono_linux.x86_64 or put 'godot' on PATH)" >&2
+  echo "smoke: Godot .NET editor binary not found (set GODOT to the stock executable or put 'godot' on PATH)" >&2
   exit 2
 fi
+
+godot=("$GODOT")
+if [[ -n "${GODOT_ARCH:-}" ]]; then
+  godot=(/usr/bin/arch "-$GODOT_ARCH" "$GODOT")
+fi
+log_dir="${DIRGE_SMOKE_LOG_DIR:-${TMPDIR:-/tmp}/dirge-smoke}"
+mkdir -p "$log_dir"
 
 if [[ ! -d addons/necronomidom ]]; then
   scripts/fetch-deps.sh
@@ -28,9 +35,9 @@ dotnet build Dirge.slnx -nologo -v q
 
 echo "smoke: godot --import"
 # A first import of a fresh checkout can abort in editor shutdown after the assets are already imported; retry once.
-if ! "$GODOT" --headless --audio-driver Dummy --path . --import >/tmp/dirge-import.log 2>&1; then
-  "$GODOT" --headless --audio-driver Dummy --path . --import >/tmp/dirge-import.log 2>&1 || {
-    echo "smoke: import failed"; cat /tmp/dirge-import.log; exit 1; }
+if ! "${godot[@]}" --headless --audio-driver Dummy --path . --import >"$log_dir/import.log" 2>&1; then
+  "${godot[@]}" --headless --audio-driver Dummy --path . --import >"$log_dir/import.log" 2>&1 || {
+    echo "smoke: import failed"; cat "$log_dir/import.log"; exit 1; }
 fi
 # The plugin must leave an existing project's settings as authored (Godot normalizes project.godot on every save).
 if git rev-parse --is-inside-work-tree >/dev/null 2>&1 && ! git diff --quiet -- project.godot; then
@@ -38,11 +45,11 @@ if git rev-parse --is-inside-work-tree >/dev/null 2>&1 && ! git diff --quiet -- 
 fi
 echo "smoke: run demo"
 set +e
-"$GODOT" --headless --audio-driver Dummy --path . res://demo/demo.tscn -- --smoke 2>&1 | tee /tmp/dirge-smoke.log
+"${godot[@]}" --headless --audio-driver Dummy --path . res://demo/demo.tscn -- --smoke 2>&1 | tee "$log_dir/demo.log"
 status=${PIPESTATUS[0]}
 set -e
 
-if grep -q '^DIRGE_SMOKE PASS' /tmp/dirge-smoke.log && [[ $status -eq 0 ]]; then
+if grep -q '^DIRGE_SMOKE PASS' "$log_dir/demo.log" && [[ $status -eq 0 ]]; then
   echo "smoke: demo PASS"
 else
   echo "smoke: demo FAIL (exit $status)"
@@ -51,11 +58,11 @@ fi
 
 echo "smoke: run sandbox"
 set +e
-"$GODOT" --headless --audio-driver Dummy --path . res://demo/sandbox/sandbox.tscn -- --smoke 2>&1 | tee /tmp/dirge-sandbox-smoke.log
+"${godot[@]}" --headless --audio-driver Dummy --path . res://demo/sandbox/sandbox.tscn -- --smoke 2>&1 | tee "$log_dir/sandbox.log"
 status=${PIPESTATUS[0]}
 set -e
 
-if grep -q '^SANDBOX_SMOKE PASS' /tmp/dirge-sandbox-smoke.log && [[ $status -eq 0 ]]; then
+if grep -q '^SANDBOX_SMOKE PASS' "$log_dir/sandbox.log" && [[ $status -eq 0 ]]; then
   echo "smoke: sandbox PASS"
 else
   echo "smoke: sandbox FAIL (exit $status)"

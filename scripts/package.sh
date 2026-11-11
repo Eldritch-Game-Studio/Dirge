@@ -26,13 +26,22 @@ for required in LICENSE README.md CHANGELOG.md addons/dirge/plugin.cfg; do
   [[ -f "$required" ]] || { echo "package: missing $required" >&2; exit 1; }
 done
 
+# A normal release must satisfy every GDExtension mapping. Only an explicitly
+# labelled diagnostic may omit platforms; never publish it as a full package.
+if [[ "$suffix" != "-partial" ]]; then
+  python3 scripts/package-native.py
+fi
+
 name="Dirge-v${version}${suffix}"
 out="dist/${name}.zip"
 mkdir -p dist
 rm -f "$out"
 
 # Build the file list explicitly so the exclusions are auditable (zip -x globbing is anchor-sensitive).
-mapfile -t files < <(
+files=()
+while IFS= read -r file; do
+  files+=("$file")
+done < <(
   find addons/dirge -type f \
     -not -path 'addons/dirge/model/bin/*' \
     -not -path '*/obj/*' \
@@ -45,7 +54,7 @@ mapfile -t files < <(
 zip -X -q "$out" "${files[@]}"
 
 count=${#files[@]}
-size=$(stat -c %s "$out")
+size=$(wc -c < "$out")
 printf 'package: %s — %d files, %d bytes (%d KiB)\n' "$out" "$count" "$size" "$(( (size + 1023) / 1024 ))"
 if [[ -d addons/dirge/bin ]]; then
   echo "package: native binaries:"

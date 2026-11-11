@@ -4,6 +4,9 @@ All notable changes to Dirge. The format follows [Keep a Changelog](https://keep
 
 ## Unreleased
 
+### Changed
+- Move all CI/CD, including PRs, to local Apple/Linux runners through a main-defined reusable workflow and exact-head approval for reviewed forks. Portable jobs, universal Mac builds, packaging and release run on Apple; Linux acceptance remains native and Windows DLLs cross-build with MinGW ABI/dependency checks. Require both Mac runtime architectures and every debug/release native output, serialize Apple producer work, and explicitly withhold qualification from unapproved PRs. Packaging supports macOS's system Bash and rejects thin/incomplete full-release inputs; Linux diagnostics run directly without `act`.
+
 ### Fixed
 - Drive runtime audio from a monotonic wall clock, resetting on load and pause/disable, rather than the engine's smoothed/scaled frame delta. Starts and seeks exclude time before their mutation boundary without shortening other instances' ticks; native voice positions, quantized starts and profiler replay preserve that boundary. Engine-free callers retain deterministic tick-boundary timing unless they provide the optional `DirgeSystem` driver clock.
 

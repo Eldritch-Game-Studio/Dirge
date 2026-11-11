@@ -269,13 +269,21 @@ cd Dirge
 scripts/fetch-deps.sh                  # NecronomiDOM into addons/necronomidom
 dotnet build Dirge.slnx                # model, demo, tests, validate CLI
 native/build.sh                        # Linux x86_64 debug + release → addons/dirge/bin/linux-x64/
-scripts/package.sh                     # dist/Dirge-v<version>.zip
+scripts/package.sh --suffix -partial   # Linux-only diagnostic; a full ZIP requires all native targets
 ```
 
-Other native platforms: `cd native && scons platform=windows target=template_release arch=x86_64` or
-`scons platform=macos target=template_release arch=universal`. `scripts/ci-local.sh` runs the GitHub workflow with
-`act`. Tagged `v*` pushes build the native libraries on Linux, Windows and macOS, assemble the ZIP and publish a
-GitHub release.
+Other native platforms: from `native/`, run `scons platform=windows target=<target> arch=x86_64` or
+`scons platform=macos target=<target> arch=universal` for **both** `template_debug` and `template_release`.
+`scripts/package.sh` requires every registered native library and checks that both Mac frameworks contain
+ARM64 and x86_64 slices, plus a source/hash-matched Proton qualification receipt for both Windows DLLs.
+`scripts/ci-local.sh` runs Linux-only diagnostics directly with local tools.
+Tagged `v*` pushes publish only after Linux smoke/native builds, Windows cross-builds and stock-Windows-Godot
+demo/sandbox/native smoke under official Proton, portable tests/validation, and both Mac runtime architectures
+pass. Proton is compatibility coverage, **not native Windows/MSVC qualification** (see `CONTRIBUTING.md`).
+Portable jobs, universal Mac builds, packaging and release use the
+local `[self-hosted, macOS, ARM64, eldritch-apple]` runner. Linux jobs and Windows MinGW cross-builds use
+`[self-hosted, Linux, X64, eldritch-linux]`; every CI/CD job is local, with no hosted fallback.
+PR execution requires the main-defined admission gate, with exact-head manual approval for reviewed forks.
 
 ## Verification
 
@@ -287,6 +295,12 @@ GODOT=/path/to/Godot_v4.7.2-stable_mono_linux.x86_64 scripts/smoke.sh
 The smoke run imports and builds the project, then runs the demo and the sandbox headless with the Dummy audio driver:
 it asserts on the applied command stream and `AudioServer` state (`DIRGE_SMOKE PASS`), then records, replays and
 compares a sandbox profiler recording (`SANDBOX_SMOKE PASS`). `GODOT` may be omitted when `godot` is on `PATH`.
+
+On macOS, set `GODOT` to `Godot_mono.app/Contents/MacOS/Godot`. CI runs the demo, sandbox and native
+send/return scene on ARM64 and on x86_64 under Rosetta with matching .NET 8 runtimes. Native/managed work on
+the shared Apple host runs through `python3 scripts/apple-run.py <command>`, which holds the foreground
+`$HOME/.local/state/eldritch-macos/producer.lock` also used by engine/game workers. See
+[`CONTRIBUTING.md`](CONTRIBUTING.md) for runner prerequisites and the untrusted-PR policy.
 
 ## License
 

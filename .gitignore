@@ -5,7 +5,7 @@ obj/
 .vs/
 .idea/
 TestResults/
-/scripts/__pycache__/
+__pycache__/
 /dist/
 
 # Dependency installed by scripts/fetch-deps.sh (NecronomiDOM release ZIP); not vendored.

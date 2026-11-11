@@ -1,0 +1,339 @@
+name: Local qualification
+
+# Runner groups must allow only this file at refs/heads/main, never caller workflows.
+on:
+  workflow_call:
+    inputs:
+      partial:
+        type: boolean
+        default: false
+      approved_pr:
+        type: string
+        default: ''
+      approved_head:
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: local-ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || format('run-{0}', github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  GODOT_VERSION: 4.7.2
+  DOTNET_NOLOGO: '1'
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  trust:
+    # Trusted inline definition only: never checkout or execute PR source here.
+    runs-on: [self-hosted, Linux, X64, eldritch-linux]
+    outputs:
+      repository: ${{ steps.source.outputs.repository }}
+      revision: ${{ steps.source.outputs.revision }}
+      runner: ${{ steps.source.outputs.runner }}
+      partial: ${{ steps.source.outputs.partial }}
+    steps:
+      - id: source
+        uses: actions/github-script@v7
+        env:
+          APPROVED_PR: ${{ inputs.approved_pr }}
+          APPROVED_HEAD: ${{ inputs.approved_head }}
+          PARTIAL: ${{ inputs.partial }}
+        with:
+          script: |
+            const expected = 'Eldritch-Game-Studio/Dirge';
+            if (`${context.repo.owner}/${context.repo.repo}` !== expected)
+              throw new Error('This producer accepts only the Dirge repository.');
+            const permission = await github.rest.repos.getCollaboratorPermissionLevel({
+              ...context.repo, username: context.actor
+            });
+            if (!['admin', 'maintain', 'write'].includes(permission.data.permission))
+              throw new Error('A repository collaborator must authorize local producer execution.');
+            let repository = expected;
+            let revision = context.sha;
+            let partial = false;
+            if (context.eventName === 'pull_request') {
+              const number = context.payload.pull_request.number;
+              const {data: pr} = await github.rest.pulls.get({...context.repo, pull_number: number});
+              if (pr.head.repo?.full_name !== expected || pr.head.repo.fork || context.actor === 'dependabot[bot]')
+                throw new Error('Untrusted PR: review it, then dispatch CI on main with approved_pr and its exact approved_head SHA. No PR source was executed.');
+              if (pr.head.sha !== context.payload.pull_request.head.sha)
+                throw new Error('PR head changed; run qualification for the current head.');
+              revision = pr.head.sha;
+            } else if (context.eventName === 'workflow_dispatch') {
+              if (context.ref !== 'refs/heads/main')
+                throw new Error('Manual approval must use the main workflow definition.');
+              partial = process.env.PARTIAL === 'true';
+              if (process.env.APPROVED_PR) {
+                if (!/^[1-9][0-9]*$/.test(process.env.APPROVED_PR) || !/^[0-9a-f]{40}$/.test(process.env.APPROVED_HEAD))
+                  throw new Error('Approval requires a PR number and exact reviewed 40-character head SHA.');
+                const {data: pr} = await github.rest.pulls.get({
+                  ...context.repo, pull_number: Number(process.env.APPROVED_PR)
+                });
+                if (pr.state !== 'open' || pr.head.sha !== process.env.APPROVED_HEAD || !pr.head.repo)
+                  throw new Error('Reviewed PR head is unavailable, closed, or changed; approval is not transferable.');
+                repository = pr.head.repo.full_name;
+                revision = pr.head.sha;
+                core.notice(`Explicit approval by ${context.actor}: ${repository}@${revision} (PR #${pr.number})`);
+              } else if (process.env.APPROVED_HEAD) {
+                throw new Error('approved_head requires approved_pr.');
+              }
+            } else if (context.eventName !== 'push' || !(context.ref === 'refs/heads/main' || context.ref.startsWith('refs/tags/v'))) {
+              throw new Error('Unsupported producer event/ref.');
+            }
+            core.setOutput('repository', repository);
+            core.setOutput('revision', revision);
+            core.setOutput('partial', String(partial));
+            core.setOutput('runner', JSON.stringify(partial
+              ? ['self-hosted', 'Linux', 'X64', 'eldritch-linux']
+              : ['self-hosted', 'macOS', 'ARM64', 'eldritch-apple']));
+
+  test:
+    needs: trust
+    runs-on: ${{ fromJSON(needs.trust.outputs.runner) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ needs.trust.outputs.repository }}
+          ref: ${{ needs.trust.outputs.revision }}
+          persist-credentials: false
+      - run: python3 scripts/apple-run.py dotnet test tests/Dirge.Model.Tests -nologo
+      - run: python3 scripts/apple-run.py python3 -m unittest discover -s tests/scripts -v
+
+  validate:
+    needs: trust
+    runs-on: ${{ fromJSON(needs.trust.outputs.runner) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ needs.trust.outputs.repository }}
+          ref: ${{ needs.trust.outputs.revision }}
+          persist-credentials: false
+      - run: python3 scripts/apple-run.py bash scripts/validate.sh
+
+  smoke:
+    # Linux stock-Godot acceptance remains a separate OS-specific oracle.
+    needs: [trust, native-linux]
+    runs-on: [self-hosted, Linux, X64, eldritch-linux]
+    steps:
+      - name: Select isolated smoke log directory
+        run: echo "DIRGE_SMOKE_LOG_DIR=$RUNNER_TEMP/dirge-smoke-linux" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ needs.trust.outputs.repository }}
+          ref: ${{ needs.trust.outputs.revision }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-linux
+          path: addons/dirge/bin/
+      - name: Cache stock Godot .NET
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/godot-zip
+          key: godot-${{ env.GODOT_VERSION }}-mono-linux-x86_64
+      - run: scripts/install-godot.sh
+      - run: scripts/fetch-deps.sh
+      - run: scripts/smoke.sh
+      - name: Native runtime smoke
+        run: |
+          "$GODOT" --headless --audio-driver Dummy --path . res://native/tests/sendreturn.tscn 2>&1 | tee "$DIRGE_SMOKE_LOG_DIR/native.log"
+          grep -q '^NATIVE_TEST PASS' "$DIRGE_SMOKE_LOG_DIR/native.log"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-logs-linux
+          path: ${{ env.DIRGE_SMOKE_LOG_DIR }}
+          if-no-files-found: ignore
+
+  native-linux:
+    needs: trust
+    runs-on: [self-hosted, Linux, X64, eldritch-linux]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ needs.trust.outputs.repository }}
+          ref: ${{ needs.trust.outputs.revision }}
+          submodules: recursive
+          persist-credentials: false
+      - id: native-pin
+        run: echo "revision=$(git rev-parse HEAD:native/godot-cpp)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        with:
+          path: |
+            native/.sconsign.dblite
+            native/godot-cpp/bin
+            native/godot-cpp/gen
+            native/godot-cpp/src/**/*.o
+          key: godot-cpp-local-linux-${{ steps.native-pin.outputs.revision }}-${{ hashFiles('native/SConstruct', 'native/build.sh') }}
+      - run: native/build.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-linux
+          path: addons/dirge/bin/
+          if-no-files-found: error
+
+  native-windows:
+    name: Windows x64 cross-build + Proton compatibility
+    needs: trust
+    if: needs.trust.outputs.partial != 'true'
+    runs-on: [self-hosted, Linux, X64, eldritch-linux]
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ needs.trust.outputs.repository }}
+          ref: ${{ needs.trust.outputs.revision }}
+          submodules: recursive
+          persist-credentials: false
+      - id: native-pin
+        run: echo "revision=$(git rev-parse HEAD:native/godot-cpp)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        with:
+          path: |
+            native/.sconsign.dblite
+            native/godot-cpp/bin
+            native/godot-cpp/gen
+            native/godot-cpp/src/**/*.o
+          key: godot-cpp-local-mingw-${{ steps.native-pin.outputs.revision }}-${{ hashFiles('native/SConstruct', 'scripts/windows-native.sh') }}
+      - name: Cross-build Windows x64 debug/release and inspect the PE ABI
+        run: scripts/windows-native.sh
+      - name: Stock Windows Godot.NET under official Proton (not native Windows)
+        env:
+          DIRGE_PROTON_LOG_DIR: ${{ runner.temp }}/dirge-smoke-windows-proton
+        run: timeout --signal=TERM --kill-after=30s 40m python3 scripts/windows-proton.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-logs-windows-proton
+          path: ${{ runner.temp }}/dirge-smoke-windows-proton
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-windows
+          path: addons/dirge/bin/
+          if-no-files-found: error
+
+  native-macos:
+    needs: trust
+    if: needs.trust.outputs.partial != 'true'
+    runs-on: [self-hosted, macOS, ARM64, eldritch-apple]
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ needs.trust.outputs.repository }}
+          ref: ${{ needs.trust.outputs.revision }}
+          submodules: recursive
+          persist-credentials: false
+      - id: native-pin
+        run: echo "revision=$(git rev-parse HEAD:native/godot-cpp)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        with:
+          path: |
+            native/.sconsign.dblite
+            native/godot-cpp/bin
+            native/godot-cpp/gen
+            native/godot-cpp/src/**/*.o
+          key: godot-cpp-local-macos-universal-clt27.2-scons4.10.1-${{ steps.native-pin.outputs.revision }}-${{ hashFiles('native/SConstruct', 'scripts/apple-native.sh') }}
+      - name: Cache stock Godot .NET
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/godot-zip
+          key: godot-${{ env.GODOT_VERSION }}-mono-macos-universal
+      - run: scripts/install-godot.sh
+      - name: Build universal libraries and qualify ARM64 and Rosetta runtimes
+        run: python3 scripts/apple-run.py bash scripts/apple-native.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-logs-macos
+          path: ${{ runner.temp }}/dirge-smoke-*
+          if-no-files-found: ignore
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-macos
+          path: addons/dirge/bin/
+          if-no-files-found: error
+
+  package:
+    needs: [trust, test, validate, smoke, native-linux, native-windows, native-macos]
+    # Every full target is mandatory. Only explicit manual diagnostics may omit any.
+    if: ${{ !cancelled() && needs.trust.result == 'success' && needs.test.result == 'success' && needs.validate.result == 'success' && needs.smoke.result == 'success' && needs.native-linux.result == 'success' && ((needs.native-windows.result == 'success' && needs.native-macos.result == 'success') || needs.trust.outputs.partial == 'true') }}
+    runs-on: ${{ fromJSON(needs.trust.outputs.runner) }}
+    outputs:
+      name: ${{ steps.zip.outputs.name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ needs.trust.outputs.repository }}
+          ref: ${{ needs.trust.outputs.revision }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: native-*
+          path: addons/dirge/bin/
+          merge-multiple: true
+      - name: Assemble validated addon ZIP
+        id: zip
+        env:
+          PARTIAL: ${{ needs.trust.outputs.partial }}
+        run: |
+          if [[ "$PARTIAL" = true ]]; then
+            python3 scripts/apple-run.py bash scripts/package.sh --suffix -partial
+          else
+            python3 scripts/apple-run.py bash scripts/package.sh
+          fi
+          files=(dist/Dirge-v*.zip)
+          [[ ${#files[@]} = 1 && -f "${files[0]}" ]]
+          echo "name=$(basename "${files[0]}" .zip)" >> "$GITHUB_OUTPUT"
+          echo "path=${files[0]}" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.zip.outputs.name }}
+          path: ${{ steps.zip.outputs.path }}
+          if-no-files-found: error
+
+  qualification:
+    needs: [trust, test, validate, smoke, native-linux, native-windows, native-macos, package]
+    if: always()
+    runs-on: [self-hosted, Linux, X64, eldritch-linux]
+    steps:
+      - env:
+          RESULTS: ${{ toJSON(needs) }}
+          TRUST: ${{ needs.trust.result }}
+          PACKAGE: ${{ needs.package.result }}
+        run: |
+          printf '%s\n' "$RESULTS"
+          if [[ "$TRUST" != success ]]; then
+            echo '::error::Local qualification withheld: source requires an internal collaborator or explicit reviewed-head manual approval. No untrusted source was executed.'
+            exit 1
+          fi
+          [[ "$PACKAGE" = success ]]
+
+  release:
+    needs: [trust, package, qualification]
+    if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && needs.trust.outputs.partial != 'true' && needs.qualification.result == 'success' }}
+    runs-on: [self-hosted, macOS, ARM64, eldritch-apple]
+    permissions:
+      contents: write
+    steps:
+      # No checkout or build: publication credentials never enter build steps.
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.package.outputs.name }}
+          path: ${{ runner.temp }}/dirge-release-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ runner.temp }}/dirge-release-${{ github.run_id }}-${{ github.run_attempt }}/${{ needs.package.outputs.name }}.zip
+          fail_on_unmatched_files: true
+          generate_release_notes: true

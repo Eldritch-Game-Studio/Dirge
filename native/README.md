@@ -44,7 +44,24 @@ Output: `addons/dirge/bin/linux-x64/libdirge_native.linux.template_{debug,releas
 (`compatibility_minimum = 4.7`; entries for linux/windows x86_64 and macOS). The
 SConstruct compiles owned sources with `-Wall -Wextra -Werror` (MSVC: `/W4 /WX`) and
 includes godot-cpp as system headers (`-isystem` / `/external:I`). Other platforms:
-`scons platform=windows|macos target=template_release` from `native/`.
+`scons platform=windows target=<target> arch=x86_64` or
+`scons platform=macos target=<target> arch=universal` from `native/`, for both
+`template_debug` and `template_release`. A standalone release requires every configuration.
+
+Mac CI runs on the local `eldritch-apple` ARM64 runner, with no hosted Mac dependency.
+`python3 scripts/apple-run.py bash scripts/apple-native.sh` holds the shared producer lock,
+builds both universal frameworks, verifies ARM64/x86_64 slices and runs stock-Godot .NET smoke
+on both architectures (Intel via Rosetta). It requires `GODOT` and `RUNNER_TEMP`; see
+[`CONTRIBUTING.md`](../CONTRIBUTING.md) for the .NET/toolchain paths. Linux native build/smoke
+and Windows MinGW cross-build qualification use the local `eldritch-linux` runner.
+`scripts/windows-native.sh` builds both Windows x64 configurations with static C++ runtimes and
+checks PE architecture, the native entrypoint export and missing MinGW runtime dependencies.
+`python3 scripts/windows-proton.py` then loads each actual debug/release DLL using matching, upstream-digest-
+verified stock Windows Godot .NET under official Proton 11. Existing demo, sandbox and native
+send/return/convolution assertions must pass with zero process exits; packaging checks the resulting
+source/DLL-bound receipt. The disposable editor mapping explicitly selects the release DLL for its second
+pass. This is compatibility coverage, not native Windows/MSVC or release-export-template execution.
+See `CONTRIBUTING.md` for the bounded command, isolated-prefix behavior and evidence locations.
 
 `build.sh` drops an untracked `.gdignore` into `native/godot-cpp` (listed in the
 submodule's `info/exclude`) so the Godot editor does not import godot-cpp's own test

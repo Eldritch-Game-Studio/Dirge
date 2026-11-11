@@ -58,7 +58,7 @@ def validate(root, revision=None):
             if not path.is_file() or not path.stat().st_size:
                 raise ValueError(f"missing native library: {path}")
         name = f"libdirge_native.macos.{target}"
-        path = root / "macos" / f"{name}.framework" / f"{name}.dylib"
+        path = root / "macos" / f"{name}.framework" / name
         if not path.is_file():
             raise ValueError(f"missing native library: {path}")
         universal_architectures(path.read_bytes())

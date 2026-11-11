@@ -102,6 +102,7 @@ The recordings use the stock Godot 4.7.2 .NET editor with Forward+ rendering; ca
 
 1. Download `Dirge-v<version>.zip` from the [latest release](https://github.com/Eldritch-Game-Studio/Dirge/releases/latest)
    and copy its `addons/dirge/` folder into your project.
+   The ZIP keeps its README, license, changelog and third-party notices inside `addons/dirge/`; it adds no root-level documents.
 2. Install NecronomiDOM into `addons/necronomidom/` from
    [its release ZIP](https://github.com/Eldritch-Game-Studio/NecronomiDOM/releases/latest).
 3. Add both build imports to your project's `.csproj`, before `</Project>`:
@@ -274,8 +275,9 @@ scripts/package.sh --suffix -partial   # Linux-only diagnostic; a full ZIP requi
 
 Other native platforms: from `native/`, run `scons platform=windows target=<target> arch=x86_64` or
 `scons platform=macos target=<target> arch=universal` for **both** `template_debug` and `template_release`.
-`scripts/package.sh` requires every registered native library and checks that both Mac frameworks contain
-ARM64 and x86_64 slices, plus a source/hash-matched Proton qualification receipt for both Windows DLLs.
+`scripts/package.sh` checks every library referenced by the final ZIP's GDExtension manifest, including debug and
+release targets. It also checks that both Mac frameworks contain ARM64 and x86_64 slices, plus a source/hash-matched
+Proton qualification receipt for both Windows DLLs. Missing or empty libraries prevent publication of the ZIP.
 `scripts/ci-local.sh` runs Linux-only diagnostics directly with local tools.
 Tagged `v*` pushes publish only after Linux smoke/native builds, Windows cross-builds and stock-Windows-Godot
 demo/sandbox/native smoke under official Proton, portable tests/validation, and both Mac runtime architectures

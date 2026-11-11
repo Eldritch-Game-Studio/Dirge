@@ -2,7 +2,7 @@
 
 Adaptive audio authoring for Godot 4 .NET: events with timelines and parameter sheets, parameters with automation and modulators, snapshots, VCAs and a mixer graph played through `AudioServer`. The authoring tool is a Godot editor main screen rendered with NecronomiDOM; the same Mixer and Profiler panes mount over a running game.
 
-Full documentation lives in the source repository: `README.md`, `docs/getting-started.md` (ten-minute walkthrough) and `docs/capabilities.md` (feature matrix and runtime API reference). The installable ZIP contains this addon folder, `LICENSE`, `README.md` and `CHANGELOG.md`.
+Full documentation lives in the source repository: `README.md`, `docs/getting-started.md` (ten-minute walkthrough) and `docs/capabilities.md` (feature matrix and runtime API reference). The installable ZIP keeps the full repository `README.md`, `LICENSE`, `CHANGELOG.md` and `THIRD_PARTY_NOTICES.md` inside `addons/dirge/`, with no ZIP-root documents.
 
 ## Installation
 
@@ -43,4 +43,4 @@ Requires **Godot 4.7.2 .NET**. Native effect binaries are provided for Windows x
 
 ## License
 
-MIT (see `LICENSE` in the repository root). Third-party components: godot-cpp (MIT), NecronomiDOM (MIT, installed separately), Noto Sans (SIL OFL 1.1, via NecronomiDOM). See `THIRD_PARTY_NOTICES.md`.
+MIT (see `LICENSE` in the repository root, or inside `addons/dirge/` in the installable ZIP). Third-party components: godot-cpp (MIT), NecronomiDOM (MIT, installed separately), Noto Sans (SIL OFL 1.1, via NecronomiDOM). See `THIRD_PARTY_NOTICES.md` alongside the license.

@@ -2,6 +2,9 @@
 """Reject incomplete standalone packages, including thin macOS libraries."""
 from pathlib import Path
 import struct
+import hashlib
+import json
+import subprocess
 import sys
 
 
@@ -24,7 +27,30 @@ def universal_architectures(data):
     return architectures
 
 
-def validate(root):
+def validate_windows_qualification(root, revision=None):
+    receipt = root / "windows-x64/proton-qualification.json"
+    try:
+        evidence = json.loads(receipt.read_text())
+    except (OSError, ValueError) as error:
+        raise ValueError(f"missing or invalid Windows Proton qualification: {receipt}") from error
+    if (evidence.get("schema") != 1 or evidence.get("status") != "PASS"
+            or evidence.get("coverage") != "windows-x64-proton-compatibility"
+            or not evidence.get("source_revision")
+            or (revision is not None and evidence["source_revision"] != revision)):
+        raise ValueError("Windows Proton qualification does not match this source revision")
+    for target in ("template_debug", "template_release"):
+        path = root / "windows-x64" / f"libdirge_native.windows.{target}.x86_64.dll"
+        item = evidence.get("targets", {}).get(target, {})
+        if (item.get("status") != "PASS"
+                or item.get("sha256") != hashlib.sha256(path.read_bytes()).hexdigest()
+                or item.get("assertions") != ["DIRGE_SMOKE PASS", "SANDBOX_SMOKE PASS", "NATIVE_TEST PASS"]
+                or any(item.get(step, {}).get("exit_code") != 0
+                       or item.get(step, {}).get("timed_out") is not False
+                       for step in ("smoke", "native"))):
+            raise ValueError(f"Windows DLL lacks matching successful Proton qualification: {path}")
+
+
+def validate(root, revision=None):
     for target in ("template_debug", "template_release"):
         for directory, suffix in (("linux-x64", "linux"), ("windows-x64", "windows")):
             extension = "so" if suffix == "linux" else "dll"
@@ -36,10 +62,13 @@ def validate(root):
         if not path.is_file():
             raise ValueError(f"missing native library: {path}")
         universal_architectures(path.read_bytes())
+    validate_windows_qualification(root, revision)
 
 
 if __name__ == "__main__":
     try:
-        validate(Path(__file__).resolve().parent.parent / "addons/dirge/bin")
+        repository = Path(__file__).resolve().parent.parent
+        revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repository, text=True).strip()
+        validate(repository / "addons/dirge/bin", revision)
     except ValueError as error:
         raise SystemExit(f"package: {error}")

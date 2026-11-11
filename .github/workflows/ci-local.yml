@@ -182,9 +182,11 @@ jobs:
           if-no-files-found: error
 
   native-windows:
+    name: Windows x64 cross-build + Proton compatibility
     needs: trust
     if: needs.trust.outputs.partial != 'true'
     runs-on: [self-hosted, Linux, X64, eldritch-linux]
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
         with:
@@ -204,6 +206,16 @@ jobs:
           key: godot-cpp-local-mingw-${{ steps.native-pin.outputs.revision }}-${{ hashFiles('native/SConstruct', 'scripts/windows-native.sh') }}
       - name: Cross-build Windows x64 debug/release and inspect the PE ABI
         run: scripts/windows-native.sh
+      - name: Stock Windows Godot.NET under official Proton (not native Windows)
+        env:
+          DIRGE_PROTON_LOG_DIR: ${{ runner.temp }}/dirge-smoke-windows-proton
+        run: timeout --signal=TERM --kill-after=30s 40m python3 scripts/windows-proton.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-logs-windows-proton
+          path: ${{ runner.temp }}/dirge-smoke-windows-proton
+          if-no-files-found: error
       - uses: actions/upload-artifact@v4
         with:
           name: native-windows

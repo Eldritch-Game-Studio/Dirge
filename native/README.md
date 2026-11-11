@@ -56,7 +56,12 @@ on both architectures (Intel via Rosetta). It requires `GODOT` and `RUNNER_TEMP`
 and Windows MinGW cross-build qualification use the local `eldritch-linux` runner.
 `scripts/windows-native.sh` builds both Windows x64 configurations with static C++ runtimes and
 checks PE architecture, the native entrypoint export and missing MinGW runtime dependencies.
-The original Windows gate was compile/artifact-only; no Windows runtime execution is claimed.
+`python3 scripts/windows-proton.py` then loads each actual debug/release DLL using matching, upstream-digest-
+verified stock Windows Godot .NET under official Proton 11. Existing demo, sandbox and native
+send/return/convolution assertions must pass with zero process exits; packaging checks the resulting
+source/DLL-bound receipt. The disposable editor mapping explicitly selects the release DLL for its second
+pass. This is compatibility coverage, not native Windows/MSVC or release-export-template execution.
+See `CONTRIBUTING.md` for the bounded command, isolated-prefix behavior and evidence locations.
 
 `build.sh` drops an untracked `.gdignore` into `native/godot-cpp` (listed in the
 submodule's `info/exclude`) so the Godot editor does not import godot-cpp's own test

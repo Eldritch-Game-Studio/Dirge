@@ -6,8 +6,11 @@ All notable changes to Dirge. The format follows [Keep a Changelog](https://keep
 
 ### Changed
 - Move all CI/CD, including PRs, to local Apple/Linux runners through a main-defined reusable workflow and exact-head approval for reviewed forks. Portable jobs, universal Mac builds, packaging and release run on Apple; Linux acceptance remains native and Windows DLLs cross-build with MinGW ABI/dependency checks. Require both Mac runtime architectures and every debug/release native output, serialize Apple producer work, and explicitly withhold qualification from unapproved PRs. Packaging supports macOS's system Bash and rejects thin/incomplete full-release inputs; Linux diagnostics run directly without `act`.
+- Require real debug/release Windows DLLs to pass the existing demo, sandbox and native audio assertions with matching, upstream-digest-verified stock Windows Godot .NET under official Proton 11 on Linux. Isolate prefixes/projects, bound execution, retain identity/exit/assertion evidence, and reject packages whose Windows DLLs or source revision do not match the successful compatibility receipt. This does not claim native Windows/MSVC qualification; Linux and Mac gates remain mandatory.
 
 ### Fixed
+- Keep Proton qualification's managed build on the native Linux SDK with isolated MSBuild/Roslyn processes, avoiding blocked shared compiler servers; capture explicit Windows Godot engine logs on private Xvfb displays instead of relying on console forwarding.
+- Supply the genuine Windows .NET SDK required by stock GodotTools during Proton imports, reject engine/script errors even on zero exits, and prove prefix quiescence without treating an already-exited wineserver as a failed smoke or masking the original failure.
 - Drive runtime audio from a monotonic wall clock, resetting on load and pause/disable, rather than the engine's smoothed/scaled frame delta. Starts and seeks exclude time before their mutation boundary without shortening other instances' ticks; native voice positions, quantized starts and profiler replay preserve that boundary. Engine-free callers retain deterministic tick-boundary timing unless they provide the optional `DirgeSystem` driver clock.
 
 ### Performance

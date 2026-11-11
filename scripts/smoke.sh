@@ -30,12 +30,24 @@ if [[ ! -f demo/sandbox/audio/calm_pad.wav || ! -f demo/sandbox/audio/line_de.wa
   python3 scripts/gen-sandbox-audio.py
 fi
 
-echo "smoke: dotnet build"
-dotnet build Dirge.slnx -nologo -v q
+echo "smoke: dotnet build (native host SDK)"
+if [[ "${DIRGE_SMOKE_ISOLATED_BUILD:-0}" = 1 ]]; then
+  # Compatibility jobs share a host with parked producers. Never wait on their
+  # reusable MSBuild/Roslyn servers; compile portable managed IL locally.
+  dotnet build Dirge.slnx -nologo -v normal --disable-build-servers \
+    -m:1 -nr:false -p:UseSharedCompilation=false \
+    "-bl:$log_dir/managed-build.binlog" 2>&1 | tee "$log_dir/managed-build.log"
+else
+  dotnet build Dirge.slnx -nologo -v q
+fi
 
 echo "smoke: godot --import"
-# A first import of a fresh checkout can abort in editor shutdown after the assets are already imported; retry once.
+# Native smoke retains its editor-shutdown retry. Compatibility qualification
+# fails on its first import error; never overwrite or hide the failing oracle.
 if ! "${godot[@]}" --headless --audio-driver Dummy --path . --import >"$log_dir/import.log" 2>&1; then
+  if [[ "${DIRGE_SMOKE_ISOLATED_BUILD:-0}" = 1 ]]; then
+    echo "smoke: compatibility import failed"; cat "$log_dir/import.log"; exit 1
+  fi
   "${godot[@]}" --headless --audio-driver Dummy --path . --import >"$log_dir/import.log" 2>&1 || {
     echo "smoke: import failed"; cat "$log_dir/import.log"; exit 1; }
 fi

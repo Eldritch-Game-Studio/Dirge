@@ -275,9 +275,12 @@ scripts/package.sh --suffix -partial   # Linux-only diagnostic; a full ZIP requi
 Other native platforms: from `native/`, run `scons platform=windows target=<target> arch=x86_64` or
 `scons platform=macos target=<target> arch=universal` for **both** `template_debug` and `template_release`.
 `scripts/package.sh` requires every registered native library and checks that both Mac frameworks contain
-ARM64 and x86_64 slices. `scripts/ci-local.sh` runs Linux-only diagnostics directly with local tools.
-Tagged `v*` pushes publish only after Linux smoke/native builds, Windows cross-builds, portable tests/validation,
-and both Mac runtime architectures pass. Portable jobs, universal Mac builds, packaging and release use the
+ARM64 and x86_64 slices, plus a source/hash-matched Proton qualification receipt for both Windows DLLs.
+`scripts/ci-local.sh` runs Linux-only diagnostics directly with local tools.
+Tagged `v*` pushes publish only after Linux smoke/native builds, Windows cross-builds and stock-Windows-Godot
+demo/sandbox/native smoke under official Proton, portable tests/validation, and both Mac runtime architectures
+pass. Proton is compatibility coverage, **not native Windows/MSVC qualification** (see `CONTRIBUTING.md`).
+Portable jobs, universal Mac builds, packaging and release use the
 local `[self-hosted, macOS, ARM64, eldritch-apple]` runner. Linux jobs and Windows MinGW cross-builds use
 `[self-hosted, Linux, X64, eldritch-linux]`; every CI/CD job is local, with no hosted fallback.
 PR execution requires the main-defined admission gate, with exact-head manual approval for reviewed forks.

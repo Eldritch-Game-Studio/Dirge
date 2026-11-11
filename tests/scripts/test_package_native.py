@@ -1,5 +1,7 @@
 import importlib.util
 from pathlib import Path
+import hashlib
+import json
 import struct
 import tempfile
 import unittest
@@ -18,6 +20,24 @@ def universal():
     for cpu in (0x01000007, 0x0100000C):
         data.extend(struct.pack("<II", 0xFEEDFACF, cpu) + bytes(24))
     return data
+
+
+def qualification(root):
+    # Unit-test metadata only; not evidence from an actual compatibility run.
+    targets = {}
+    for target in ("template_debug", "template_release"):
+        path = root / "windows-x64" / f"libdirge_native.windows.{target}.x86_64.dll"
+        targets[target] = {
+            "status": "PASS", "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+            "assertions": ["DIRGE_SMOKE PASS", "SANDBOX_SMOKE PASS", "NATIVE_TEST PASS"],
+            "smoke": {"exit_code": 0, "timed_out": False},
+            "native": {"exit_code": 0, "timed_out": False},
+        }
+    receipt = root / "windows-x64/proton-qualification.json"
+    receipt.write_text(json.dumps({"schema": 1, "status": "PASS",
+        "coverage": "windows-x64-proton-compatibility", "source_revision": "a" * 40,
+        "targets": targets}))
+    return receipt
 
 
 class NativePackageTests(unittest.TestCase):
@@ -60,6 +80,7 @@ class NativePackageTests(unittest.TestCase):
                 path.parent.mkdir(parents=True)
                 path.write_bytes(universal())
                 files.append(path)
+            receipt = qualification(root)
             package_native.validate(root)
             for path in files:
                 with self.subTest(path=path.name):
@@ -68,6 +89,33 @@ class NativePackageTests(unittest.TestCase):
                     with self.assertRaisesRegex(ValueError, "missing native library"):
                         package_native.validate(root)
                     path.write_bytes(contents)
+            receipt.unlink()
+            with self.assertRaisesRegex(ValueError, "missing or invalid Windows Proton"):
+                package_native.validate(root)
+            qualification(root)
+            with self.assertRaisesRegex(ValueError, "source revision"):
+                package_native.validate(root, "b" * 40)
+            package_native.validate(root, "a" * 40)
+            windows = next(path for path in files if path.suffix == ".dll")
+            windows.write_bytes(b"unqualified replacement")
+            with self.assertRaisesRegex(ValueError, "matching successful Proton"):
+                package_native.validate(root)
+
+    def test_rejects_failed_or_timed_out_proton_runs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for target in ("template_debug", "template_release"):
+                path = root / "windows-x64" / f"libdirge_native.windows.{target}.x86_64.dll"
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(b"unit-test fixture")
+            for step in ("smoke", "native"):
+                for field, value in (("exit_code", 1), ("timed_out", True)):
+                    receipt = qualification(root)
+                    evidence = json.loads(receipt.read_text())
+                    evidence["targets"]["template_release"][step][field] = value
+                    receipt.write_text(json.dumps(evidence))
+                    with self.assertRaisesRegex(ValueError, "matching successful Proton"):
+                        package_native.validate_windows_qualification(root)
 
 
 if __name__ == "__main__":

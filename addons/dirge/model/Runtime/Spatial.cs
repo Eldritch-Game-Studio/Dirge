@@ -14,6 +14,16 @@ internal static class Spatial
     private const float Epsilon = 1e-6f;
     private const float RadToDeg = 180f / MathF.PI;
 
+    // Missing-region listeners mean maximally distant, neutral relative direction/speed.
+    // ParameterState applies the authored bounds; absolute speed does not need a listener.
+    public static float WithoutListener(BuiltInParameter kind, in Attributes3D emitter) => kind switch
+    {
+        BuiltInParameter.Distance => float.MaxValue,
+        BuiltInParameter.DistanceNormalized => 1f,
+        BuiltInParameter.SpeedAbsolute => emitter.Velocity.Length(),
+        _ => 0f,
+    };
+
     public static float Compute(BuiltInParameter kind, in Attributes3D emitter, in Attributes3D listener, float minDistance, float maxDistance)
     {
         Vector3 toEmitter = emitter.Position - listener.Position;

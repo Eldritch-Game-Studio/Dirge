@@ -7,9 +7,9 @@ using Godot;
 namespace Dirge.Driver;
 
 /// <summary>
-/// Applies the model's <see cref="Command"/> stream to <see cref="AudioServer"/> and a pool of stream players parented under
-/// <see cref="Host"/>. Owns the engine bus layout (rebuilt from <see cref="MixerGraph"/> on <see cref="LoadMixer"/>) and the
-/// voice→player mapping. Steady state allocates nothing: players are pooled, bus names are pre-interned.
+/// Applies the model's <see cref="Command"/> stream to one <see cref="AudioServer"/> mixer and pooled stream players.
+/// Default voices belong to <see cref="Host"/>; explicit spatial regions belong to registered World3D hosts.
+/// Construct and use on the scene-tree thread. Steady state reuses players and pre-interned bus names.
 /// </summary>
 /// <remarks>
 /// <para><b>Sync groups.</b> <see cref="VoicePlay"/> commands that share a non-zero <see cref="VoicePlay.SyncGroup"/> inside one
@@ -39,6 +39,7 @@ public sealed class AudioDriver
     {
         public Node Player = null!;
         public bool Spatial;
+        public SpatialRegionId Region;
         /// <summary>Voice currently bound (the leading member for a sync slot); -1 when idle so a late <c>finished</c> is ignored.</summary>
         public int Voice = -1;
         /// <summary>Non-null for a synchronized slot; the player's stream.</summary>
@@ -47,6 +48,15 @@ public sealed class AudioDriver
         public int[]? Members;
         public int MemberCount;
         public int LiveMembers;
+    }
+
+    private sealed class RegionRoute
+    {
+        public SpatialRegionId Id;
+        public Node3D Host = null!;
+        public AudioListener3D Listener = null!;
+        public World3D World = null!;
+        public Action Exiting = null!;
     }
 
     /// <summary>In-chain fader of a bus with <see cref="Bus.FaderIndex"/> &lt; effect count.</summary>
@@ -81,6 +91,9 @@ public sealed class AudioDriver
     private readonly Dictionary<string, StringName> _parameterNames = new();
     private readonly StringName _master = new("Master");
     private LoudnessCapture? _capture;
+    private readonly int _thread = Environment.CurrentManagedThreadId;
+    private readonly Dictionary<SpatialRegionId, RegionRoute> _regions = new();
+    private readonly List<SpatialRegionId> _withdrawn = new();
 
     /// <summary>Raised when a player reports <c>finished</c> for a bound voice; the server forwards it as <see cref="VoiceFinished"/>.</summary>
     public event Action<VoiceId>? VoiceFinished;
@@ -113,9 +126,94 @@ public sealed class AudioDriver
 
     public AudioDriver(Node host, AssetCatalog assets)
     {
+        if (OS.GetThreadCallerId() != OS.GetMainThreadId())
+            throw new InvalidOperationException("Construct AudioDriver on the scene-tree/main thread.");
         _host = host;
         _assets = assets;
         Array.Fill(_syncIndex, -1);
+    }
+
+    /// <summary>
+    /// Registers a nonzero region in a distinct live World3D. Host and current listener must share an audio-enabled
+    /// viewport with a current camera. Does not change the mixer or create listeners. Call on the scene-tree thread.
+    /// Unregister before replacing a world; tree exit also withdraws the route synchronously.
+    /// </summary>
+    public void RegisterSpatialRegion(SpatialRegionId region, Node3D host, AudioListener3D listener)
+    {
+        CheckThread();
+        if (region == default) throw new ArgumentException("Region zero is reserved for the legacy host.", nameof(region));
+        ArgumentNullException.ThrowIfNull(host);
+        ArgumentNullException.ThrowIfNull(listener);
+        if (_regions.ContainsKey(region)) throw new InvalidOperationException("Unregister a region before replacing it.");
+        if (!GodotObject.IsInstanceValid(host) || !host.IsInsideTree() ||
+            !GodotObject.IsInstanceValid(listener) || !listener.IsInsideTree())
+            throw new ArgumentException("Region host and listener must be live in the scene tree.");
+        var route = new RegionRoute { Id = region, Host = host, Listener = listener, World = host.GetWorld3D() };
+        if (!IsLive(route)) throw new ArgumentException("Region requires a current listener and camera in the same audio-enabled viewport/world.");
+        if (route.World == _host.GetViewport().FindWorld3D())
+            throw new ArgumentException("An explicit region must not share the default host's World3D.");
+        foreach (RegionRoute other in _regions.Values)
+            if (other.World == route.World) throw new ArgumentException("Each region must own a distinct World3D.");
+        route.Exiting = () => WithdrawRegion(region, retirePlayers: true);
+        _regions.Add(region, route);
+        host.TreeExiting += route.Exiting;
+        listener.TreeExiting += route.Exiting;
+    }
+
+    /// <summary>Stops/reports all voices in a region and returns their players to the default pool. Zero is not removable.</summary>
+    public bool UnregisterSpatialRegion(SpatialRegionId region) => WithdrawRegion(region, retirePlayers: false);
+
+    private bool WithdrawRegion(SpatialRegionId region, bool retirePlayers)
+    {
+        CheckThread();
+        if (!_regions.Remove(region, out RegionRoute? route)) return false;
+        if (GodotObject.IsInstanceValid(route.Host)) route.Host.TreeExiting -= route.Exiting;
+        if (GodotObject.IsInstanceValid(route.Listener)) route.Listener.TreeExiting -= route.Exiting;
+        for (int i = _all.Count - 1; i >= 0; i--)
+            if (_all[i].Voice >= 0 && _all[i].Spatial && _all[i].Region == region) OnFinished(_all[i], retirePlayers);
+        return true;
+    }
+
+    private void CheckThread()
+    {
+        if (Environment.CurrentManagedThreadId != _thread)
+            throw new InvalidOperationException("AudioDriver node lifecycle must run on its scene-tree thread.");
+    }
+
+    private static bool IsLive(RegionRoute route)
+    {
+        if (!GodotObject.IsInstanceValid(route.Host) || !GodotObject.IsInstanceValid(route.Listener) ||
+            !route.Host.IsInsideTree() || !route.Listener.IsInsideTree() ||
+            route.Host.IsQueuedForDeletion() || route.Listener.IsQueuedForDeletion()) return false;
+        Viewport viewport = route.Host.GetViewport();
+        Camera3D? camera = viewport.GetCamera3D();
+        return viewport == route.Listener.GetViewport() && viewport.AudioListenerEnable3D &&
+            camera is not null && camera.IsInsideTree() && !camera.IsQueuedForDeletion() &&
+            camera.GetWorld3D() == route.World && route.Listener.IsCurrent() &&
+            route.Host.GetWorld3D() == route.World && route.Listener.GetWorld3D() == route.World;
+    }
+
+    // Once per command batch, including empty batches. No per-voice route scans or temporary collections.
+    private void WithdrawInvalidRegions()
+    {
+        _withdrawn.Clear();
+        foreach (RegionRoute route in _regions.Values)
+            if (!IsLive(route)) _withdrawn.Add(route.Id);
+        for (int i = 0; i < _withdrawn.Count; i++) UnregisterSpatialRegion(_withdrawn[i]);
+    }
+
+    private bool TryRegionHost(SpatialRegionId region, out Node host)
+    {
+        host = _host;
+        if (region == default) return true;
+        if (!_regions.TryGetValue(region, out RegionRoute? route)) return false;
+        host = route.Host;
+        return true;
+    }
+
+    private static void MovePlayer(Slot slot, Node host)
+    {
+        if (slot.Player.GetParent() != host) slot.Player.Reparent(host, keepGlobalTransform: false);
     }
 
     /// <summary>Engine bus index for a model bus name; -1 when unknown.</summary>
@@ -407,6 +505,8 @@ public sealed class AudioDriver
     /// <summary>Applies every command in order, folding same-batch sync-group plays into shared players. The caller clears the buffer afterwards.</summary>
     public void Apply(CommandBuffer buffer)
     {
+        CheckThread();
+        WithdrawInvalidRegions();
         IReadOnlyList<Command> commands = buffer.Commands;
         int count = commands.Count;
         if (count == 0)
@@ -432,7 +532,7 @@ public sealed class AudioDriver
             }
             else
             {
-                Apply(commands[i]);
+                ApplyCore(commands[i]);
             }
         }
 
@@ -442,6 +542,7 @@ public sealed class AudioDriver
     /// <summary>Stops every bound voice and returns its player to the pool; used when the host unloads or leaves the tree.</summary>
     public void StopAll()
     {
+        CheckThread();
         for (int i = 0; i < _all.Count; i++)
         {
             if (_all[i].Voice >= 0)
@@ -459,6 +560,12 @@ public sealed class AudioDriver
     public void Shutdown()
     {
         StopAll();
+        foreach (RegionRoute route in _regions.Values)
+        {
+            if (GodotObject.IsInstanceValid(route.Host)) route.Host.TreeExiting -= route.Exiting;
+            if (GodotObject.IsInstanceValid(route.Listener)) route.Listener.TreeExiting -= route.Exiting;
+        }
+        _regions.Clear();
         for (int i = 0; i < _all.Count; i++)
         {
             Slot slot = _all[i];
@@ -491,6 +598,13 @@ public sealed class AudioDriver
 
     /// <summary>Applies one command. A <see cref="VoicePlay"/> applied alone plays as an independent voice regardless of its sync group.</summary>
     public void Apply(Command command)
+    {
+        CheckThread();
+        WithdrawInvalidRegions();
+        ApplyCore(command);
+    }
+
+    private void ApplyCore(Command command)
     {
         switch (command)
         {
@@ -563,11 +677,7 @@ public sealed class AudioDriver
             }
             case VoiceSet3D set3D:
             {
-                Slot? slot = SlotOf(set3D.Voice);
-                if (slot is { Spatial: true })
-                {
-                    ((AudioStreamPlayer3D)slot.Player).GlobalTransform = ToTransform(set3D.Attributes);
-                }
+                SetSpatialAttributes(set3D.Voice, set3D.Attributes);
 
                 break;
             }
@@ -679,6 +789,13 @@ public sealed class AudioDriver
 
     private void Play(VoicePlay play)
     {
+        Node host = _host;
+        if (play.Spatial && !TryRegionHost(play.Attributes.Region, out host))
+        {
+            Release(play.Voice);
+            VoiceFinished?.Invoke(play.Voice);
+            return;
+        }
         Slot? slot = SlotOf(play.Voice);
         if (slot is not null && (slot.Spatial != play.Spatial || slot.Sync is not null))
         {
@@ -687,6 +804,12 @@ public sealed class AudioDriver
         }
 
         slot ??= Acquire(play.Voice, play.Spatial);
+        if (play.Spatial)
+        {
+            ((AudioStreamPlayer3D)slot.Player).Stop();
+            MovePlayer(slot, host);
+            slot.Region = play.Attributes.Region;
+        }
 
         AudioStream? stream = play.Loop ? _assets.GetLoopingStream(play.Asset) : _assets.GetStream(play.Asset);
         if (stream is null)
@@ -733,7 +856,8 @@ public sealed class AudioDriver
         _consumed[first] = true;
         for (int j = first + 1; j < commands.Count && _group.Count < MaxSyncStreams; j++)
         {
-            if (!_consumed[j] && commands[j] is VoicePlay other && other.SyncGroup == lead.SyncGroup && other.Spatial == lead.Spatial)
+            if (!_consumed[j] && commands[j] is VoicePlay other && other.SyncGroup == lead.SyncGroup &&
+                other.Spatial == lead.Spatial && (!lead.Spatial || other.Attributes.Region == lead.Attributes.Region))
             {
                 _group.Add(other);
                 _consumed[j] = true;
@@ -752,7 +876,20 @@ public sealed class AudioDriver
             Release(_group[k].Voice);
         }
 
+        Node host = _host;
+        if (lead.Spatial && !TryRegionHost(lead.Attributes.Region, out host))
+        {
+            for (int k = 0; k < _group.Count; k++) VoiceFinished?.Invoke(_group[k].Voice);
+            _group.Clear();
+            return;
+        }
+
         Slot slot = AcquireSync(lead.Spatial);
+        if (lead.Spatial)
+        {
+            MovePlayer(slot, host);
+            slot.Region = lead.Attributes.Region;
+        }
         AudioStreamSynchronized sync = slot.Sync!;
         int[] members = slot.Members!;
         sync.StreamCount = _group.Count;
@@ -885,7 +1022,7 @@ public sealed class AudioDriver
         return slot;
     }
 
-    private void OnFinished(Slot slot)
+    private void OnFinished(Slot slot, bool retire = false)
     {
         if (slot.Voice < 0)
         {
@@ -895,21 +1032,21 @@ public sealed class AudioDriver
         if (slot.Sync is null)
         {
             var voice = new VoiceId(slot.Voice);
-            ReleaseSlot(slot);
+            ReleaseSlot(slot, retire);
             VoiceFinished?.Invoke(voice);
             return;
         }
 
         // Every surviving layer ends together with the shared playback.
-        int[] members = slot.Members!;
         int count = slot.MemberCount;
-        ReleaseSlot(slot);
+        Span<int> members = stackalloc int[MaxSyncStreams];
+        slot.Members.AsSpan(0, count).CopyTo(members);
+        ReleaseSlot(slot, retire);
         for (int k = 0; k < count; k++)
         {
             if (members[k] >= 0)
             {
                 VoiceFinished?.Invoke(new VoiceId(members[k]));
-                members[k] = -1;
             }
         }
     }
@@ -954,7 +1091,7 @@ public sealed class AudioDriver
         }
     }
 
-    private void ReleaseSlot(Slot slot)
+    private void ReleaseSlot(Slot slot, bool retire = false)
     {
         if (slot.Sync is null)
         {
@@ -984,12 +1121,17 @@ public sealed class AudioDriver
             var player = (AudioStreamPlayer3D)slot.Player;
             player.Stop();
             player.StreamPaused = false;
+            player.Stream = null;
+            if (!retire) MovePlayer(slot, _host);
+            player.Transform = Transform3D.Identity;
+            slot.Region = default;
         }
         else
         {
             var player = (AudioStreamPlayer)slot.Player;
             player.Stop();
             player.StreamPaused = false;
+            player.Stream = null;
         }
 
         if (slot.Sync is not null)
@@ -998,15 +1140,76 @@ public sealed class AudioDriver
             for (int k = 0; k < slot.MemberCount; k++)
             {
                 slot.Sync.SetSyncStream(k, null);
+                slot.Members![k] = -1;
             }
 
             slot.MemberCount = 0;
+        }
+        if (retire)
+        {
+            // During TreeExiting an ancestor can be busy traversing children: never reparent into/out of it.
+            // Discard the native slot instead; subsequent acquisition creates a clean player.
+            slot.Sync?.Dispose();
+            slot.Sync = null;
+            _all.Remove(slot);
+            slot.Player.QueueFree();
+        }
+        else if (slot.Sync is not null)
+        {
             (slot.Spatial ? _freeSync3D : _freeSync2D).Push(slot);
         }
         else
         {
             (slot.Spatial ? _free3D : _free2D).Push(slot);
         }
+    }
+
+    private void SetSpatialAttributes(VoiceId voice, Attributes3D attributes)
+    {
+        Slot? slot = SlotOf(voice);
+        if (slot is not { Spatial: true }) return;
+        if (!TryRegionHost(attributes.Region, out Node host))
+        {
+            Release(voice);
+            VoiceFinished?.Invoke(voice);
+            return;
+        }
+        var player = (AudioStreamPlayer3D)slot.Player;
+        if (slot.Region != attributes.Region)
+        {
+            float position = player.GetPlaybackPosition();
+            bool paused = player.StreamPaused;
+            bool playing = player.Playing;
+            if (slot.Sync is not null)
+            {
+                // A single layer moving worlds must not drag its siblings with it.
+                int index = _syncIndex[voice.Value];
+                AudioStream? stream = slot.Sync.GetSyncStream(index);
+                float volume = slot.Sync.GetSyncStreamVolume(index);
+                StringName bus = player.Bus;
+                float pitch = player.PitchScale, unit = player.UnitSize, max = player.MaxDistance;
+                var attenuation = player.AttenuationModel;
+                var doppler = player.DopplerTracking;
+                Release(voice);
+                slot = Acquire(voice, spatial: true);
+                player = (AudioStreamPlayer3D)slot.Player;
+                player.Stream = stream;
+                player.Bus = bus;
+                player.VolumeDb = volume;
+                player.PitchScale = pitch;
+                player.UnitSize = unit;
+                player.MaxDistance = max;
+                player.AttenuationModel = attenuation;
+                player.DopplerTracking = doppler;
+            }
+            player.Stop();
+            MovePlayer(slot, host);
+            slot.Region = attributes.Region;
+            player.GlobalTransform = ToTransform(attributes);
+            if (playing || paused) player.Play(position);
+            player.StreamPaused = paused;
+        }
+        else player.GlobalTransform = ToTransform(attributes);
     }
 
     private Slot? SlotOf(VoiceId voice) => voice.Value >= 0 && voice.Value < _byVoice.Length ? _byVoice[voice.Value] : null;

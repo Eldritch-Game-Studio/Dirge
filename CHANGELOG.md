@@ -11,6 +11,7 @@ All notable changes to Dirge. The format follows [Keep a Changelog](https://keep
 
 ### Added
 - Headless tool-UI proof (`scripts/ui-proof.sh`, part of CI smoke). It mounts every `tool/ui` document and the in-game overlay's Mixer and Profiler in real NecronomiDOM `DocumentHost`s, and fails on any layout/paint exception or engine error. It also compares each document's paint runs with a PaintRun-JSON golden in `tests/godot/golden/`.
+- Explicit `SpatialRegionId` on `Attributes3D`, region-local nearest-listener/distance stealing, and `AudioDriver.RegisterSpatialRegion` / `UnregisterSpatialRegion` for live, distinct World3D hosts under one mixer. Spatial players migrate through the driver, clear their owner on release, and fail closed for unregistered regions; sync groups never merge worlds. Default-region and nonspatial behavior remain compatible. Recorder/replayer roundtrip integer region IDs without changing legacy command text. Focused model and native lifecycle smoke coverage authored; multi-world audible output still requires runtime qualification.
 
 ## 1.0.4 — 2026-11-15
 

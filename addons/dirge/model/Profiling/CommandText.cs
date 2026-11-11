@@ -83,6 +83,7 @@ public static class CommandText
     private static StringBuilder Attr(StringBuilder sb, in Attributes3D a)
     {
         sb.Append("p="); Vec(sb, a.Position).Append(" v="); Vec(sb, a.Velocity).Append(" f="); Vec(sb, a.Forward).Append(" u="); Vec(sb, a.Up);
+        if (a.Region != default) sb.Append(" region=").Append(a.Region.Value.ToString(CultureInfo.InvariantCulture));
         return sb;
     }
 }

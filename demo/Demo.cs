@@ -22,6 +22,7 @@ public partial class Demo : Node
     private ulong _startMsec;
     private SnapshotInstance? _muffled;
 
+    private SpatialRegionSmoke? _spatialRegions;
     private readonly Dictionary<Type, int> _commandCounts = new();
     private VoiceId? _windVoice;
     private VoiceId? _clickVoice;
@@ -73,6 +74,7 @@ public partial class Demo : Node
             switch (frame)
             {
                 case 0:
+                    _spatialRegions = new SpatialRegionSmoke(_server.Driver, this);
                     _server.StartEvent(DemoProject.WindEvent);
                     break;
                 case 10:
@@ -232,6 +234,16 @@ public partial class Demo : Node
         catch (Exception error)
         {
             Fail($"asset scanner: {error.Message}");
+            return;
+        }
+
+        try
+        {
+            _spatialRegions!.Finish();
+        }
+        catch (Exception e)
+        {
+            Fail(e.ToString());
             return;
         }
 

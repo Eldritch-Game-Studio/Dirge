@@ -20,6 +20,7 @@ All notable changes to Dirge. The format follows [Keep a Changelog](https://keep
 
 ### Fixed
 - Serialize reviewed manual CI dispatches with their PR events and main dispatches with main pushes, without cancelling active native qualification. Preserve exact-head admission for delayed PR events and document safe source supersession separately from completed-build deduplication.
+- Preserve the remaining frame in native sample offsets for transition-entered layers and internally started quantized cues. Keep the sandbox's 20 ms alignment tolerance while comparing actual native sample offsets against the conductor; regressions cover slow frames and exact recording replay.
 
 ## 1.0.3 — 2026-11-11
 

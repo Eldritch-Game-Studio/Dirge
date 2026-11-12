@@ -66,6 +66,7 @@ func run(test: Object) -> void:
 	_transitions(test)
 	_clocked_timing(test)
 	_quantized_starts(test)
+	_native_quantized_alignment(test)
 	_stealing_limits(test)
 	_playlists_scatter(test)
 	_nested_commands_programmer(test)
@@ -74,6 +75,59 @@ func run(test: Object) -> void:
 	_determinism(test)
 	_command_edges_and_ownership(test)
 	_tempo_and_instrument_modulation(test)
+
+func _native_quantized_alignment(test) -> void:
+	for overshoot in [0.0210284, 0.125]:
+		var project = _project()
+		var conductor_event = _event(project, "Music/Conductor")
+		conductor_event.isConductor = true
+		conductor_event.tempo.append({"position": 0, "bpm": 120})
+		_instrument(conductor_event)
+		var cue_event = _event(project, "Music/Cue")
+		cue_event.macros.startQuantization = "Beat"
+		_instrument(cue_event)
+		project.assetLengths["res://tone.wav"] = 10
+		var system = System.new(project)
+		var recorder = Recorder.new(system)
+		var conductor = system.get_event("Music/Conductor").create_instance()
+		conductor.start()
+		system.update(0)
+		system.commands.clear()
+		system.update(0.49)
+		system.commands.clear()
+		var cue = system.get_event("Music/Cue").create_instance()
+		cue.start()
+		system.update(0.01 + overshoot)
+		var play = _first(system, "VoicePlay")
+		test.check(_near(cue.timeline_position, overshoot), "quantized cue retains remaining model tick")
+		test.check(not play.is_empty() and _near(play.startSeconds, fmod(conductor.timeline_position, 0.5)),
+			"unclocked quantized native onset aligns after a slow frame")
+		var recording = recorder.stop()
+		test.check(Replayer.compare(recording, Replayer.replay(recording, project)) == null,
+			"quantized native catchup replays identically")
+
+		project = _project()
+		var event = _event(project, "Music/Transition")
+		_instrument(event, "Clip", 0, 4).asset = "res://calm.wav"
+		_instrument(event, "Clip", 4, 4).asset = "res://combat.wav"
+		project.assetLengths["res://calm.wav"] = 4
+		project.assetLengths["res://combat.wav"] = 4
+		var destination = _marker(event, "Destination", 4)
+		_marker(event, "Transition", 0.5, {"destination": destination.id, "quantization": "None"})
+		system = System.new(project)
+		recorder = Recorder.new(system)
+		var music = system.get_event("Music/Transition").create_instance()
+		music.start()
+		system.update(0)
+		system.commands.clear()
+		system.update(0.5 + overshoot)
+		var combat = _of(system, "VoicePlay").filter(func(command): return command.asset == "res://combat.wav")
+		test.check(_near(music.timeline_position, 4 + overshoot), "transition retains the remaining model tick")
+		test.check(combat.size() == 1 and _near(combat[0].startSeconds, overshoot),
+			"transition-entered native layer catches up after a slow frame")
+		recording = recorder.stop()
+		test.check(Replayer.compare(recording, Replayer.replay(recording, project)) == null,
+			"transition native catchup replays identically")
 
 func _parameters(test) -> void:
 	var definition = {"id": "p", "name": "Speed", "minimum": 0, "maximum": 10, "default": 2, "seekSpeedUp": 4, "seekSpeedDown": 1}

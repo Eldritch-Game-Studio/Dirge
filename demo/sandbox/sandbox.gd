@@ -205,16 +205,18 @@ func _on_commands(commands: Array) -> void:
 			continue
 		_counts[command.type] = _counts.get(command.type, 0) + 1
 		if command.type == "VoicePlay":
+			var onset_phase = fposmod(phase - fmod(command.startSeconds, Project.BeatSeconds), Project.BeatSeconds)
+			onset_phase = minf(onset_phase, Project.BeatSeconds - onset_phase)
 			var asset: String = command.asset
 			match asset.get_file():
 				"combat_drums.wav", "combat_lead.wav":
 					_combat_plays += 1
-					_worst_combat_phase = maxf(_worst_combat_phase, phase)
-					print("SANDBOX_SMOKE combat layer %s at t=%.3f musicPos=%.4f phase=%.4f start=%.3f" % [asset, _server.System.time, _music.timeline_position, phase, command.startSeconds])
+					_worst_combat_phase = maxf(_worst_combat_phase, onset_phase)
+					print("SANDBOX_SMOKE combat layer %s at t=%.3f musicPos=%.4f phase=%.4f start=%.4f" % [asset, _server.System.time, _music.timeline_position, onset_phase, command.startSeconds])
 				"stinger.wav":
 					_stinger_plays += 1
-					_worst_stinger_phase = maxf(_worst_stinger_phase, phase)
-					print("SANDBOX_SMOKE stinger at t=%.3f musicPos=%.4f phase=%.4f" % [_server.System.time, _music.timeline_position, phase])
+					_worst_stinger_phase = maxf(_worst_stinger_phase, onset_phase)
+					print("SANDBOX_SMOKE stinger at t=%.3f musicPos=%.4f phase=%.4f start=%.4f" % [_server.System.time, _music.timeline_position, onset_phase, command.startSeconds])
 				"line_en.wav": _line_en_plays += 1
 				"line_de.wav": _line_de_plays += 1
 				_:
@@ -250,11 +252,11 @@ func _evaluate() -> void:
 	elif _combat_plays < 2:
 		_fail("expected both Combat layers, saw %d VoicePlays" % _combat_plays)
 	elif _worst_combat_phase >= BeatPhaseTolerance:
-		_fail("Combat layers started %.4fs past beat (tolerance %.2f)" % [_worst_combat_phase, BeatPhaseTolerance])
+		_fail("Combat native sample alignment error %.4fs exceeds tolerance %.2f" % [_worst_combat_phase, BeatPhaseTolerance])
 	elif _stinger_plays < 1:
 		_fail("stinger never played")
 	elif _worst_stinger_phase >= BeatPhaseTolerance:
-		_fail("stinger started %.4fs past beat (tolerance %.2f)" % [_worst_stinger_phase, BeatPhaseTolerance])
+		_fail("stinger native sample alignment error %.4fs exceeds tolerance %.2f" % [_worst_stinger_phase, BeatPhaseTolerance])
 	elif _line_en_plays != 1 or _line_de_plays != 1:
 		_fail("expected one en and one de line; en=%d de=%d" % [_line_en_plays, _line_de_plays])
 	elif not _music_min_db <= -10.0:

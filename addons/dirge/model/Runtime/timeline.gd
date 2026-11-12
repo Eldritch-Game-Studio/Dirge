@@ -23,6 +23,7 @@ var _armed_at: float = 0.0
 var _last_beat: float = 0.0
 var _beat_inclusive: bool = true
 var _jumps: int = 0
+var _advance_remainder: float = 0.0
 
 func _init(owner, desc):
 	instance = owner
@@ -44,6 +45,7 @@ func reset(at: float) -> void:
 
 func begin() -> bool:
 	_jumps = 0
+	_advance_remainder = 0
 	_process_beats(position)
 	_arm_containing(position)
 	return _jumps > 0
@@ -58,6 +60,7 @@ func advance(dt: float) -> void:
 		return
 	_jumps = 0
 	var remaining = dt
+	_advance_remainder = dt
 	var points = description.points
 	for _guard in range(4096):
 		if remaining <= 0 or _jumps > 64:
@@ -67,6 +70,7 @@ func advance(dt: float) -> void:
 			var previous = transition_elapsed
 			transition_elapsed += step
 			remaining -= step
+			_advance_remainder = maxf(0, remaining)
 			instance.on_transition_segment(transition, previous, transition_elapsed)
 			if transition_elapsed < _transition_length - EPSILON:
 				return
@@ -94,6 +98,7 @@ func advance(dt: float) -> void:
 		var points_here = pi >= 0 and points[pi].position <= next + EPSILON
 		var looping_here = not arrived_by_jump and points_here and _loop_fires_at(pi, next)
 		remaining -= maxf(0, next - position)
+		_advance_remainder = maxf(0, remaining)
 		_move_to(next, looping_here)
 		var transitioned = false
 		if kind == 1:
@@ -235,5 +240,5 @@ func _jump(destination: float) -> void:
 	_last_beat = destination
 	_beat_inclusive = true
 	_process_beats(destination)
-	instance.on_timeline_jump(destination)
+	instance.on_timeline_jump(destination, _advance_remainder)
 	_arm_containing(destination)

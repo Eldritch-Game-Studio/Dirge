@@ -334,9 +334,11 @@ func update_internal(dt: float) -> void:
 		dt = maxf(0, dt - _update_offset)
 	_update_offset = null
 	var just_started = false
+	var quantized_start = false
 	var advance = dt
 	if state == "Starting":
 		if _start_delay > 0:
+			quantized_start = true
 			_start_delay -= dt
 			if _start_delay > 0:
 				return
@@ -372,7 +374,7 @@ func update_internal(dt: float) -> void:
 		if not _timeline.begin():
 			on_timeline_jump(_timeline.position)
 		_defer_native_seek = false
-	if clocked_mutation and just_started:
+	if just_started and (clocked_mutation or quantized_start):
 		for instrument in _instruments:
 			instrument.advance_initial_voices(advance)
 	if not paused and can_trigger:
@@ -432,7 +434,7 @@ func on_timeline_segment(from: float, to: float, inclusive: bool, looping_here: 
 		elif not inside and not instrument.active and not looping_here and (info.region_start >= from if inclusive else info.region_start > from) and info.region_end <= to:
 			instrument.on_point()
 
-func on_timeline_jump(position: float) -> void:
+func on_timeline_jump(position: float, remaining_advance: float = 0) -> void:
 	for instrument in _instruments:
 		var info = instrument.info
 		if not info.on_timeline or info.transition != null:
@@ -444,10 +446,12 @@ func on_timeline_jump(position: float) -> void:
 		var inside = position >= info.region_start and position < info.region_end
 		if inside and not instrument.active:
 			instrument.on_enter(position - info.region_start)
+			instrument.advance_initial_voices(remaining_advance)
 		elif not inside and instrument.active:
 			instrument.on_exit()
 		elif inside and not info.instrument.get("async", false):
 			instrument.on_jump(position, _defer_native_seek)
+			instrument.advance_initial_voices(remaining_advance)
 
 func on_transition_begin(marker: Dictionary) -> void:
 	for instrument in _instruments:

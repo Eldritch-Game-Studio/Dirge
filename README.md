@@ -92,7 +92,7 @@ The recordings above are historical 1.0-era captures using the stock Godot 4.7.2
 
 - Stock **Godot 4.7.2**; the non-.NET editor is supported. No .NET SDK/runtime, NuGet restore, C# project imports or external validator executable is required to consume Dirge.
 - **NecronomiDOM native GDExtension** for the HTML/CSS editor tool and in-game overlay. Its NativeAOT implementation remains; removing Dirge's managed scripts does not remove this dependency.
-  The required selector/mutation/scroll bridge is pinned to source `99fa1910866590cfaa28f6c56489a5711bc8fddf`, not released **1.1.5**. The current lock is a local Linux-x64-only diagnostic package, not a published cross-platform dependency (see below).
+  The required selector/mutation/scroll bridge is pinned to merged source `bac89b47f335c113a6903df100b953bef1962b5b`, including bridge `99fa1910866590cfaa28f6c56489a5711bc8fddf`, not released **1.1.5**. The current local diagnostic package includes Linux and macOS on x64 and ARM64, but no Windows library; it is not a full-platform release dependency (see below).
   The runtime alone (`DirgeServer`, audio driver, banks, loudness, live update) does not use Neo.
 - Native audio effects use six debug/release libraries: Linux x64, Windows x64 and macOS universal (ARM64 + x64). Android, iOS and Web native effects are not supported.
 - Building Dirge native audio from source needs C++17 and SCons. Building NecronomiDOM from source needs its own .NET NativeAOT SDK/compiler toolchain; consuming its precompiled GDExtension does not.
@@ -102,7 +102,7 @@ The recordings above are historical 1.0-era captures using the stock Godot 4.7.2
 1. Download `Dirge-v<version>.zip` from the [latest release](https://github.com/Eldritch-Game-Studio/Dirge/releases/latest)
    and copy its `addons/dirge/` folder into your project.
    The ZIP keeps its README, license, changelog and third-party notices inside `addons/dirge/`; it adds no root-level documents.
-2. Install the matching **bridge-enabled native** NecronomiDOM package into `addons/necronomidom/`, retaining its GDExtension manifest, platform binaries and notices. Use the exact dependency lock described below; it currently supports local Linux x64 diagnostics only. Released 1.1.5 is not sufficient, and a complete cross-platform release package remains a prerequisite.
+2. Install the matching **bridge-enabled native** NecronomiDOM package into `addons/necronomidom/`, retaining its GDExtension manifest, platform binaries and notices. Use the exact dependency lock described below; its current package supports local Linux/macOS diagnostics only. Released 1.1.5 is not sufficient, and a complete cross-platform release package remains a prerequisite.
 3. Open the project in stock Godot 4.7.2 and enable **Dirge** in **Project → Project Settings → Plugins**. No `.csproj` edits or `dotnet build` step are needed. Enabling registers the
    `DirgeServer` and `DirgeOverlay` autoloads and adds the `dirge/project_path` project setting; disabling removes the autoloads.
 4. Set **`dirge/project_path`** to your `*.dirge.json` file (the Dirge main screen's **Save As…** writes one).
@@ -276,21 +276,21 @@ PR execution requires the main-defined admission gate, with exact-head manual ap
 
 `scripts/fetch-deps.sh` reads the exact repository-root `dependency-lock.json`. Its current identity is:
 
-- Source: `99fa1910866590cfaa28f6c56489a5711bc8fddf`.
-- Local package: `file:dist/dependencies/NecronomiDOM-dirge11-99fa19108665-runtime-no-windows-partial.zip`.
-- Package SHA-256: `e12e0240c50e896fefda9d54b88af2c9a693cf19c00a097e446470e134dc517c`.
-- Newly compiled Linux x64 library SHA-256: `b4b6a3e158e9a1a957b0237966e0d39802f356fd179d564d4cfe2f10e942c93f`.
+- Source: `bac89b47f335c113a6903df100b953bef1962b5b`.
+- Local package: `file:dist/dependencies/NecronomiDOM-dirge11-bac89b47f335-no-windows.zip`.
+- Package SHA-256: `f489bfb8b50c884f6fd9ce0f2396e8c1082eacea9ebca8d3fba00eca42ee56a1`.
+- Upstream native runtime/editor bridge qualification: [run 43151174681](https://github.com/Eldritch-Game-Studio/NecronomiDOM/actions/runs/43151174681), artifact `13913658492`.
 
-This is an explicitly **local diagnostic** lock, not a published URL/version or a claim that the source has been published.
-Only `linux-x64` is included. Neo `linux-arm64`, `win-x64`, `osx-arm64` and `osx-x64` builds remain required prerequisites, not dropped support; the filename's `no-windows` label does not mean other targets are present.
+This is an explicitly **local diagnostic** package lock, not a published release URL/version. Its source is merged upstream.
+It includes `linux-x64`, `linux-arm64`, `osx-arm64` and `osx-x64`. A matching `win-x64` build remains mandatory; never mix an old Windows binary with the new bridge API. Upstream platform passes do not qualify integrated Dirge.
 The local package must exist at that repository-relative path; cloning alone does not download it.
 Explicit package inputs use `NECRONOMIDOM_PACKAGE_URL`, `NECRONOMIDOM_PACKAGE_SHA256` and matching `NECRONOMIDOM_REVISION`; never substitute a guessed version or unverified latest release.
 
-The bridge itself passed stock Godot 4.7.2 non-.NET checks for incremental DOM changes, focus, dirty input values,
+The original bridge passed stock Godot 4.7.2 non-.NET checks for incremental DOM changes, focus, dirty input values,
 scrolling, child order, keyboard/wheel/capture events, resource lifetime and clean teardown.
-Those results do not qualify the integrated Dirge application. The NativeAOT build still reports NU1903 for
+Those results do not qualify the integrated Dirge application. That NativeAOT build reported NU1903 for
 `Microsoft.DotNet.ILCompiler` 10.0.10, advisory [GHSA-p3jp-9v83-76w9](https://github.com/advisories/GHSA-p3jp-9v83-76w9);
-no bridge runtime failure was observed, but the advisory is not resolved or waived by that result.
+no bridge runtime failure was observed, but the runtime result does not resolve or waive the advisory.
 
 ## Verification
 
@@ -303,8 +303,8 @@ To qualify the **installed ZIP**, including the real editor main screen and F9 o
 ```sh
 python3 scripts/qualify-package.py --godot /path/to/stock/godot \
   --package dist/Dirge-v1.1.0.zip \
-  --dependency dist/dependencies/NecronomiDOM-dirge11-99fa19108665-runtime-no-windows-partial.zip \
-  --dependency-sha256 e12e0240c50e896fefda9d54b88af2c9a693cf19c00a097e446470e134dc517c \
+  --dependency dist/dependencies/NecronomiDOM-dirge11-bac89b47f335-no-windows.zip \
+  --dependency-sha256 f489bfb8b50c884f6fd9ce0f2396e8c1082eacea9ebca8d3fba00eca42ee56a1 \
   --output /tmp/dirge11-installed-proof --gui
 ```
 

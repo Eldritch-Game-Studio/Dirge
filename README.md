@@ -277,9 +277,9 @@ PR execution requires the main-defined admission gate, with exact-head manual ap
 `scripts/fetch-deps.sh` reads the exact repository-root `dependency-lock.json`. Its current identity is:
 
 - Source: `bac89b47f335c113a6903df100b953bef1962b5b`.
-- Local package: `file:dist/dependencies/NecronomiDOM-dirge11-bac89b47f335-no-windows.zip`.
-- Package SHA-256: `f489bfb8b50c884f6fd9ce0f2396e8c1082eacea9ebca8d3fba00eca42ee56a1`.
-- Upstream native runtime/editor bridge qualification: [run 43151174681](https://github.com/Eldritch-Game-Studio/NecronomiDOM/actions/runs/43151174681), artifact `13913658492`.
+- Local runtime-only package: `file:dist/dependencies/NecronomiDOM-dirge11-bac89b47f335-runtime-no-windows.zip`.
+- Package SHA-256: `faf258347e361de1aa843a7b487b6bc47da716c9279cf73ba8475a81da5f7b04`.
+- The upstream owner's runtime projection preserves native libraries, descriptors, assets and notices from [run 43151174681](https://github.com/Eldritch-Game-Studio/NecronomiDOM/actions/runs/43151174681), artifact `13913658492`; `runtime-package.json` records the full-package provenance. The general .NET/GDScript ZIP is not accepted by Dirge's runtime-only installer.
 
 This is an explicitly **local diagnostic** package lock, not a published release URL/version. Its source is merged upstream.
 It includes `linux-x64`, `linux-arm64`, `osx-arm64` and `osx-x64`. A matching `win-x64` build remains mandatory; never mix an old Windows binary with the new bridge API. Upstream platform passes do not qualify integrated Dirge.
@@ -303,8 +303,8 @@ To qualify the **installed ZIP**, including the real editor main screen and F9 o
 ```sh
 python3 scripts/qualify-package.py --godot /path/to/stock/godot \
   --package dist/Dirge-v1.1.0.zip \
-  --dependency dist/dependencies/NecronomiDOM-dirge11-bac89b47f335-no-windows.zip \
-  --dependency-sha256 f489bfb8b50c884f6fd9ce0f2396e8c1082eacea9ebca8d3fba00eca42ee56a1 \
+  --dependency dist/dependencies/NecronomiDOM-dirge11-bac89b47f335-runtime-no-windows.zip \
+  --dependency-sha256 faf258347e361de1aa843a7b487b6bc47da716c9279cf73ba8475a81da5f7b04 \
   --output /tmp/dirge11-installed-proof --gui
 ```
 

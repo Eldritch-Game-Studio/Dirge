@@ -1,7 +1,7 @@
 {
   "necronomidom": {
-    "url": "file:dist/dependencies/NecronomiDOM-dirge11-bac89b47f335-no-windows.zip",
-    "sha256": "f489bfb8b50c884f6fd9ce0f2396e8c1082eacea9ebca8d3fba00eca42ee56a1",
+    "url": "file:dist/dependencies/NecronomiDOM-dirge11-bac89b47f335-runtime-no-windows.zip",
+    "sha256": "faf258347e361de1aa843a7b487b6bc47da716c9279cf73ba8475a81da5f7b04",
     "revision": "bac89b47f335c113a6903df100b953bef1962b5b",
     "included_targets": [
       "linux-x64",

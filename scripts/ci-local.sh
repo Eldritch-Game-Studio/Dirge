@@ -6,6 +6,7 @@ cd "$(dirname "$0")/.."
 [[ "$(uname -s)" = Linux ]] || { echo 'ci-local.sh is the Linux diagnostic path' >&2; exit 2; }
 [[ $# = 0 ]] || { echo 'usage: scripts/ci-local.sh' >&2; exit 2; }
 bash scripts/test.sh
+
 native/build.sh
 scripts/fetch-deps.sh
 scripts/smoke.sh

@@ -107,6 +107,7 @@ jobs:
           persist-credentials: false
       - run: python3 scripts/apple-run.py bash scripts/test.sh
 
+
   smoke:
     # Linux stock-Godot acceptance remains a separate OS-specific oracle.
     needs: [trust, native-linux]

@@ -5,8 +5,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 [[ "$(uname -s)" = Linux ]] || { echo 'ci-local.sh is the Linux diagnostic path' >&2; exit 2; }
 [[ $# = 0 ]] || { echo 'usage: scripts/ci-local.sh' >&2; exit 2; }
-dotnet test tests/Dirge.Model.Tests -nologo
-python3 -m unittest discover -s tests/scripts -v
+bash scripts/test.sh
 scripts/validate.sh
 native/build.sh
 scripts/fetch-deps.sh

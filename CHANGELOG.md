@@ -6,6 +6,7 @@ All notable changes to Dirge. The format follows [Keep a Changelog](https://keep
 
 ### Fixed
 - Serialize reviewed manual CI dispatches with their PR events and main dispatches with main pushes, without cancelling active native qualification. Preserve exact-head admission for delayed PR events and document safe source supersession separately from completed-build deduplication.
+- Invoke version-specific tests through a source-owned `scripts/test.sh` after exact-head admission, preserving unconditional .NET model tests and delivery regressions while allowing the GDScript cutover to retain its required behavioral smoke gates.
 
 ## 1.0.3 — 2026-11-11
 

@@ -33,7 +33,7 @@ native/build.sh                        # only when native/ changed
 - `Dirge.Model` (`addons/dirge/model`) must stay free of Godot references; engine glue lives in `runtime/` and `tool/`.
 - Behaviour changes need a model test or a smoke assertion; UI changes need a short description of how you verified them in the editor.
 - Keep `docs/capabilities.md` in step with feature status and add a line to `CHANGELOG.md` under an `Unreleased` heading.
-- CI script regressions run with `python3 -m unittest discover -s tests/scripts -v`.
+- `bash scripts/test.sh` runs this revision's model and delivery tests; `python3 -m unittest discover -s tests/scripts -v` runs only delivery regressions.
 - Commit the demo `*.dirge.json` files when authored data changes; they are plain JSON with deterministic key order.
 
 ## Releases
@@ -61,6 +61,11 @@ To approve reviewed external code, a collaborator dispatches **CI on main**, sup
 the exact 40-character reviewed `approved_head`; changed heads invalidate approval. Merely approving a fork's
 workflow run does not grant access. Every build checks out the resolved immutable SHA without retaining
 GitHub credentials; release publication is a separate no-build job.
+
+The trusted test job invokes the checked-out revision's `scripts/test.sh`, rather than
+hardcoding a language-specific project path in the main workflow. This .NET revision
+runs its model suite and delivery tests unconditionally; missing suites are errors.
+Version-specific runtime behavior remains mandatory in the separate smoke jobs.
 
 PR events and exact-head manual approvals for the same PR share one concurrency group;
 ordinary main dispatches share the main push group. Active qualification is not cancelled

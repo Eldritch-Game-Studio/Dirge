@@ -16,6 +16,9 @@ All notable changes to Dirge. The format follows [Keep a Changelog](https://keep
 - The Neo bridge passed stock Godot 4.7.2 non-.NET incremental DOM/focus/dirty-value/scroll/order/input-capture/resource-lifetime checks with clean teardown. Only Linux x64 was newly compiled/included; Linux ARM64, Windows x64 and both macOS architectures remain required build prerequisites. The NativeAOT build still reports NU1903 for `Microsoft.DotNet.ILCompiler` 10.0.10, advisory [GHSA-p3jp-9v83-76w9](https://github.com/advisories/GHSA-p3jp-9v83-76w9); no bridge runtime failure was observed.
 - The local dependency lock does not qualify integrated Dirge. Full dependency platform closure and integrated Linux/Windows-on-Proton/macOS ARM64+x64 qualification remain release prerequisites. Windows-on-Proton coverage does not claim native Windows/MSVC or release-export-template qualification.
 
+### Fixed
+- Serialize reviewed manual CI dispatches with their PR events and main dispatches with main pushes, without cancelling active native qualification. Preserve exact-head admission for delayed PR events and document safe source supersession separately from completed-build deduplication.
+
 ## 1.0.3 — 2026-11-11
 
 ### Changed

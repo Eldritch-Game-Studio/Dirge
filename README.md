@@ -1,6 +1,6 @@
 # Dirge
 
-![Dirge — adaptive game audio, authored inside Godot](docs/images/dirge-promo.png)
+![Dirge — adaptive game audio, authored inside Godot](https://raw.githubusercontent.com/Eldritch-Game-Studio/Dirge/main/docs/images/dirge-promo.png)
 
 FMOD-Studio-style adaptive audio for Godot 4 .NET. Author events with timelines and parameter sheets, local and
 global parameters with automation and modulators, snapshots, VCAs and a mixer graph in an editor main screen, then
@@ -10,15 +10,15 @@ mount over a running game.
 
 **Inspired by [FMOD Studio](https://www.fmod.com/studio), built independently for Godot. No second audio engine: one DSP path, Godot's.**
 
-[Download the addon](https://github.com/Eldritch-Game-Studio/Dirge/releases/latest) · [Getting started](docs/getting-started.md) · [Capabilities and API](docs/capabilities.md) · [Specification](docs/SPEC.md) · [Changelog](CHANGELOG.md)
+[Download the addon](https://github.com/Eldritch-Game-Studio/Dirge/releases/latest) · [Getting started](https://github.com/Eldritch-Game-Studio/Dirge/blob/main/docs/getting-started.md) · [Capabilities and API](https://github.com/Eldritch-Game-Studio/Dirge/blob/main/docs/capabilities.md) · [Specification](https://github.com/Eldritch-Game-Studio/Dirge/blob/main/docs/SPEC.md) · [Changelog](CHANGELOG.md)
 
-![Dirge main screen: browser, transport with 3D preview panner, event editor, mixer](docs/images/shell.png)
+![Dirge main screen: browser, transport with 3D preview panner, event editor, mixer](https://raw.githubusercontent.com/Eldritch-Game-Studio/Dirge/main/docs/images/shell.png)
 
 ## Author, audition, mix, profile
 
 ### Events on a timeline, parameters on a curve
 
-![Dropping an audio asset from the browser onto a track creates a clip; a local parameter gets an automation curve drawn by hand; Play moves the playhead while the mixer meters follow](docs/images/event-editor.gif)
+![Dropping an audio asset from the browser onto a track creates a clip; a local parameter gets an automation curve drawn by hand; Play moves the playhead while the mixer meters follow](https://raw.githubusercontent.com/Eldritch-Game-Studio/Dirge/main/docs/images/event-editor.gif)
 
 Drag an asset from the **Browser** onto a track and it becomes a clip instrument. Add a local parameter and an
 automation lane: double-click in the curve editor to add points, drag to shape them. **Play** auditions the event
@@ -27,7 +27,7 @@ meters in the mixer all live.
 
 ### A mixer that knows about snapshots
 
-![Dragging a bus fader while two events play, adding a Low Pass Filter from the effect catalog, then selecting the Dialogue Ducking snapshot so a fader drag scopes into the snapshot and the intensity slider blends it in](docs/images/mixer.gif)
+![Dragging a bus fader while two events play, adding a Low Pass Filter from the effect catalog, then selecting the Dialogue Ducking snapshot so a fader drag scopes into the snapshot and the intensity slider blends it in](https://raw.githubusercontent.com/Eldritch-Game-Studio/Dirge/main/docs/images/mixer.gif)
 
 One strip per bus: fader, peak meter, mute/solo/bypass, routing picker, max voices and the effect chain, with every
 instantiable `AudioEffect` (plus the Dirge native effects when the extension is loaded) available from `+`. Select a
@@ -36,7 +36,7 @@ put, and the intensity slider lets you hear the blend.
 
 ### Record, replay, and connect to the game
 
-![Recording the editor audition into a command-stream recording, replaying it for comparison, then connecting to a running game whose instances, voices and bus levels stream into the profiler while a fader push reaches it live](docs/images/profiler-live.gif)
+![Recording the editor audition into a command-stream recording, replaying it for comparison, then connecting to a running game whose instances, voices and bus levels stream into the profiler while a fader push reaches it live](https://raw.githubusercontent.com/Eldritch-Game-Studio/Dirge/main/docs/images/profiler-live.gif)
 
 The **Profiler** records the deterministic command stream the model emits and replays it on a fresh model to compare,
 so recordings double as regression fixtures. **Live → Connect…** attaches the tool to a running game over localhost:
@@ -45,7 +45,7 @@ immediately.
 
 ### Adaptive music and ducking in a running game
 
-![The 3D sandbox HUD shows Threat flipping to 1 and the music section switching from Calm to Combat on the beat, a dialogue line ducking the Music bus, then the F9 overlay with the Mixer and Profiler panes over the game](docs/images/sandbox.gif)
+![The 3D sandbox HUD shows Threat flipping to 1 and the music section switching from Calm to Combat on the beat, a dialogue line ducking the Music bus, then the F9 overlay with the Mixer and Profiler panes over the game](https://raw.githubusercontent.com/Eldritch-Game-Studio/Dirge/main/docs/images/sandbox.gif)
 
 `demo/sandbox/` is a small 3D scene driven entirely by an authored `*.dirge.json`: a global `Threat` parameter
 switches a two-layer music event from Calm to Combat on the next beat, a dialogue line raises a ducking snapshot
@@ -102,6 +102,7 @@ The recordings use the stock Godot 4.7.2 .NET editor with Forward+ rendering; ca
 
 1. Download `Dirge-v<version>.zip` from the [latest release](https://github.com/Eldritch-Game-Studio/Dirge/releases/latest)
    and copy its `addons/dirge/` folder into your project.
+   The ZIP keeps its README, license, changelog and third-party notices inside `addons/dirge/`; it adds no root-level documents.
 2. Install NecronomiDOM into `addons/necronomidom/` from
    [its release ZIP](https://github.com/Eldritch-Game-Studio/NecronomiDOM/releases/latest).
 3. Add both build imports to your project's `.csproj`, before `</Project>`:
@@ -175,7 +176,7 @@ duck.Stop();
 ```
 
 `Attributes3D` is the model's own vector type (`System.Numerics.Vector3`), so the model stays engine-free; convert
-from Godot vectors at the call site. The [getting started guide](docs/getting-started.md) walks through authoring a
+from Godot vectors at the call site. The [getting started guide](https://github.com/Eldritch-Game-Studio/Dirge/blob/main/docs/getting-started.md) walks through authoring a
 bus, an event, a parameter with automation and a snapshot in ten minutes.
 
 ## Tool tour
@@ -236,7 +237,7 @@ builds and under the headless display server.
   `AudioStream` as impulse.
 
 The Mixer pane lists them when the extension is loaded. Routing rules (bus order, keep-alive players) are in
-[`native/README.md`](native/README.md). Everything else works without the extension.
+[`native/README.md`](https://github.com/Eldritch-Game-Studio/Dirge/blob/main/native/README.md). Everything else works without the extension.
 
 ## Demos
 
@@ -274,8 +275,9 @@ scripts/package.sh --suffix -partial   # Linux-only diagnostic; a full ZIP requi
 
 Other native platforms: from `native/`, run `scons platform=windows target=<target> arch=x86_64` or
 `scons platform=macos target=<target> arch=universal` for **both** `template_debug` and `template_release`.
-`scripts/package.sh` requires every registered native library and checks that both Mac frameworks contain
-ARM64 and x86_64 slices, plus a source/hash-matched Proton qualification receipt for both Windows DLLs.
+`scripts/package.sh` checks every library referenced by the final ZIP's GDExtension manifest, including debug and
+release targets. It also checks that both Mac frameworks contain ARM64 and x86_64 slices, plus a source/hash-matched
+Proton qualification receipt for both Windows DLLs. Missing or empty libraries prevent publication of the ZIP.
 `scripts/ci-local.sh` runs Linux-only diagnostics directly with local tools.
 Tagged `v*` pushes publish only after Linux smoke/native builds, Windows cross-builds and stock-Windows-Godot
 demo/sandbox/native smoke under official Proton, portable tests/validation, and both Mac runtime architectures

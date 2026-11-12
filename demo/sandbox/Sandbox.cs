@@ -26,7 +26,7 @@ public partial class Sandbox : Node3D
     private const float BirdOrbitHeight = 2.5f;
     private const float BirdOrbitSpeed = 0.35f;
     private const double SmokeSeconds = 6.0;
-    /// <summary>Tolerance for "started on a beat": one 60 fps frame plus slack, as the assignment specifies.</summary>
+    /// <summary>Tolerance for native sample alignment with a beat: one 60 fps frame plus slack.</summary>
     private const double BeatPhaseTolerance = 0.02;
 
     private DirgeServer _server = null!;
@@ -382,7 +382,7 @@ public partial class Sandbox : Node3D
 
     private void OnCommands(IReadOnlyList<Command> commands)
     {
-        // Position after this tick's update; a jump/quantized start inside the tick leaves the playhead < dt past the grid point.
+        // Compare the native sample onset with the conductor, not the wall-clock frame's overshoot.
         double musicPhase = _music is null ? 0 : _music.TimelinePosition % DemoProject.BeatSeconds;
         for (int i = 0; i < commands.Count; i++)
         {
@@ -402,18 +402,21 @@ public partial class Sandbox : Node3D
             switch (command)
             {
                 case VoicePlay play:
+                    double onsetPhase = (musicPhase - play.StartSeconds % DemoProject.BeatSeconds
+                        + DemoProject.BeatSeconds) % DemoProject.BeatSeconds;
+                    onsetPhase = Math.Min(onsetPhase, DemoProject.BeatSeconds - onsetPhase);
                     switch (play.Asset.Path)
                     {
                         case DemoProject.CombatDrumsAsset:
                         case DemoProject.CombatLeadAsset:
                             _combatPlays++;
-                            _worstCombatPhase = Math.Max(_worstCombatPhase, musicPhase);
-                            GD.Print($"SANDBOX_SMOKE combat layer {play.Asset.Path} at t={_server.System.Time:F3} musicPos={_music!.TimelinePosition:F4} phase={musicPhase:F4} start={play.StartSeconds:F3}");
+                            _worstCombatPhase = Math.Max(_worstCombatPhase, onsetPhase);
+                            GD.Print($"SANDBOX_SMOKE combat layer {play.Asset.Path} at t={_server.System.Time:F3} musicPos={_music!.TimelinePosition:F4} phase={onsetPhase:F4} start={play.StartSeconds:F4}");
                             break;
                         case DemoProject.StingerAsset:
                             _stingerPlays++;
-                            _worstStingerPhase = Math.Max(_worstStingerPhase, musicPhase);
-                            GD.Print($"SANDBOX_SMOKE stinger at t={_server.System.Time:F3} musicPos={_music!.TimelinePosition:F4} phase={musicPhase:F4}");
+                            _worstStingerPhase = Math.Max(_worstStingerPhase, onsetPhase);
+                            GD.Print($"SANDBOX_SMOKE stinger at t={_server.System.Time:F3} musicPos={_music!.TimelinePosition:F4} phase={onsetPhase:F4} start={play.StartSeconds:F4}");
                             break;
                         case DemoProject.LineEnAsset:
                             _lineEnPlays++;
@@ -481,7 +484,7 @@ public partial class Sandbox : Node3D
 
         if (_worstCombatPhase >= BeatPhaseTolerance)
         {
-            Fail($"Combat layers started {_worstCombatPhase:F4}s past a beat (tolerance {BeatPhaseTolerance})");
+            Fail($"Combat native sample alignment error {_worstCombatPhase:F4}s exceeds tolerance {BeatPhaseTolerance}");
             return;
         }
 
@@ -493,7 +496,7 @@ public partial class Sandbox : Node3D
 
         if (_worstStingerPhase >= BeatPhaseTolerance)
         {
-            Fail($"stinger started {_worstStingerPhase:F4}s past a beat (tolerance {BeatPhaseTolerance})");
+            Fail($"stinger native sample alignment error {_worstStingerPhase:F4}s exceeds tolerance {BeatPhaseTolerance}");
             return;
         }
 

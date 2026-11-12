@@ -59,6 +59,7 @@ internal sealed class Timeline
     private double _lastBeat;
     private bool _beatInclusive;
     private int _jumps;
+    private double _advanceRemainder;
 
     public Timeline(EventInstance instance, EventDescription description)
     {
@@ -92,6 +93,7 @@ internal sealed class Timeline
     public bool Begin()
     {
         _jumps = 0;
+        _advanceRemainder = 0;
         ProcessBeats(Position);
         ArmRegionContaining(Position);
         return _jumps > 0;
@@ -110,6 +112,7 @@ internal sealed class Timeline
         _jumps = 0;
         TimelinePoint[] points = _description.Points;
         double remaining = dt;
+        _advanceRemainder = dt;
         int guard = 0;
         while (remaining > 0 && guard++ < 4096)
         {
@@ -120,6 +123,7 @@ internal sealed class Timeline
                 double from = TransitionElapsed;
                 TransitionElapsed += step;
                 remaining -= step;
+                _advanceRemainder = Math.Max(0, remaining);
                 _instance.OnTransitionSegment(Transition, from, TransitionElapsed);
                 if (TransitionElapsed < _transitionLength - Epsilon) return;
                 LogicMarker marker = Transition;
@@ -146,6 +150,7 @@ internal sealed class Timeline
             bool pointsHere = pi >= 0 && points[pi].Position <= next + Epsilon;
             bool loopingHere = !arrivedByJump && pointsHere && LoopFiresAt(points, pi, next);
             remaining -= Math.Max(0, next - Position);
+            _advanceRemainder = Math.Max(0, remaining);
             MoveTo(next, loopingHere);
             bool transitioned = false;
             switch (kind)
@@ -336,7 +341,7 @@ internal sealed class Timeline
         _lastBeat = destination;
         _beatInclusive = true;
         ProcessBeats(destination);
-        _instance.OnTimelineJump(destination);
+        _instance.OnTimelineJump(destination, _advanceRemainder);
         ArmRegionContaining(destination);
     }
 }

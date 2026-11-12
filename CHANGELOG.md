@@ -7,6 +7,8 @@ All notable changes to Dirge. The format follows [Keep a Changelog](https://keep
 ### Fixed
 - Serialize reviewed manual CI dispatches with their PR events and main dispatches with main pushes, without cancelling active native qualification. Preserve exact-head admission for delayed PR events and document safe source supersession separately from completed-build deduplication.
 - Invoke version-specific tests through a source-owned `scripts/test.sh` after exact-head admission, preserving unconditional .NET model tests and delivery regressions while allowing the GDScript cutover to retain its required behavioral smoke gates.
+- Preserve the remaining frame in native sample offsets when a transition enters new layers or an internally started quantized cue crosses its beat. The sandbox checks actual native sample/conductor alignment with the unchanged 20 ms tolerance; slow-frame regressions also require exact recording replay.
+- Isolate native-platform smoke builds from reusable MSBuild/Roslyn workers, just like compatibility builds, and retain managed logs/binlogs and the original failing exit code.
 
 ## 1.0.3 — 2026-11-11
 

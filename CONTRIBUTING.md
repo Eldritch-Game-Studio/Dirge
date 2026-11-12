@@ -62,6 +62,19 @@ the exact 40-character reviewed `approved_head`; changed heads invalidate approv
 workflow run does not grant access. Every build checks out the resolved immutable SHA without retaining
 GitHub credentials; release publication is a separate no-build job.
 
+PR events and exact-head manual approvals for the same PR share one concurrency group;
+ordinary main dispatches share the main push group. Active qualification is not cancelled
+by a new event. Concurrency serializes active runs; it does not deduplicate completed work.
+A delayed PR event must still match the live PR head at admission or fail before checkout.
+Do not dispatch a replacement merely because a provider reports zero jobs: that event can
+still start later. Before source supersession, quiesce trusted admission routing, establish
+that no old trust/build job was assigned, advance the PR head with the actual fix, then
+restore routing. The old event's exact-head check excludes native work. If trust already
+succeeded, reconcile its dependent jobs to terminal state instead; never replace evidence
+or bypass the platform gate. Workflow changes take effect only after the trusted main
+definition contains them. Neither PR nor manual qualification publishes a GitHub release;
+publication remains tag-only, and Asset Store submission is a separate reconciled action.
+
 The local `[self-hosted, Linux, X64, eldritch-linux]` runner needs Python 3, SCons, a native C++17 compiler,
 .NET SDK 10.0.100/runtime 8, `xvfb-run`/Xvfb/xauth, `x86_64-w64-mingw32-g++`/`x86_64-w64-mingw32-objdump`, and official
 Proton 11 (`PROTON_HOME`, default `$HOME/.local/share/Steam/steamapps/common/Proton 11.0`).

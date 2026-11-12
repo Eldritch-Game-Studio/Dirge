@@ -32,14 +32,14 @@ def qualification(root):
         path = root / "windows-x64" / f"libdirge_native.windows.{target}.x86_64.dll"
         targets[target] = {
             "status": "PASS", "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
-            "assertions": ["DIRGE_SMOKE PASS", "SANDBOX_SMOKE PASS", "NATIVE_TEST PASS"],
+            "assertions": ["DIRGE_TEST PASS", "DIRGE_SMOKE PASS", "SANDBOX_SMOKE PASS", "NATIVE_TEST PASS"],
             "smoke": {"exit_code": 0, "timed_out": False},
             "native": {"exit_code": 0, "timed_out": False},
         }
     receipt = root / "windows-x64/proton-qualification.json"
-    receipt.write_text(json.dumps({"schema": 1, "status": "PASS",
+    receipt.write_text(json.dumps({"schema": 2, "status": "PASS",
         "coverage": "windows-x64-proton-compatibility", "source_revision": "a" * 40,
-        "targets": targets}))
+        "godot_distribution": "standard", "godot_version": "4.7.2", "targets": targets}))
     return receipt
 
 
@@ -93,8 +93,9 @@ class NativePackageTests(unittest.TestCase):
                         package_native.validate(root)
                     path.write_bytes(contents)
             receipt.unlink()
+            package_native.validate(root)  # Structural closure never requires historical receipts.
             with self.assertRaisesRegex(ValueError, "missing or invalid Windows Proton"):
-                package_native.validate(root)
+                package_native.validate(root, "a" * 40)
             qualification(root)
             with self.assertRaisesRegex(ValueError, "source revision"):
                 package_native.validate(root, "b" * 40)
@@ -102,7 +103,7 @@ class NativePackageTests(unittest.TestCase):
             windows = next(path for path in files if path.suffix == ".dll")
             windows.write_bytes(b"unqualified replacement")
             with self.assertRaisesRegex(ValueError, "matching successful Proton"):
-                package_native.validate(root)
+                package_native.validate(root, "a" * 40)
 
     def test_rejects_failed_or_timed_out_proton_runs(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -118,7 +119,7 @@ class NativePackageTests(unittest.TestCase):
                     evidence["targets"]["template_release"][step][field] = value
                     receipt.write_text(json.dumps(evidence))
                     with self.assertRaisesRegex(ValueError, "matching successful Proton"):
-                        package_native.validate_windows_qualification(root)
+                        package_native.validate_windows_qualification(root, "a" * 40)
 
 
 class ArchivePackageTests(unittest.TestCase):
@@ -129,11 +130,16 @@ class ArchivePackageTests(unittest.TestCase):
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
         repository = SCRIPT.parents[1]
-        for relative in ("scripts/package.sh", "scripts/package-native.py",
+        for relative in ("scripts/package.sh", "scripts/package.py", "scripts/package-native.py",
                          "addons/dirge/plugin.cfg", "addons/dirge/dirge_native.gdextension"):
             destination = self.root / relative
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(repository / relative, destination)
+        (self.root / "addons/dirge/plugin.cfg").write_text('[plugin]\nversion="1.1.0"\nscript="runtime/dirge_plugin.gd"\n')
+        for relative in (*package_native.REQUIRED_SCRIPTS, *("tool/ui/" + name for name in package_native.REQUIRED_UI)):
+            path = self.root / "addons/dirge" / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("extends RefCounted\n" if relative.endswith(".gd") else "fixture\n")
         self.documents = ("LICENSE", "README.md", "CHANGELOG.md", "THIRD_PARTY_NOTICES.md")
         for document in self.documents:
             (self.root / document).write_text(f"repository {document}\n")
@@ -142,8 +148,9 @@ class ArchivePackageTests(unittest.TestCase):
                          "runtime/obj/generated.cs", ".DS_Store", "sample.import.tmp",
                          ".git/config", ".github/workflows/ci.yml", ".godot/editor/cache",
                          ".gitignore", ".gitattributes", "Thumbs.db", "__MACOSX/._resource",
-                         "__pycache__/generated.pyc")
-        for relative in (*self.excluded, "runtime/source.cs", "runtime/source.cs.uid"):
+                         "__pycache__/generated.pyc", "runtime/source.cs", "runtime/source.cs.uid",
+                         "Dirge.csproj", "build.targets", "archive.nupkg", "tool.exe", "build.binlog")
+        for relative in (*self.excluded, "runtime/source.gd", "runtime/source.gd.uid"):
             path = self.root / "addons/dirge" / relative
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text("fixture\n")
@@ -169,7 +176,7 @@ class ArchivePackageTests(unittest.TestCase):
         evidence = json.loads(receipt.read_text())
         evidence["source_revision"] = self.revision
         receipt.write_text(json.dumps(evidence))
-        self.run_command("bash", "scripts/package.sh")
+        self.run_command("bash", "scripts/package.sh", "--require-qualification")
         self.archive = next((self.root / "dist").glob("Dirge-v*.zip"))
 
     def run_command(self, *arguments, check=True):
@@ -201,7 +208,7 @@ class ArchivePackageTests(unittest.TestCase):
                 self.assertIn(library, names)
             for relative in self.excluded:
                 self.assertNotIn(f"addons/dirge/{relative}", names)
-            self.assertIn("addons/dirge/runtime/source.cs.uid", names)
+            self.assertIn("addons/dirge/runtime/source.gd.uid", names)
 
     def test_archive_rejects_each_missing_or_empty_library(self):
         for library in self.libraries:
@@ -247,6 +254,7 @@ class ArchivePackageTests(unittest.TestCase):
 
     def test_archive_rejects_store_prohibited_payloads_and_junk(self):
         for name in ("tool.exe", "library.nupkg", "symbols.snupkg", "tool.EXE",
+                     "source.cs", "source.cs.uid", "Dirge.csproj", "build.targets", "build.binlog",
                      ".gitignore", "Thumbs.db", "__MACOSX/._resource", ".github/workflows/ci.yml"):
             with self.subTest(name=name):
                 archive = self.rewrite_archive(extra={f"addons/dirge/{name}": b"unwanted"})
@@ -279,6 +287,45 @@ class ArchivePackageTests(unittest.TestCase):
                                   str(self.archive), "--partial", check=False)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("requires a -partial.zip", result.stderr)
+
+    def test_structural_package_omits_stale_receipt_and_preserves_binary_bytes(self):
+        receipt = self.root / "addons/dirge/bin/windows-x64/proton-qualification.json"
+        receipt.write_text('{"schema": 1, "source_revision": "old-1.0.3", "status": "PASS"}')
+        self.run_command("bash", "scripts/package.sh")
+        package_native.validate_archive(self.archive)
+        with zipfile.ZipFile(self.archive) as archive:
+            self.assertNotIn("addons/dirge/bin/windows-x64/proton-qualification.json", archive.namelist())
+            contract = json.loads(archive.read("addons/dirge/package-contract.json"))
+            self.assertEqual(contract["runtime_evidence"], "not-asserted")
+            for name in self.libraries:
+                self.assertEqual(archive.read(name), (self.root / name).read_bytes())
+                self.assertEqual(contract["native_sha256"][name], hashlib.sha256(archive.read(name)).hexdigest())
+        result = self.run_command("bash", "scripts/package.sh", "--require-qualification", check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("source revision", result.stderr)
+
+    def test_rebuild_preserves_previous_version_archives(self):
+        previous = self.root / "dist/Dirge-v1.0.3.zip"
+        previous.write_bytes(b"previous published artifact")
+        self.run_command("bash", "scripts/package.sh")
+        self.assertEqual(previous.read_bytes(), b"previous published artifact")
+
+    def test_archive_requires_gdscript_and_ui_closure(self):
+        for name in (*package_native.REQUIRED_SCRIPTS, "tool/ui/theme.css", "tool/ui/shell.html"):
+            with self.subTest(name=name):
+                archive = self.rewrite_archive(omit=("addons/dirge/" + name,))
+                with self.assertRaisesRegex(ValueError, "missing GDScript/UI asset"):
+                    package_native.validate_archive(archive)
+
+    def test_old_mono_receipt_is_not_transferable_even_with_matching_hashes(self):
+        receipt = "addons/dirge/bin/windows-x64/proton-qualification.json"
+        with zipfile.ZipFile(self.archive) as archive:
+            evidence = json.loads(archive.read(receipt))
+        evidence["schema"] = 1
+        evidence.pop("godot_distribution")
+        archive = self.rewrite_archive(replace={receipt: json.dumps(evidence).encode()})
+        with self.assertRaisesRegex(ValueError, "source revision"):
+            package_native.validate_archive(archive, self.revision)
 
 
 if __name__ == "__main__":

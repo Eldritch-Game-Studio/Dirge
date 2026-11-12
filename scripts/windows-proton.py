@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Qualify real Windows DLLs with stock Windows Godot.NET under official Proton.
+"""Qualify real Windows DLLs with standard Windows Godot under official Proton.
 
 Compatibility coverage only: not native Windows/MSVC or export-template coverage.
 No Steam launch, user prefix, system Wine, or synthetic native artifact is used.
@@ -139,9 +139,6 @@ def godot_run(arguments):
         "STEAM_COMPAT_CLIENT_INSTALL_PATH": str(work / "steam"),
         "SteamAppId": "0", "SteamGameId": "0",
         "PROTON_LOG": "1", "PROTON_LOG_DIR": str(work / "logs"),
-        "DOTNET_ROOT": windows_path(work / "dotnet"),
-        "DOTNET_ROOT_X64": windows_path(work / "dotnet"),
-        "WINEPATH": windows_path(work / "dotnet"),
     })
     if "--path" in arguments:
         index = arguments.index("--path") + 1
@@ -155,7 +152,8 @@ def godot_run(arguments):
              str(proton / "proton"), "waitforexitandrun", os.environ["DIRGE_WINDOWS_GODOT"],
              "--log-file", windows_path(engine_log), *arguments],
             log, Path.cwd(), env, 180)
-        validate_engine_log(engine_log)
+        if arguments != ["--version"]:
+            validate_engine_log(engine_log)
     except BaseException as error:
         primary_error = error
         raise
@@ -194,10 +192,8 @@ def qualify():
     if sys.platform != "linux":
         raise ValueError("Proton qualification requires Linux")
     version = os.environ.get("GODOT_VERSION", "4.7.2")
-    if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version):
-        raise ValueError("GODOT_VERSION must be a stable numeric version")
-    if f'Godot.NET.Sdk/{version}"' not in (ROOT / "Dirge.Demo.csproj").read_text():
-        raise ValueError("stock Windows Godot must match the project's managed SDK version")
+    if version != "4.7.2":
+        raise ValueError("standard Godot 4.7.2 is required")
     proton = Path(os.environ.get("PROTON_HOME", str(Path.home() / ".local/share/Steam/steamapps/common/Proton 11.0"))).resolve()
     proton_version = (proton / "version").read_text().strip()
     if not re.fullmatch(r"[0-9]+ proton-11\.[^ ]+-x86_64", proton_version) or "GE" in proton_version:
@@ -216,7 +212,7 @@ def qualify():
     log_root.mkdir(parents=True, exist_ok=True)
     # Keep the unique run directory in logs even when setup fails. No stale PASS
     # receipt survives a new invocation; only all-success writes qualification.
-    report = {"schema": 1, "coverage": "windows-x64-proton-compatibility",
+    report = {"schema": 2, "coverage": "windows-x64-proton-compatibility", "godot_distribution": "standard",
               "source_revision": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
               "workspace": str(work), "godot_version": version,
               "runner_sha256": digest(Path(__file__).resolve()),
@@ -225,31 +221,24 @@ def qualify():
               "targets": {}}
     try:
         release = metadata(f"https://api.github.com/repos/godotengine/godot/releases/tags/{version}-stable", work / "godot-release.json")
-        archive_name = f"Godot_v{version}-stable_mono_win64.zip"
+        archive_name = f"Godot_v{version}-stable_win64.exe.zip"
         asset = next(item for item in release["assets"] if item["name"] == archive_name)
         expected_url = f"https://github.com/godotengine/godot/releases/download/{version}-stable/{archive_name}"
         if asset["browser_download_url"] != expected_url or not (asset.get("digest") or "").startswith("sha256:"):
             raise ValueError("matching stock Godot archive lacks authenticated upstream SHA-256 identity")
         report["godot"] = install_archive(expected_url, asset["digest"][7:], "sha256", work / "godot", work / archive_name)
-        executables = list((work / "godot").rglob(f"Godot_v{version}-stable_mono_win64.exe"))
+        executables = list((work / "godot").rglob(f"Godot_v{version}-stable_win64_console.exe"))
         if len(executables) != 1:
-            raise ValueError("stock Windows Godot.NET executable missing or ambiguous")
+            raise ValueError("standard Windows Godot console executable missing or ambiguous")
         executable = executables[0]
         report["godot"]["executable_sha256"] = digest(executable)
-        sdk_metadata = metadata("https://builds.dotnet.microsoft.com/dotnet/release-metadata/8.0/releases.json", work / "dotnet-releases.json")
-        sdk = next(item["sdk"] for item in sdk_metadata["releases"] if item["sdk"]["version"] == sdk_metadata["latest-sdk"])
-        sdk_file = next(item for item in sdk["files"] if item["rid"] == "win-x64" and item["name"].endswith(".zip"))
-        report["dotnet"] = install_archive(sdk_file["url"], sdk_file["hash"], "sha512", work / "dotnet", work / "dotnet.zip")
-        report["dotnet"].update({"sdk_version": sdk["version"], "runtime_version": sdk["runtime-version"],
-                                 "purpose": "Windows GodotTools editor dependencies; managed IL builds on Linux"})
         for name in ("compat", "steam", "logs"):
             (work / name).mkdir(exist_ok=True)
         wrapper = work / "godot-proton"
         wrapper.write_text(f"#!/bin/sh\nexec {shlex.quote(sys.executable)} {shlex.quote(str(Path(__file__).resolve()))} --godot \"$@\"\n")
         wrapper.chmod(0o700)
         env = dict(os.environ, GODOT=str(wrapper), DIRGE_PROTON_WORK=str(work),
-                   DIRGE_PROTON_HOME=str(proton), DIRGE_WINDOWS_GODOT=str(executable),
-                   DIRGE_SMOKE_ISOLATED_BUILD="1")
+                   DIRGE_PROTON_HOME=str(proton), DIRGE_WINDOWS_GODOT=str(executable))
         env.pop("GODOT_ARCH", None)
         for target in TARGETS:
             stage = work / target
@@ -257,7 +246,7 @@ def qualify():
             source_hash = stage_source(stage)
             report["source_content_sha256"] = source_hash
             staged_binary = stage / "addons/dirge/bin/windows-x64" / f"libdirge_native.windows.{target}.x86_64.dll"
-            staged_binary.parent.mkdir(parents=True)
+            staged_binary.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(binary_root / staged_binary.name, staged_binary)
             if digest(staged_binary) != hashes[target]:
                 raise ValueError("DLL changed during staging")
@@ -275,14 +264,14 @@ def qualify():
                 raise ValueError("smoke import rewrote project.godot")
             native = run([str(wrapper), "--headless", "--audio-driver", "Dummy", "--path", ".",
                           "res://native/tests/sendreturn.tscn"], logs / "native.log", stage, target_env, 240)
-            for filename, marker in (("demo.log", "DIRGE_SMOKE PASS"), ("sandbox.log", "SANDBOX_SMOKE PASS"), ("native.log", "NATIVE_TEST PASS")):
-                if marker not in (logs / filename).read_text(errors="replace").splitlines():
+            for filename, marker in (("gdscript.log", "DIRGE_TEST PASS"), ("demo.log", "DIRGE_SMOKE PASS"), ("sandbox.log", "SANDBOX_SMOKE PASS"), ("native.log", "NATIVE_TEST PASS")):
+                if not any(line == marker or line.startswith(marker + " ") for line in (logs / filename).read_text(errors="replace").splitlines()):
                     raise ValueError(f"{target}: missing {marker}")
             if digest(staged_binary) != hashes[target] or digest(binary_root / staged_binary.name) != hashes[target]:
                 raise ValueError("qualified DLL changed during smoke")
             report["targets"][target] = {"sha256": hashes[target], "status": "PASS",
-                "host": "stock-windows-dotnet-editor", "selection": "staged-debug-feature-mapping",
-                "assertions": ["DIRGE_SMOKE PASS", "SANDBOX_SMOKE PASS", "NATIVE_TEST PASS"],
+                "host": "stock-windows-standard-editor", "selection": "staged-debug-feature-mapping",
+                "assertions": ["DIRGE_TEST PASS", "DIRGE_SMOKE PASS", "SANDBOX_SMOKE PASS", "NATIVE_TEST PASS"],
                 "smoke": smoke, "native": native}
         report["status"] = "PASS"
         json_write(receipt_path, report)
@@ -303,7 +292,7 @@ def qualify():
         if log_root != work / "logs" and (work / "logs").exists():
             shutil.copytree(work / "logs", log_root, dirs_exist_ok=True)
         shutil.copy2(work / "qualification.json", log_root / "qualification.json")
-        for name in ("godot-release.json", "dotnet-releases.json"):
+        for name in ("godot-release.json",):
             if (work / name).exists():
                 shutil.copy2(work / name, log_root / name)
         print(f"Proton qualification evidence: {log_root}", flush=True)

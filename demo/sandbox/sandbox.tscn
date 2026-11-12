@@ -1,7 +1,7 @@
 [gd_scene load_steps=10 format=3]
 
-[ext_resource type="Script" path="res://demo/sandbox/Sandbox.cs" id="1_sandbox"]
-[ext_resource type="Script" path="res://addons/dirge/runtime/DirgeServer.cs" id="2_server"]
+[ext_resource type="Script" path="res://demo/sandbox/sandbox.gd" id="1_sandbox"]
+[ext_resource type="Script" path="res://addons/dirge/runtime/dirge_server.gd" id="2_server"]
 
 [sub_resource type="Environment" id="env"]
 background_mode = 1

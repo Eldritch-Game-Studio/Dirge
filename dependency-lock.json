@@ -1,0 +1,17 @@
+{
+  "necronomidom": {
+    "url": "file:dist/dependencies/NecronomiDOM-dirge11-99fa19108665-runtime-no-windows-partial.zip",
+    "sha256": "e12e0240c50e896fefda9d54b88af2c9a693cf19c00a097e446470e134dc517c",
+    "revision": "99fa1910866590cfaa28f6c56489a5711bc8fddf",
+    "included_targets": [
+      "linux-x64"
+    ],
+    "missing_targets": [
+      "linux-arm64",
+      "win-x64",
+      "osx-arm64",
+      "osx-x64"
+    ],
+    "diagnostic": true
+  }
+}

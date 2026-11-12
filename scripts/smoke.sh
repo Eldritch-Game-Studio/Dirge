@@ -1,84 +1,50 @@
 #!/usr/bin/env bash
-# Headless smoke: import the project, build, run the demo scene and the sandbox scene in smoke mode with the Dummy audio driver.
-# Usage: GODOT=/path/to/the/stock/Godot.NET/executable scripts/smoke.sh
+# Import and exercise the real GDScript suite, both demos, and native audio tests.
+# Usage: GODOT=/path/to/standard/godot scripts/smoke.sh
 set -euo pipefail
-
 cd "$(dirname "$0")/.."
-
 GODOT="${GODOT:-$(command -v godot || true)}"
-if [[ -z "$GODOT" || ! -x "$GODOT" ]]; then
-  echo "smoke: Godot .NET editor binary not found (set GODOT to the stock executable or put 'godot' on PATH)" >&2
-  exit 2
-fi
-
+export GODOT
+[[ -n "$GODOT" && -x "$GODOT" ]] || { echo 'smoke: standard Godot executable required (set GODOT)' >&2; exit 2; }
 godot=("$GODOT")
-if [[ -n "${GODOT_ARCH:-}" ]]; then
-  godot=(/usr/bin/arch "-$GODOT_ARCH" "$GODOT")
+if [[ -n "${GODOT_ARCH:-}" ]]; then godot=(/usr/bin/arch "-$GODOT_ARCH" "$GODOT"); fi
+version="$("${godot[@]}" --version)"
+if ! printf '%s\n' "$version" | grep -Eq '^4\.7\.2\.stable(\.|$)' || printf '%s\n' "$version" | grep -Eq '^4\.7\.2\..*mono'; then
+  echo "smoke: standard Godot 4.7.2 required, got $version" >&2; exit 2
 fi
 log_dir="${DIRGE_SMOKE_LOG_DIR:-${TMPDIR:-/tmp}/dirge-smoke}"
 mkdir -p "$log_dir"
-
-if [[ ! -d addons/necronomidom ]]; then
-  scripts/fetch-deps.sh
-fi
-
-if [[ ! -f demo/audio/wind.wav || ! -f demo/audio/click.wav ]]; then
-  python3 scripts/gen-demo-audio.py
-fi
-
-if [[ ! -f demo/sandbox/audio/calm_pad.wav || ! -f demo/sandbox/audio/line_de.wav ]]; then
-  python3 scripts/gen-sandbox-audio.py
-fi
-
-echo "smoke: dotnet build (native host SDK)"
-if [[ "${DIRGE_SMOKE_ISOLATED_BUILD:-0}" = 1 ]]; then
-  # Compatibility jobs share a host with parked producers. Never wait on their
-  # reusable MSBuild/Roslyn servers; compile portable managed IL locally.
-  dotnet build Dirge.slnx -nologo -v normal --disable-build-servers \
-    -m:1 -nr:false -p:UseSharedCompilation=false \
-    "-bl:$log_dir/managed-build.binlog" 2>&1 | tee "$log_dir/managed-build.log"
-else
-  dotnet build Dirge.slnx -nologo -v q
-fi
-
-echo "smoke: godot --import"
-# Native smoke retains its editor-shutdown retry. Compatibility qualification
-# fails on its first import error; never overwrite or hide the failing oracle.
-if ! "${godot[@]}" --headless --audio-driver Dummy --path . --import >"$log_dir/import.log" 2>&1; then
-  if [[ "${DIRGE_SMOKE_ISOLATED_BUILD:-0}" = 1 ]]; then
-    echo "smoke: compatibility import failed"; cat "$log_dir/import.log"; exit 1
+# Never restore another project's editor session or write the user's editor preferences.
+export XDG_CONFIG_HOME="$log_dir/user/config"
+export XDG_DATA_HOME="$log_dir/user/data"
+export XDG_CACHE_HOME="$log_dir/user/cache"
+mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_CACHE_HOME"
+scripts/fetch-deps.sh
+if [[ ! -f demo/audio/wind.wav || ! -f demo/audio/click.wav ]]; then python3 scripts/gen-demo-audio.py; fi
+if [[ ! -f demo/sandbox/audio/calm_pad.wav || ! -f demo/sandbox/audio/line_de.wav ]]; then python3 scripts/gen-sandbox-audio.py; fi
+settings="$(mktemp)"
+trap 'rm -f "$settings"' EXIT
+cp project.godot "$settings"
+run_checked() {
+  local name="$1" marker="$2"
+  shift 2
+  "${godot[@]}" --headless --audio-driver Dummy --path . "$@" 2>&1 | tee "$log_dir/$name.log"
+  if grep -Eq '^(ERROR:|SCRIPT ERROR:)' "$log_dir/$name.log"; then
+    echo "smoke: $name reported engine/script errors" >&2; exit 1
   fi
-  "${godot[@]}" --headless --audio-driver Dummy --path . --import >"$log_dir/import.log" 2>&1 || {
-    echo "smoke: import failed"; cat "$log_dir/import.log"; exit 1; }
+  if [[ -n "$marker" ]] && ! grep -Eq "^${marker}([[:space:]]|$)" "$log_dir/$name.log"; then
+    echo "smoke: $name missing $marker" >&2; exit 1
+  fi
+}
+run_checked import '' --import
+cmp -s project.godot "$settings" || { echo 'smoke: import rewrote project.godot' >&2; exit 1; }
+run_checked gdscript 'DIRGE_TEST PASS' --script res://tests/gdscript/run.gd
+run_checked demo 'DIRGE_SMOKE PASS' res://demo/demo.tscn -- --smoke
+run_checked sandbox 'SANDBOX_SMOKE PASS' res://demo/sandbox/sandbox.tscn -- --smoke
+run_checked native 'NATIVE_TEST PASS' res://native/tests/sendreturn.tscn
+# Proton captures a separate Windows engine log; its wrapper is not a JSON stdout transport.
+# The CLI JSON contract is exercised directly on both native Unix hosts.
+if [[ -z "${DIRGE_PROTON_WORK:-}" ]]; then
+  python3 -m unittest discover -s tests/scripts -p test_validate_cli.py -v 2>&1 | tee "$log_dir/validator-cli.log"
 fi
-# The plugin must leave an existing project's settings as authored (Godot normalizes project.godot on every save).
-if git rev-parse --is-inside-work-tree >/dev/null 2>&1 && ! git diff --quiet -- project.godot; then
-  echo "smoke: import rewrote project.godot"; git --no-pager diff -- project.godot; exit 1
-fi
-echo "smoke: run demo"
-set +e
-"${godot[@]}" --headless --audio-driver Dummy --path . res://demo/demo.tscn -- --smoke 2>&1 | tee "$log_dir/demo.log"
-status=${PIPESTATUS[0]}
-set -e
-
-if grep -q '^DIRGE_SMOKE PASS' "$log_dir/demo.log" && [[ $status -eq 0 ]]; then
-  echo "smoke: demo PASS"
-else
-  echo "smoke: demo FAIL (exit $status)"
-  exit 1
-fi
-
-echo "smoke: run sandbox"
-set +e
-"${godot[@]}" --headless --audio-driver Dummy --path . res://demo/sandbox/sandbox.tscn -- --smoke 2>&1 | tee "$log_dir/sandbox.log"
-status=${PIPESTATUS[0]}
-set -e
-
-if grep -q '^SANDBOX_SMOKE PASS' "$log_dir/sandbox.log" && [[ $status -eq 0 ]]; then
-  echo "smoke: sandbox PASS"
-else
-  echo "smoke: sandbox FAIL (exit $status)"
-  exit 1
-fi
-
-echo "smoke: PASS"
+echo 'smoke: PASS'

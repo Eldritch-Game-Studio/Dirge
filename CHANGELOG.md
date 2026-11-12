@@ -2,6 +2,19 @@
 
 All notable changes to Dirge. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
+## 1.1.0 — Unreleased
+
+### Changed
+- Cut over Dirge models, runtime, editor panes, demos, validation and regression entrypoints to GDScript for stock Godot 4.7.2, including non-.NET projects. Consumers no longer need a .NET SDK/runtime, NuGet restore, C# build imports or an external validator executable.
+- Preserve the public PascalCase `DirgeServer` method/signal surface; replace typed C# model consumers with snake_case runtime objects and Dictionary/Array authored data. Existing camelCase JSON keys, string enums, 32-hex IDs and `$type` discriminators remain compatible. See the migration section in `docs/capabilities.md`.
+- Retain NecronomiDOM's native HTML/CSS GDExtension and NativeAOT implementation for editor and overlay UI. The required selector/mutation/scroll bridge is newer than released 1.1.5: source `99fa1910866590cfaa28f6c56489a5711bc8fddf`, pinned by `dependency-lock.json`. The exact package hash is recorded in the README. This is a local Linux-x64 diagnostic identity, not a published release. Building Neo needs its source/compiler toolchain; using its precompiled native package does not require .NET.
+- Replace managed test/validator commands with `tests/gdscript/run.gd`, `scripts/validate.sh` and stock-Godot `scripts/smoke.sh`. Keep six-library native audio closure (Linux x64, Windows x64, universal macOS; debug and release) and strict release platform gates. Structural packaging is not runtime qualification.
+
+### Qualification
+- Qualification is recorded for each exact source and installed ZIP; no prior-version test pass, CI success, screenshot proof or platform requalification transfers. Existing Planned/Partial feature limits remain; the receipts below are historical, not 1.1.0 evidence.
+- The Neo bridge passed stock Godot 4.7.2 non-.NET incremental DOM/focus/dirty-value/scroll/order/input-capture/resource-lifetime checks with clean teardown. Only Linux x64 was newly compiled/included; Linux ARM64, Windows x64 and both macOS architectures remain required build prerequisites. The NativeAOT build still reports NU1903 for `Microsoft.DotNet.ILCompiler` 10.0.10, advisory [GHSA-p3jp-9v83-76w9](https://github.com/advisories/GHSA-p3jp-9v83-76w9); no bridge runtime failure was observed.
+- The local dependency lock does not qualify integrated Dirge. Full dependency platform closure and integrated Linux/Windows-on-Proton/macOS ARM64+x64 qualification remain release prerequisites. Windows-on-Proton coverage does not claim native Windows/MSVC or release-export-template qualification.
+
 ## 1.0.3 — 2026-11-11
 
 ### Changed

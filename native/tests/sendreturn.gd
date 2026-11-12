@@ -176,6 +176,17 @@ func _fail(message: String) -> void:
 
 
 func _finish() -> void:
+	set_process(false)
+	var players: Array = [_player_a, _player_conv, get_tree().root.get_node_or_null("DirgeReturnKeepAlive_Ret")]
+	for player in players:
+		if is_instance_valid(player):
+			player.stop()
+			player.queue_free()
+	AudioServer.set_bus_count(1)
+	_send = null
+	_conv = null
+	# Consume stop requests before exit; stock 4.7.2 still retains generator playbacks (see qualification evidence).
+	await get_tree().create_timer(0.05).timeout
 	if _failures.is_empty():
 		print("NATIVE_TEST PASS")
 		get_tree().quit(0)

@@ -24,8 +24,6 @@ concurrency:
 
 env:
   GODOT_VERSION: 4.7.2
-  DOTNET_NOLOGO: '1'
-  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
 
 defaults:
   run:
@@ -105,19 +103,7 @@ jobs:
           repository: ${{ needs.trust.outputs.repository }}
           ref: ${{ needs.trust.outputs.revision }}
           persist-credentials: false
-      - run: python3 scripts/apple-run.py dotnet test tests/Dirge.Model.Tests -nologo
       - run: python3 scripts/apple-run.py python3 -m unittest discover -s tests/scripts -v
-
-  validate:
-    needs: trust
-    runs-on: ${{ fromJSON(needs.trust.outputs.runner) }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          repository: ${{ needs.trust.outputs.repository }}
-          ref: ${{ needs.trust.outputs.revision }}
-          persist-credentials: false
-      - run: python3 scripts/apple-run.py bash scripts/validate.sh
 
   smoke:
     # Linux stock-Godot acceptance remains a separate OS-specific oracle.
@@ -135,18 +121,15 @@ jobs:
         with:
           name: native-linux
           path: addons/dirge/bin/
-      - name: Cache stock Godot .NET
+      - name: Cache standard Godot
         uses: actions/cache@v4
         with:
           path: ${{ runner.temp }}/godot-zip
-          key: godot-${{ env.GODOT_VERSION }}-mono-linux-x86_64
+          key: godot-${{ env.GODOT_VERSION }}-standard-linux-x86_64
       - run: scripts/install-godot.sh
       - run: scripts/fetch-deps.sh
       - run: scripts/smoke.sh
-      - name: Native runtime smoke
-        run: |
-          "$GODOT" --headless --audio-driver Dummy --path . res://native/tests/sendreturn.tscn 2>&1 | tee "$DIRGE_SMOKE_LOG_DIR/native.log"
-          grep -q '^NATIVE_TEST PASS' "$DIRGE_SMOKE_LOG_DIR/native.log"
+      - run: scripts/validate.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -206,7 +189,7 @@ jobs:
           key: godot-cpp-local-mingw-${{ steps.native-pin.outputs.revision }}-${{ hashFiles('native/SConstruct', 'scripts/windows-native.sh') }}
       - name: Cross-build Windows x64 debug/release and inspect the PE ABI
         run: scripts/windows-native.sh
-      - name: Stock Windows Godot.NET under official Proton (not native Windows)
+      - name: Standard Windows Godot under official Proton (not native Windows)
         env:
           DIRGE_PROTON_LOG_DIR: ${{ runner.temp }}/dirge-smoke-windows-proton
         run: timeout --signal=TERM --kill-after=30s 40m python3 scripts/windows-proton.py
@@ -244,11 +227,11 @@ jobs:
             native/godot-cpp/gen
             native/godot-cpp/src/**/*.o
           key: godot-cpp-local-macos-universal-clt27.2-scons4.10.1-${{ steps.native-pin.outputs.revision }}-${{ hashFiles('native/SConstruct', 'scripts/apple-native.sh') }}
-      - name: Cache stock Godot .NET
+      - name: Cache standard Godot
         uses: actions/cache@v4
         with:
           path: ${{ runner.temp }}/godot-zip
-          key: godot-${{ env.GODOT_VERSION }}-mono-macos-universal
+          key: godot-${{ env.GODOT_VERSION }}-standard-macos-universal
       - run: scripts/install-godot.sh
       - name: Build universal libraries and qualify ARM64 and Rosetta runtimes
         run: python3 scripts/apple-run.py bash scripts/apple-native.sh
@@ -265,9 +248,9 @@ jobs:
           if-no-files-found: error
 
   package:
-    needs: [trust, test, validate, smoke, native-linux, native-windows, native-macos]
+    needs: [trust, test, smoke, native-linux, native-windows, native-macos]
     # Every full target is mandatory. Only explicit manual diagnostics may omit any.
-    if: ${{ !cancelled() && needs.trust.result == 'success' && needs.test.result == 'success' && needs.validate.result == 'success' && needs.smoke.result == 'success' && needs.native-linux.result == 'success' && ((needs.native-windows.result == 'success' && needs.native-macos.result == 'success') || needs.trust.outputs.partial == 'true') }}
+    if: ${{ !cancelled() && needs.trust.result == 'success' && needs.test.result == 'success' && needs.smoke.result == 'success' && needs.native-linux.result == 'success' && ((needs.native-windows.result == 'success' && needs.native-macos.result == 'success') || needs.trust.outputs.partial == 'true') }}
     runs-on: ${{ fromJSON(needs.trust.outputs.runner) }}
     outputs:
       name: ${{ steps.zip.outputs.name }}
@@ -287,15 +270,35 @@ jobs:
         env:
           PARTIAL: ${{ needs.trust.outputs.partial }}
         run: |
+          suffix=''
           if [[ "$PARTIAL" = true ]]; then
+            suffix='-partial'
             python3 scripts/apple-run.py bash scripts/package.sh --suffix -partial
           else
-            python3 scripts/apple-run.py bash scripts/package.sh
+            python3 scripts/apple-run.py bash scripts/package.sh --require-qualification
           fi
-          files=(dist/Dirge-v*.zip)
-          [[ ${#files[@]} = 1 && -f "${files[0]}" ]]
-          echo "name=$(basename "${files[0]}" .zip)" >> "$GITHUB_OUTPUT"
-          echo "path=${files[0]}" >> "$GITHUB_OUTPUT"
+          version="$(python3 -c 'import configparser; p=configparser.ConfigParser(); p.read("addons/dirge/plugin.cfg"); print(p["plugin"]["version"].strip(chr(34)))')"
+          file="dist/Dirge-v${version}${suffix}.zip"
+          [[ -f "$file" ]]
+          echo "name=$(basename "$file" .zip)" >> "$GITHUB_OUTPUT"
+          echo "path=$file" >> "$GITHUB_OUTPUT"
+      - run: scripts/install-godot.sh
+      - run: scripts/fetch-deps.sh --archive-output "$RUNNER_TEMP/dirge-dependency.zip"
+      - name: Qualify the actual installed ZIP on this OS
+        env:
+          PACKAGE: ${{ steps.zip.outputs.path }}
+        run: |
+          dependency_sha="$(python3 -c 'import json; print(json.load(open("addons/necronomidom/.dirge-dependency.json"))["sha256"])')"
+          python3 scripts/apple-run.py python3 scripts/qualify-package.py \
+            --godot "$GODOT" --package "$PACKAGE" \
+            --dependency "$RUNNER_TEMP/dirge-dependency.zip" --dependency-sha256 "$dependency_sha" \
+            --output "$RUNNER_TEMP/dirge-installed-package"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: installed-package-evidence
+          path: ${{ runner.temp }}/dirge-installed-package
+          if-no-files-found: ignore
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.zip.outputs.name }}
@@ -303,7 +306,7 @@ jobs:
           if-no-files-found: error
 
   qualification:
-    needs: [trust, test, validate, smoke, native-linux, native-windows, native-macos, package]
+    needs: [trust, test, smoke, native-linux, native-windows, native-macos, package]
     if: always()
     runs-on: [self-hosted, Linux, X64, eldritch-linux]
     steps:

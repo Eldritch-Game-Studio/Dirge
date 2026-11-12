@@ -433,11 +433,13 @@ public sealed class EventInstance
         if (_updateOffset is { } elapsed) dt = Math.Max(0, dt - elapsed);
         _updateOffset = null;
         bool justStarted = false;
+        bool quantizedStart = false;
         double advance = dt;
         if (_state == PlaybackState.Starting)
         {
             if (_startDelay > 0)
             {
+                quantizedStart = true;
                 _startDelay -= dt;
                 if (_startDelay > 0) return;
                 // The grid point fell inside this tick: play only the part after it.
@@ -480,9 +482,9 @@ public sealed class EventInstance
             }
             finally { _deferNativeSeek = false; }
         }
-        // Begin enters instruments at the mutation's position, unlike later region entries whose
-        // offsets already include this tick's advance. Only the former still need that elapsed time.
-        if (clockedMutation && justStarted)
+        // Clocked and quantized starts must emit the sample position at this tick's end.
+        // Ordinary unclocked starts retain their explicit tick-boundary semantics.
+        if (justStarted && (clockedMutation || quantizedStart))
             for (int i = 0; i < _instruments.Length; i++) _instruments[i].AdvanceInitialVoices(advance);
         if (!_paused && CanTrigger) _timeline.Advance(advance);
         if (CanTrigger) EvaluateParameterInstruments();
@@ -585,7 +587,7 @@ public sealed class EventInstance
         }
     }
 
-    internal void OnTimelineJump(double position)
+    internal void OnTimelineJump(double position, double remainingAdvance = 0)
     {
         for (int i = 0; i < _instruments.Length; i++)
         {
@@ -597,9 +599,17 @@ public sealed class EventInstance
                 continue;
             }
             bool inRegion = position >= s.Info.RegionStart && position < s.Info.RegionEnd;
-            if (inRegion && !s.Active) s.OnEnter(position - s.Info.RegionStart);
+            if (inRegion && !s.Active)
+            {
+                s.OnEnter(position - s.Info.RegionStart);
+                s.AdvanceInitialVoices(remainingAdvance);
+            }
             else if (!inRegion && s.Active) s.OnExit();
-            else if (inRegion && !s.Info.Instrument.Async) s.OnJump(position, _deferNativeSeek);
+            else if (inRegion && !s.Info.Instrument.Async)
+            {
+                s.OnJump(position, _deferNativeSeek);
+                s.AdvanceInitialVoices(remainingAdvance);
+            }
         }
     }
 

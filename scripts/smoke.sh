@@ -31,15 +31,11 @@ if [[ ! -f demo/sandbox/audio/calm_pad.wav || ! -f demo/sandbox/audio/line_de.wa
 fi
 
 echo "smoke: dotnet build (native host SDK)"
-if [[ "${DIRGE_SMOKE_ISOLATED_BUILD:-0}" = 1 ]]; then
-  # Compatibility jobs share a host with parked producers. Never wait on their
-  # reusable MSBuild/Roslyn servers; compile portable managed IL locally.
-  dotnet build Dirge.slnx -nologo -v normal --disable-build-servers \
-    -m:1 -nr:false -p:UseSharedCompilation=false \
-    "-bl:$log_dir/managed-build.binlog" 2>&1 | tee "$log_dir/managed-build.log"
-else
-  dotnet build Dirge.slnx -nologo -v q
-fi
+# Every platform shares a host with other producers. Keep this build in one
+# process and never attach to reusable MSBuild/Roslyn servers owned by other work.
+dotnet build Dirge.slnx -nologo -v normal --disable-build-servers \
+  -m:1 -nr:false -p:UseSharedCompilation=false \
+  "-bl:$log_dir/managed-build.binlog" 2>&1 | tee "$log_dir/managed-build.log"
 
 echo "smoke: godot --import"
 # Native smoke retains its editor-shutdown retry. Compatibility qualification

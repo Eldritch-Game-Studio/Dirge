@@ -107,8 +107,7 @@ jobs:
           repository: ${{ needs.trust.outputs.repository }}
           ref: ${{ needs.trust.outputs.revision }}
           persist-credentials: false
-      - run: python3 scripts/apple-run.py dotnet test tests/Dirge.Model.Tests -nologo
-      - run: python3 scripts/apple-run.py python3 -m unittest discover -s tests/scripts -v
+      - run: python3 scripts/apple-run.py bash scripts/test.sh
 
   validate:
     needs: trust

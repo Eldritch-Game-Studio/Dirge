@@ -43,6 +43,17 @@ class AdmissionConcurrencyTests(unittest.TestCase):
         self.assertRegex(self.concurrency, r"(?m)^  cancel-in-progress: false$")
         self.assertNotIn("github.run_id", self.concurrency)
 
+    def test_source_owned_test_contract(self):
+        job = re.split(r"\n  [a-z][a-z-]*:\n", self.workflow.split("\n  test:\n", 1)[1], maxsplit=1)[0]
+        self.assertIn("needs: trust", job)
+        self.assertIn("persist-credentials: false", job)
+        self.assertIn("python3 scripts/apple-run.py bash scripts/test.sh", job)
+        self.assertNotIn("dotnet test", job)
+        self.assertNotIn("unittest discover", job)
+        root = WORKFLOW.parents[2]
+        self.assertTrue((root / "scripts/test.sh").is_file())
+        self.assertIn("bash scripts/test.sh", (root / "scripts/ci-local.sh").read_text())
+
     def test_stale_head_validation_remains_before_checkout(self):
         trust = self.workflow.split("\n  trust:\n", 1)[1].split("\n  test:\n", 1)[0]
         self.assertIn("pr.head.sha !== context.payload.pull_request.head.sha", trust)

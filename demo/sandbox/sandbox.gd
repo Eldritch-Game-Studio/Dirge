@@ -58,6 +58,7 @@ func _ready() -> void:
 		return
 	_server.System.locale = "en"
 	_server.CommandsEmitted.connect(_on_commands)
+	_server.Loaded.connect(_on_system_loaded)
 	_yaw = _player.rotation.y
 	_pitch = _player.rotation.x
 	if _smoke:
@@ -67,12 +68,21 @@ func _ready() -> void:
 	else:
 		print("Dirge sandbox: 1 Threat 0/1 · 2 stinger · 3 dialogue · L locale en/de · Space click · F9 HUD · click to capture mouse, Esc to release.")
 	_push_listener()
+	_start_ambience()
+	_update_hud()
+
+func _on_system_loaded(_system) -> void:
+	# Model instances belong to their system. Recording/live reload replaces that system.
+	_music = null
+	_birds = null
+	_start_ambience.call_deferred()
+
+func _start_ambience() -> void:
 	_music = _server.System.get_event(Project.MusicEvent).create_instance()
 	_music.start()
 	_birds = _server.System.get_event(Project.BirdsEvent).create_instance()
 	_birds.set_3d_attributes(_attributes(_bird_emitter.global_transform))
 	_birds.start()
-	_update_hud()
 
 func _process(delta: float) -> void:
 	if _quitting or not _server.IsLoaded:

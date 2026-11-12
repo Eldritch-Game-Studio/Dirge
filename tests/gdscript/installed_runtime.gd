@@ -75,6 +75,8 @@ func _run() -> void:
 	profiler.host.click("#rec-start")
 	await _settle()
 	check(profiler.is_recording, "real profiler record button starts capture")
+	check(sandbox._birds.system == server.System and sandbox._music.system == server.System, "sandbox reacquires model instances after recorder resets the system")
+	check(server.GetStats().real_voices > 0, "sandbox ambience resumes on the recorded system")
 	server.StartEvent("UI/Click")
 	_key(KEY_1)
 	await create_timer(0.3).timeout

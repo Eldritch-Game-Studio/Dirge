@@ -30,7 +30,7 @@ native/build.sh                        # only when native/ changed
 - `addons/dirge/model` holds GDScript data/evaluation/runtime logic; engine playback glue lives in `runtime/` and authoring glue in `tool/`. Models run under Godot without invoking `AudioServer` themselves.
 - Behaviour changes need a model test or a smoke assertion; UI changes need a short description of how you verified them in the editor.
 - Keep `docs/capabilities.md` in step with feature status and add a line to `CHANGELOG.md` under an `Unreleased` heading.
-- CI script regressions run with `python3 -m unittest discover -s tests/scripts -v`.
+- `bash scripts/test.sh` runs delivery regressions. `scripts/smoke.sh` separately runs the required GDScript behavioral suites and demo/sandbox/native assertions; delivery tests do not replace those runtime gates.
 - Commit the demo `*.dirge.json` files when authored data changes; they are plain JSON with deterministic key order.
 
 ## Releases
@@ -57,6 +57,12 @@ To approve reviewed external code, a collaborator dispatches **CI on main**, sup
 the exact 40-character reviewed `approved_head`; changed heads invalidate approval. Merely approving a fork's
 workflow run does not grant access. Every build checks out the resolved immutable SHA without retaining
 GitHub credentials; release publication is a separate no-build job.
+
+The trusted test job must invoke the checked-out revision's `scripts/test.sh`, rather
+than hardcoding the removed .NET test project. This GDScript revision runs its delivery
+suite there; behavioral tests still run unconditionally in the required smoke jobs.
+Land the corresponding reviewed test-entrypoint change on trusted main before opening
+the GDScript release PR. Do not broaden runner workflow access or skip missing tests.
 
 PR events and exact-head manual approvals for the same PR share one concurrency group;
 ordinary main dispatches share the main push group. Active qualification is not cancelled

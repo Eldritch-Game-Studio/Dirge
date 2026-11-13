@@ -2,21 +2,21 @@
 
 All notable changes to Dirge. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
-## 1.1.0 — Unreleased
+## 1.1.0 — 2026-11-13
 
 ### Changed
 - Cut over Dirge models, runtime, editor panes, demos, validation and regression entrypoints to GDScript for stock Godot 4.7.2, including non-.NET projects. Consumers no longer need a .NET SDK/runtime, NuGet restore, C# build imports or an external validator executable.
 - Preserve the public PascalCase `DirgeServer` method/signal surface; replace typed C# model consumers with snake_case runtime objects and Dictionary/Array authored data. Existing camelCase JSON keys, string enums, 32-hex IDs and `$type` discriminators remain compatible. See the migration section in `docs/capabilities.md`.
-- Retain NecronomiDOM's native HTML/CSS GDExtension and NativeAOT implementation for editor and overlay UI. The required selector/mutation/scroll bridge is newer than released 1.1.5: merged source `bac89b47f335c113a6903df100b953bef1962b5b` includes bridge `99fa1910866590cfaa28f6c56489a5711bc8fddf` and is pinned by `dependency-lock.json`. The exact package hash is recorded in the README. This remains a local diagnostic package, not a full-platform release; Linux and macOS binaries are included, Windows is not. Building Neo needs its source/compiler toolchain; using its precompiled native package does not require .NET.
+- Retain NecronomiDOM's native HTML/CSS GDExtension for editor and overlay UI. Requires NecronomiDOM **1.1.6** (source `9be2bdd22f1904525014501939afc493ef270592`); released 1.1.5 lacks the selector/mutation/scroll bridge. `dependency-lock.json` pins its runtime-only release package for Linux x64/ARM64, Windows x64 and macOS ARM64/x64 by URL and SHA-256 (`f8f60d5c9f78e3efb8eb529cce8d81c2259631b79354b5fd64860c28f9859dc0`). Using its precompiled native package does not require .NET.
 - Replace managed test/validator commands with `tests/gdscript/run.gd`, `scripts/validate.sh` and stock-Godot `scripts/smoke.sh`. Keep six-library native audio closure (Linux x64, Windows x64, universal macOS; debug and release) and strict release platform gates. Structural packaging is not runtime qualification.
 - Reacquire sandbox model instances when recording or live reload replaces their owning system; the overlay retains its recording and UI while ambience resumes on the new system.
 - Supply the source-owned `scripts/test.sh` delivery-test contract for trusted-main admission. GDScript behavioral suites remain mandatory in the separate runtime smoke gates; no .NET test-path fallback is retained.
 
 ### Qualification
-- Qualification is recorded for each exact source and installed ZIP; no prior-version test pass, CI success, screenshot proof or platform requalification transfers. Existing Planned/Partial feature limits remain; the receipts below are historical, not 1.1.0 evidence.
-- The original Linux-x64 Neo bridge passed stock Godot 4.7.2 non-.NET incremental DOM/focus/dirty-value/scroll/order/input-capture/resource-lifetime checks with clean teardown. Its NativeAOT build reported NU1903 for `Microsoft.DotNet.ILCompiler` 10.0.10, advisory [GHSA-p3jp-9v83-76w9](https://github.com/advisories/GHSA-p3jp-9v83-76w9); no bridge runtime failure was observed.
-- The updated dependency package passed upstream native runtime/editor bridge oracles on Linux x64/ARM64 and macOS ARM64/x64 at its exact merged source. This does not transfer qualification to Dirge or supply the missing Windows dependency.
-- The local dependency lock does not qualify integrated Dirge. Full dependency platform closure and integrated Linux/Windows-on-Proton/macOS ARM64+x64 qualification remain release prerequisites. Windows-on-Proton coverage does not claim native Windows/MSVC or release-export-template qualification.
+- Qualification is recorded for each exact source and installed ZIP; no prior-version test pass, CI success, screenshot proof or platform requalification transfers. Existing Planned/Partial feature limits remain.
+- NecronomiDOM v1.1.6 passed its release pipeline ([run 43479352356](https://github.com/Eldritch-Game-Studio/NecronomiDOM/actions/runs/43479352356)): native builds and installed-package qualification on Linux x64/ARM64, macOS ARM64/x64 and Windows x64 under Proton. Its NativeAOT build reports NU1903 for `Microsoft.DotNet.ILCompiler` 10.0.10, advisory [GHSA-p3jp-9v83-76w9](https://github.com/advisories/GHSA-p3jp-9v83-76w9); no bridge runtime failure was observed.
+- With that exact package installed, official stock (non-.NET) Godot 4.7.2 on Linux x64 passed `scripts/test.sh` (43 tests), `scripts/validate.sh` (demo and sandbox projects: 0 errors, 0 warnings) and `scripts/smoke.sh` (843 GDScript assertions, 0 failures; demo, sandbox replay and native-audio smokes PASS).
+- The v1.1.0 release ZIP is published only after Dirge's tag pipeline builds all six native audio libraries and qualifies that exact installed ZIP with its exact NecronomiDOM dependency on Linux x64, macOS and Windows x64 under Proton. Windows-on-Proton coverage does not claim native Windows/MSVC or release-export-template qualification.
 
 ### Fixed
 - Serialize reviewed manual CI dispatches with their PR events and main dispatches with main pushes, without cancelling active native qualification. Preserve exact-head admission for delayed PR events and document safe source supersession separately from completed-build deduplication.

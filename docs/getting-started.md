@@ -5,7 +5,7 @@ A ten-minute walkthrough: install the addon, author a bus, an event with a clip,
 ## 1. Install (2 minutes)
 
 1. Copy `addons/dirge/` from the matching release ZIP into your project.
-2. Install the matching bridge-enabled **native NecronomiDOM GDExtension** into `addons/necronomidom/`. Released 1.1.5 is insufficient. The current `dependency-lock.json` pins source `99fa1910866590cfaa28f6c56489a5711bc8fddf` and a local Linux-x64-only diagnostic ZIP by its exact hash; see [package identity and platform prerequisites](../README.md#building-from-source). This is not a published dependency version: Linux ARM64, Windows x64 and both macOS builds remain prerequisites. Keep the native binaries and notices; the HTML/CSS UI still requires them.
+2. Install the matching bridge-enabled **native NecronomiDOM GDExtension** into `addons/necronomidom/`. Released 1.1.5 is insufficient. Use 1.1.6 or newer: `dependency-lock.json` pins its released runtime-only package for Linux x64/ARM64, Windows x64 and macOS ARM64/x64; see [package identity](../README.md#building-from-source). Keep the native binaries and notices; the HTML/CSS UI still requires them.
 3. Open the project in stock Godot 4.7.2, then enable **Dirge** in **Project → Project Settings → Plugins**. A **Dirge** button appears in the editor's main-screen bar next to 2D/3D/Script, and two autoloads are registered: `DirgeServer` (runtime) and `DirgeOverlay` (debug-build overlay on **F9**).
 
 No `.csproj` imports, NuGet packages, `dotnet build`, or external executable are required. NecronomiDOM's NativeAOT build toolchain is needed only when compiling that dependency from source, not when loading its precompiled GDExtension.

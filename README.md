@@ -92,7 +92,7 @@ The recordings above are historical 1.0-era captures using the stock Godot 4.7.2
 
 - Stock **Godot 4.7.2**; the non-.NET editor is supported. No .NET SDK/runtime, NuGet restore, C# project imports or external validator executable is required to consume Dirge.
 - **NecronomiDOM native GDExtension** for the HTML/CSS editor tool and in-game overlay. Its NativeAOT implementation remains; removing Dirge's managed scripts does not remove this dependency.
-  The required selector/mutation/scroll bridge is pinned to merged source `bac89b47f335c113a6903df100b953bef1962b5b`, including bridge `99fa1910866590cfaa28f6c56489a5711bc8fddf`, not released **1.1.5**. The current local diagnostic package includes Linux and macOS on x64 and ARM64, but no Windows library; it is not a full-platform release dependency (see below).
+  Requires NecronomiDOM **1.1.6** or newer; released 1.1.5 lacks the selector/mutation/scroll bridge. Its packages include Linux x64/ARM64, Windows x64 and macOS ARM64/x64 libraries (see below).
   The runtime alone (`DirgeServer`, audio driver, banks, loudness, live update) does not use Neo.
 - Native audio effects use six debug/release libraries: Linux x64, Windows x64 and macOS universal (ARM64 + x64). Android, iOS and Web native effects are not supported.
 - Building Dirge native audio from source needs C++17 and SCons. Building NecronomiDOM from source needs its own .NET NativeAOT SDK/compiler toolchain; consuming its precompiled GDExtension does not.
@@ -102,7 +102,7 @@ The recordings above are historical 1.0-era captures using the stock Godot 4.7.2
 1. Download `Dirge-v<version>.zip` from the [latest release](https://github.com/Eldritch-Game-Studio/Dirge/releases/latest)
    and copy its `addons/dirge/` folder into your project.
    The ZIP keeps its README, license, changelog and third-party notices inside `addons/dirge/`; it adds no root-level documents.
-2. Install the matching **bridge-enabled native** NecronomiDOM package into `addons/necronomidom/`, retaining its GDExtension manifest, platform binaries and notices. Use the exact dependency lock described below; its current package supports local Linux/macOS diagnostics only. Released 1.1.5 is not sufficient, and a complete cross-platform release package remains a prerequisite.
+2. Install NecronomiDOM **1.1.6** into `addons/necronomidom/`, retaining its GDExtension manifest, platform binaries and notices: its Godot Asset Store package, or the runtime-only `NecronomiDOM-v1.1.6-runtime.zip` release asset pinned below, which omits C# integration sources. Released 1.1.5 is not sufficient.
 3. Open the project in stock Godot 4.7.2 and enable **Dirge** in **Project → Project Settings → Plugins**. No `.csproj` edits or `dotnet build` step are needed. Enabling registers the
    `DirgeServer` and `DirgeOverlay` autoloads and adds the `dirge/project_path` project setting; disabling removes the autoloads.
 4. Set **`dirge/project_path`** to your `*.dirge.json` file (the Dirge main screen's **Save As…** writes one).
@@ -276,14 +276,12 @@ PR execution requires the main-defined admission gate, with exact-head manual ap
 
 `scripts/fetch-deps.sh` reads the exact repository-root `dependency-lock.json`. Its current identity is:
 
-- Source: `bac89b47f335c113a6903df100b953bef1962b5b`.
-- Local runtime-only package: `file:dist/dependencies/NecronomiDOM-dirge11-bac89b47f335-runtime-no-windows.zip`.
-- Package SHA-256: `faf258347e361de1aa843a7b487b6bc47da716c9279cf73ba8475a81da5f7b04`.
-- The upstream owner's runtime projection preserves native libraries, descriptors, assets and notices from [run 43151174681](https://github.com/Eldritch-Game-Studio/NecronomiDOM/actions/runs/43151174681), artifact `13913658492`; `runtime-package.json` records the full-package provenance. The general .NET/GDScript ZIP is not accepted by Dirge's runtime-only installer.
+- Release: NecronomiDOM [v1.1.6](https://github.com/Eldritch-Game-Studio/NecronomiDOM/releases/tag/v1.1.6), source `9be2bdd22f1904525014501939afc493ef270592`.
+- Runtime-only package: `https://github.com/Eldritch-Game-Studio/NecronomiDOM/releases/download/v1.1.6/NecronomiDOM-v1.1.6-runtime.zip`.
+- Package SHA-256: `f8f60d5c9f78e3efb8eb529cce8d81c2259631b79354b5fd64860c28f9859dc0`.
+- It includes `linux-x64`, `linux-arm64`, `win-x64`, `osx-arm64` and `osx-x64`. Its `runtime-package.json` records the full release ZIP it was projected from. The general .NET/GDScript ZIP is not accepted by Dirge's runtime-only installer.
 
-This is an explicitly **local diagnostic** package lock, not a published release URL/version. Its source is merged upstream.
-It includes `linux-x64`, `linux-arm64`, `osx-arm64` and `osx-x64`. A matching `win-x64` build remains mandatory; never mix an old Windows binary with the new bridge API. Upstream platform passes do not qualify integrated Dirge.
-The local package must exist at that repository-relative path; cloning alone does not download it.
+Upstream platform passes do not qualify integrated Dirge; Dirge's own CI qualifies it with this exact package.
 Explicit package inputs use `NECRONOMIDOM_PACKAGE_URL`, `NECRONOMIDOM_PACKAGE_SHA256` and matching `NECRONOMIDOM_REVISION`; never substitute a guessed version or unverified latest release.
 
 The original bridge passed stock Godot 4.7.2 non-.NET checks for incremental DOM changes, focus, dirty input values,
@@ -303,8 +301,8 @@ To qualify the **installed ZIP**, including the real editor main screen and F9 o
 ```sh
 python3 scripts/qualify-package.py --godot /path/to/stock/godot \
   --package dist/Dirge-v1.1.0.zip \
-  --dependency dist/dependencies/NecronomiDOM-dirge11-bac89b47f335-runtime-no-windows.zip \
-  --dependency-sha256 faf258347e361de1aa843a7b487b6bc47da716c9279cf73ba8475a81da5f7b04 \
+  --dependency /path/to/NecronomiDOM-v1.1.6-runtime.zip \
+  --dependency-sha256 f8f60d5c9f78e3efb8eb529cce8d81c2259631b79354b5fd64860c28f9859dc0 \
   --output /tmp/dirge11-installed-proof --gui
 ```
 
@@ -317,7 +315,7 @@ The smoke entrypoint imports the project, runs `tests/gdscript/run.gd`, then dem
 headless with Dummy audio. These assert command streams, `AudioServer` state and profiler replay; they do not prove audible output or visual UI parity.
 `GODOT` may be omitted when `godot` is on `PATH`. On macOS use `Godot.app/Contents/MacOS/Godot`.
 The release contract requires Linux, Windows-on-Proton and macOS ARM64/x64 closure for both debug/release native effects.
-No 1.1.0 test pass, CI success, platform requalification or fresh screenshot proof is claimed by this document.
+Per-release qualification results are recorded in [`CHANGELOG.md`](CHANGELOG.md).
 See [`CONTRIBUTING.md`](CONTRIBUTING.md) for runner prerequisites and the untrusted-PR policy.
 
 ## License

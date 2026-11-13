@@ -1,4 +1,5 @@
 import importlib.util
+import io
 import hashlib
 from pathlib import Path
 import tempfile
@@ -69,6 +70,32 @@ class WindowsProtonTests(unittest.TestCase):
                     windows_proton.install_archive("https://example.invalid/standard.zip",
                         "0" * 64, "sha256", root / "rejected", root / "download.zip")
                 self.assertFalse((root / "rejected").exists())
+
+    def test_version_probe_reports_redirected_engine_output_only(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "logs").mkdir()
+            commands = []
+
+            def fake_run(command, log, cwd, env, seconds, check=True):
+                commands.append(command)
+                log.write_text("Proton: Upgrading prefix\n")
+                script = Path(log).with_suffix(".version.cmd")
+                self.assertIn(" --version > ", script.read_text())
+                Path(log).with_suffix(".version.txt").write_text("4.7.2.stable.official.ed1daf0bf\r\n")
+                return {"exit_code": 0, "timed_out": False}
+
+            env = {"DIRGE_PROTON_WORK": str(root), "DIRGE_PROTON_HOME": str(root),
+                   "DIRGE_WINDOWS_GODOT": str(root / "Godot_v4.7.2-stable_win64_console.exe")}
+            with patch.dict(windows_proton.os.environ, env), \
+                 patch.object(windows_proton, "run", side_effect=fake_run), \
+                 patch.object(windows_proton, "quiesce_prefix"), \
+                 patch("sys.stdout", new_callable=io.StringIO) as stdout, \
+                 patch("sys.stderr", new_callable=io.StringIO) as stderr:
+                windows_proton.godot_run(["--version"])
+            self.assertEqual(stdout.getvalue(), "4.7.2.stable.official.ed1daf0bf\n")
+            self.assertIn("Proton: Upgrading prefix", stderr.getvalue())
+            self.assertEqual(commands[0][-3:-1], ["C:\\windows\\system32\\cmd.exe", "/c"])
 
 
 if __name__ == "__main__":

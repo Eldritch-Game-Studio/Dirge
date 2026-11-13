@@ -145,12 +145,20 @@ def godot_run(arguments):
         arguments[index] = windows_path(Path(arguments[index]))
     log = work / "logs" / f"godot-{time.time_ns()}.log"
     engine_log = log.with_suffix(".engine.log")
+    version_output = log.with_suffix(".version.txt")
+    if arguments == ["--version"]:
+        # Proton does not forward a console program's stdout, and --version exits
+        # before --log-file opens. Let cmd.exe redirect the engine's real output.
+        script = log.with_suffix(".version.cmd")
+        script.write_text(f'@"{windows_path(Path(os.environ["DIRGE_WINDOWS_GODOT"]))}" --version > "{windows_path(version_output)}"\r\n')
+        command = ["C:\\windows\\system32\\cmd.exe", "/c", windows_path(script)]
+    else:
+        command = [os.environ["DIRGE_WINDOWS_GODOT"], "--log-file", windows_path(engine_log), *arguments]
     primary_error = None
     try:
         run(["xvfb-run", "--auto-servernum", "--error-file", str(log.with_suffix(".xvfb.log")),
              "--server-args=-screen 0 1280x720x24 -nolisten tcp",
-             str(proton / "proton"), "waitforexitandrun", os.environ["DIRGE_WINDOWS_GODOT"],
-             "--log-file", windows_path(engine_log), *arguments],
+             str(proton / "proton"), "waitforexitandrun", *command],
             log, Path.cwd(), env, 180)
         if arguments != ["--version"]:
             validate_engine_log(engine_log)
@@ -158,7 +166,13 @@ def godot_run(arguments):
         primary_error = error
         raise
     finally:
-        print(log.read_text(errors="replace"), end="", flush=True)
+        if arguments == ["--version"]:
+            # Keep stdout to the engine's own answer; Proton diagnostics go to stderr.
+            print(log.read_text(errors="replace"), end="", file=sys.stderr, flush=True)
+            if version_output.is_file():
+                print(version_output.read_text(errors="replace").replace("\r\n", "\n"), end="", flush=True)
+        else:
+            print(log.read_text(errors="replace"), end="", flush=True)
         if engine_log.is_file():
             print(engine_log.read_text(errors="replace"), end="", flush=True)
         try:

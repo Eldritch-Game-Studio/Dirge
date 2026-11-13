@@ -1,6 +1,6 @@
 # Dirge capabilities and runtime API
 
-Feature matrix from [`SPEC.md`](SPEC.md) §3 with the implementation status of each row as of 1.0.0, followed by a reference of every public member of the runtime types game code talks to. Statuses: **Done** — implemented and covered by a model test, the headless smoke or a tool proof; **Partial** — implemented with a documented gap; **Planned** — not implemented.
+Feature matrix from [`SPEC.md`](SPEC.md) §3, followed by the 1.1.0 GDScript runtime contract. Matrix statuses retain the existing feature scope: **Done** — implemented in the previous baseline and required by the cutover; **Partial** — implemented with a documented gap; **Planned** — not implemented. These labels are not evidence of fresh 1.1.0 test, UI or platform qualification. The matrix's PascalCase type/property names identify schema concepts from the original model; they are not C# APIs to import in 1.1.0. Authored keys remain camelCase; lower-level runtime members are snake_case.
 
 Priority tiers: P0 ships with 1.0, P1 in 1.x, P2 after; `—` is a deliberate non-goal.
 
@@ -18,7 +18,7 @@ Priority tiers: P0 ships with 1.0, P1 in 1.x, P2 after; `—` is a deliberate no
 | Timeline markers: loop region, transition marker, transition region, sustain point, destination marker, tempo marker, magnet region | `LoopRegion`, `TransitionMarker`, `TransitionRegion`, `SustainPoint`, `DestinationMarker`, `TempoMarker`, `MagnetRegion` | P0 (magnet P1) | Done | seeks are block-quantized by Godot (~10 ms at default latency) |
 | Trigger conditions: parameter range, probability | `TriggerCondition`, `Instrument.Probability`, `LogicMarker.Probability` | P0 | Done | labeled parameters are matched by their numeric value |
 | Async instruments, cut-off on condition exit | `Instrument.Async`, `CutMode` (Cut / FadeOut) | P0 | Done | |
-| Callbacks: started / stopped / marker / beat / sound played / sound stopped / virtualized / unvirtualized / stolen / programmer sound | `EventInstance.Callback` + `CallbackMask`, `CallbackEvent` records; GDScript: `DirgeServer` signals | P0 | Done | handle-based instances emit `EventStarted`, `EventStopped`, `TimelineMarker`, `TimelineBeat`, `SoundPlayed`, `EventVirtualized`, `EventUnvirtualized`, `EventStolen`, `ProgrammerSound`; `SoundStopped` is C#-only |
+| Callbacks: started / stopped / marker / beat / sound played / sound stopped / virtualized / unvirtualized / stolen / programmer sound | instance `callback(instance, event: Dictionary)` + integer callback mask; public `DirgeServer` signals | P0 | Done | handle-based instances emit `EventStarted`, `EventStopped`, `TimelineMarker`, `TimelineBeat`, `SoundPlayed`, `EventVirtualized`, `EventUnvirtualized`, `EventStolen`, `ProgrammerSound`; `SoundStopped` is available through the lower-level instance callback |
 | Event preview / audition with parameter scrubbing | Transport pane | P0 | Done | |
 | Per-event 3D attributes | `EventInstance.Set3DAttributes(Attributes3D)` → `AudioStreamPlayer3D` | P0 | Done | |
 | Instance user data / property overrides (`setProperty`) | — | P1 | Planned | |
@@ -88,7 +88,7 @@ Priority tiers: P0 ships with 1.0, P1 in 1.x, P2 after; `—` is a deliberate no
 
 Selection updates reuse browser rows/tag chips, the event toolbar and empty automation controls, unchanged transport parameter lists, and structurally unchanged mixer effect rows. Pickers resolve the current event when opened; unrelated project changes do not refresh the mixer. Parameter-definition changes and structural effect-chain changes still rebuild their affected controls.
 
-The responsiveness measurements in the Unreleased changelog were collected with the companion NecronomiDOM style-reuse changes in the maintained Eldritch editor, not the stock-Godot smoke environment. To reproduce the combined improvements from source, use NecronomiDOM's matching source changes rather than the 1.1.5 release fetched by `scripts/fetch-deps.sh`; Dirge's stock Godot 4.7.2 .NET build target is unchanged.
+The earlier responsiveness measurements were collected with companion NecronomiDOM style-reuse changes in the maintained Eldritch editor, not the stock-Godot cutover environment. They do not qualify 1.1.0. The HTML/CSS UI remains on Neo's native GDExtension; the required GDScript selector/mutation/scroll bridge needs NecronomiDOM 1.1.6. `dependency-lock.json` pins its released runtime-only package for Linux x64/ARM64, Windows x64 and macOS ARM64/x64 by URL, SHA-256 and source revision. Bridge DOM/input/scroll/lifetime checks passed stock non-.NET Godot 4.7.2; integrated Dirge qualification requires the exact installed-package receipt and inspected screenshots. See [package details and outstanding compiler advisory](../README.md#building-from-source). Consuming Neo's precompiled NativeAOT binary needs no .NET installation.
 
 | FMOD Studio | Dirge | P | Status | Note |
 |---|---|---|---|---|
@@ -100,7 +100,7 @@ The responsiveness measurements in the Unreleased changelog were collected with 
 | Live update | `LiveUpdateHost` (game), `LiveUpdateBridge`/`LiveUpdateClient` (editor); `--dirge-live[=port]` | P1 | Done | localhost TCP, protocol 1, port 7447 |
 | Sandbox | `demo/sandbox/sandbox.tscn`; `DirgeOverlay` (F9) | P1 | Done | |
 | Validation panel + CLI | `ValidationPanel`, `ProjectValidator`, `tools/dirge-validate` | P0 | Done | |
-| Scripting | C# API + GDScript through `DirgeServer` | P0 | Done | |
+| Scripting | GDScript model objects and Dictionaries; retained PascalCase `DirgeServer` API | P0 | Done | no typed C# assembly dependency |
 | Undo/redo, multi-select, copy/paste across events | `ProjectDocument`, `ToolCommand` | P0 | Done | clipboard is pane-local and survives event switches |
 | Localization audio tables | `AudioTable`, `DirgeSystem.Locale` | P1 | Done | |
 | Banks | `AudioBank`; `DirgeServer.LoadBank/UnloadBank/IsBankLoaded`, `BankLoader` | — | Done | preload groups over `ResourceLoader`; no bank files |
@@ -110,9 +110,38 @@ The responsiveness measurements in the Unreleased changelog were collected with 
 | Themes | `ToolTheme`/`ToolPalette` (`Core`); editor settings `dirge/theme` (Editor, Dirge Dark, Dirge Light, High Contrast, Custom), `dirge/theme_background`, `dirge/theme_foreground`, `dirge/theme_accent`; **View › Theme** cycles | — | Done | one palette for every document (written as inline custom properties on each document root; `theme.css` holds the Dirge Dark defaults and pane stylesheets use variables only) and every canvas (timeline, curve, panner, profiler graph and recording). Editor preset derives from the Godot editor theme (`base_color`, `dark_color_*`, `font_color`, `accent_color`, `error/warning/success_color`) so light editor themes get a light Dirge. Derived palettes keep text ≥ 4.5:1 and accent/semantic colors ≥ 3:1 against the background; a Custom pair below the floor is corrected and warned about once. Re-applied live on `EditorSettings.SettingsChanged` (deferred, so editor theme rebuilds are seen) |
 | Tool UI localization | — | P2 | Planned | |
 
+## Migration from 1.0 C# consumers
+
+1. Replace Dirge's old addon files rather than layering `.gd` files over obsolete `.cs` files. Remove the `Dirge.targets` and `NecronomiDom.targets` imports used for this integration, obsolete Dirge assembly references and typed `using Dirge.*` consumers. Keep unrelated C# code/tooling if your game uses it; Dirge itself no longer requires it.
+2. Install the matching native Neo bridge package, preserving its `.gdextension`, binaries and notices. Do **not** remove Neo or replace its HTML/CSS UI with Controls. Released 1.1.5 is insufficient; use NecronomiDOM 1.1.6 or newer (the exact package pinned above).
+3. Existing handle-based GDScript calls and server signals keep **PascalCase**. Replace typed C# instance/model calls with the snake_case GDScript APIs below. There are no compatibility assemblies or obsolete-name aliases.
+4. Authored objects become `Dictionary`/`Array`: `AudioProject.Events` → `project["events"]`, `AudioEvent.LocalParameters` → `event["localParameters"]`, `Bus.VolumeDb` → `bus["volumeDb"]`. IDs stay 32 hexadecimal characters, assets stay paths, enums stay strings, and polymorphic objects keep `$type` (for example `"Clip"`, not a script class name). Do not snake_case persisted keys.
+5. Runtime instances remain objects, not serialized project Dictionaries. Stop modes are `"AllowFadeout"`/`"Immediate"`; playback states are string values. Callback masks remain integer bits. Replace typed callback records with Dictionaries containing `type` and camelCase payload fields.
+6. Use Godot `Vector3` values in runtime 3D attribute Dictionaries (`position`, `velocity`, `forward`, `up`) instead of `System.Numerics.Vector3`/`Attributes3D` constructors. Godot forward is −Z.
+7. Use model constructors and serializers rather than hand-renaming JSON fields. Deep-copy mutable authored data with `duplicate(true)` when isolating edits. Editor changes go through `ProjectDocument.transact(label, callable)`, then undo/redo; direct mutations alone do not publish document changes.
+
+```gdscript
+const Model = preload("res://addons/dirge/model/Project/project_model.gd")
+const ProjectJson = preload("res://addons/dirge/model/Serialization/project_json.gd")
+const Validator = preload("res://addons/dirge/model/Validation/project_validator.gd")
+
+var project = Model.new_project("Example")
+var master = Model.create("Bus", {"name": "Master"})
+project["mixer"]["buses"].append(master)
+var event = Model.create("AudioEvent", {"path": "Ambience/Wind", "bus": master["id"]})
+project["events"].append(event)
+var diagnostics = Validator.validate(project) # code/message/severity/subject dictionaries
+var text = ProjectJson.serialize(project)
+var restored = ProjectJson.deserialize(text)
+```
+
+`Model.defaults(kind)`, `create(kind, values)`, `hydrate(values, kind)`, `new_id()` and `property_ref(kind, owner, effect_index, name)` replace typed constructors. `new_project` does not add a Master bus automatically; the editor's New action does.
+`ProjectJson.load_file(path)` returns project data; `save_file(path, project)` returns a Godot `Error`. Serialization retains the existing JSON schema, unknown authored fields and deterministic ordering; no `.tres` conversion or data migration is required.
+Regression fixtures and command recordings remain JSON. A language/RNG change is not a promise that old recordings are bit-identical; replay and compare them during qualification.
+
 ## Runtime API reference
 
-Namespaces: `Dirge.Driver` (`DirgeServer`, `DirgeStats`), `Dirge.Runtime` (model runtime), `Dirge.Project` (authored data). `Attributes3D(Position, Velocity, Forward, Up)` uses `System.Numerics.Vector3`.
+Names below describe the GDScript contract. Explicit `preload("res://addons/dirge/model/Runtime/dirge_system.gd")` replaces CLR namespace imports when constructing a standalone model. Use the server-owned system for normal game playback so its driver applies commands.
 
 ### `DirgeServer` (`Node`, autoload)
 
@@ -120,139 +149,96 @@ Exports: `ProjectPath` (file, `*.json`; empty = read `dirge/project_path`), `See
 
 | Member | Description |
 |---|---|
-| `const string Version` | `"1.0.0"` |
-| `const string ProjectPathSetting` | `"dirge/project_path"` |
-| `event Action<IReadOnlyList<Command>> CommandsEmitted` | after each `Update`, before the commands are applied |
-| `event Action<Feedback> FeedbackSent` | every driver → model feedback |
-| `event Action<DirgeSystem> Loaded` | after `Load`/`HotReload` created a system |
-| `const CallbackMask SignalMask` | callbacks handle-based instances forward as signals (everything but `SoundStopped`) |
-| signals `EventStarted(int handle)`, `EventStopped(int handle)`, `TimelineMarker(int handle, string name, double position)`, `TimelineBeat(int handle, int bar, int beat, float bpm, double position)`, `SoundPlayed(int handle, string asset)`, `EventVirtualized(int handle)`, `EventUnvirtualized(int handle)`, `EventStolen(int handle)`, `ProgrammerSound(int handle, string key)` | emitted synchronously from inside `Update` for every instance started through `StartEvent` (also restored `HotReload` handles) |
-| `bool IsLoaded` | a project is loaded |
-| `DirgeSystem System` | the running system; throws when none is loaded |
-| `AudioDriver Driver` | the `AudioServer` driver; throws before `_Ready` |
-| `AssetCatalog Assets` | asset length/stream catalog |
-| `BankLoader Banks` | bank preloading |
-| `LiveUpdateHost? Live` | live-update host when enabled |
-| `LoudnessCapture? Loudness` | Master loudness meter when `MeterLoudness` |
-| `double LastUpdateMs` | duration of the last model update |
-| `string Platform` | platform key for `PlatformOverrides` |
-| `string Locale` | `TranslationServer.GetLocale()` |
-| `IReadOnlyDictionary<int, EventInstance> Handles` | handle → instance for handle-started events |
-| `DirgeStats Stats` | counters and loudness snapshot |
-| `void EnableLiveUpdate(int port)` / `void DisableLiveUpdate()` | start/move or stop the live host |
-| `void Unload()` | stop everything and drop the system |
-| `void LoadFile(string path)` | parse a `res://`/`user://` JSON file and `Load` it |
-| `void Load(AudioProject project)` | replace the project: rebuilds the bus layout and the system |
-| `void HotReload(AudioProject project)` | live replace keeping globals, running snapshots and handles |
-| `bool LiveSetBusVolume(string bus, float volumeDb)` | absolute authored fader override |
-| `bool LiveSetEffectParameter(string bus, int effectIndex, string name, float value)` | write an effect property to the engine |
-| `int StartEvent(string path)` | start + auto-release; 0 if unknown |
-| `void StopEvent(int handle, bool immediate = false)` | |
-| `void StopAllEvents(bool immediate = false)` | |
-| `void SetParameter(int handle, string name, float value)` / `float GetParameter(int handle, string name)` | local first, then global |
-| `void SetGlobalParameter(string name, float value)` / `float GetGlobalParameter(string name)` | |
-| `void StartSnapshot(string name)` / `void StopSnapshot(string name)` / `bool IsSnapshotActive(string name)` | throws `KeyNotFoundException` for unknown names |
-| `bool IsEventPlaying(int handle)` | |
-| `EventInstance? GetInstance(int handle)` | null once stopped |
-| `void SetCallbackMask(int handle, int mask)` | restrict a handle's signals; `mask` is a `CallbackMask` value, clipped to `SignalMask` |
-| `void SetProgrammerSound(int handle, string assetPath)` | answer a `ProgrammerSound` emission (synchronously, inside the handler) and/or set the handle's fallback programmer asset |
-| `bool LoadBank(string name)` / `void UnloadBank(string name)` / `bool IsBankLoaded(string name)` | |
-| `string GetPlatform()` / `string GetLocale()` | GDScript-friendly accessors |
-| `Godot.Collections.Dictionary GetStats()` | keys `time`, `instances`, `real_voices`, `update_ms`, `handles`, `momentary_lufs`, `short_term_lufs`, `integrated_lufs`, `true_peak_dbtp` |
+| `Version`, `ProjectPathSetting` | addon version (`1.1.0`) and `"dirge/project_path"` |
+| `CommandsEmitted(commands)`, `FeedbackSent(feedback)`, `Loaded(system)` | signals after model update/before apply, for driver feedback, and after load/hot reload |
+| `SignalMask` | integer mask for forwarded callbacks (excludes `SoundStopped`) |
+| `EventStarted(handle)`, `EventStopped(handle)` | lifecycle signals for handle-started instances |
+| `TimelineMarker(handle, name, position)`, `TimelineBeat(handle, bar, beat, bpm, position)` | timeline signals |
+| `SoundPlayed(handle, asset)` | sound-start signal |
+| `EventVirtualized(handle)`, `EventUnvirtualized(handle)`, `EventStolen(handle)` | voice lifecycle signals |
+| `ProgrammerSound(handle, key)` | synchronously answer with `SetProgrammerSound` |
+| `IsLoaded`, `System`, `Driver`, `Assets`, `Banks`, `Live`, `Loudness` | loaded state and runtime providers; guard `IsLoaded` before using the model |
+| `LastUpdateMs`, `Platform`, `Locale`, `Handles`, `Stats` | update duration, platform/locale, handle→instance Dictionary, stats snapshot |
+| `EnableLiveUpdate(port)`, `DisableLiveUpdate()` | start/move or stop localhost host |
+| `Unload()`, `LoadFile(path)` | stop/drop the system; load JSON |
+| `Load(project: Dictionary)`, `HotReload(project: Dictionary)` | replace the model/bus layout; hot reload preserves globals, snapshots and handles |
+| `LiveSetBusVolume(bus, volumeDb)`, `LiveSetEffectParameter(bus, effectIndex, name, value)` | live fader/effect edits; return success |
+| `StartEvent(path) -> int` | start and auto-release; 0 if unknown |
+| `StopEvent(handle, immediate=false)`, `StopAllEvents(immediate=false)` | stop handles/events |
+| `SetParameter(handle, name, value)`, `GetParameter(handle, name)` | local first, then global |
+| `SetGlobalParameter(name, value)`, `GetGlobalParameter(name)` | global bank |
+| `StartSnapshot(name)`, `StopSnapshot(name)`, `IsSnapshotActive(name)` | snapshot lifecycle |
+| `IsEventPlaying(handle)`, `GetInstance(handle)` | state and lower-level instance (null when absent) |
+| `SetCallbackMask(handle, mask)` | clips integer bits to `SignalMask` |
+| `SetProgrammerSound(handle, assetPath)` | synchronous programmer response or fallback asset |
+| `LoadBank(name)`, `UnloadBank(name)`, `IsBankLoaded(name)` | preload groups |
+| `GetPlatform()`, `GetLocale()`, `GetStats()` | convenience accessors |
 
-`DirgeStats` record: `Time`, `Instances`, `RealVoices`, `LastUpdateMs`, `Handles`, `MomentaryLufs`, `ShortTermLufs`, `IntegratedLufs`, `TruePeakDbtp` (loudness is −∞ while only silence was heard).
+`GetStats()` returns Dictionary keys `time`, `instances`, `real_voices`, `update_ms`, `handles`, `momentary_lufs`, `short_term_lufs`, `integrated_lufs`, `true_peak_dbtp`; silence has −∞ loudness.
 
 ### `DirgeSystem`
 
 | Member | Description |
 |---|---|
-| `const int MaxListeners` | 8 |
-| `DirgeSystem(AudioProject project, int seed = 0, IAssetCatalog? assets = null, string? platform = null)` | |
-| `AudioProject Project` | |
-| `MixerState Mixer` | |
-| `ParameterBank GlobalParameters` | |
-| `CommandBuffer Commands` | filled by `Update`; the driver clears it |
-| `double Time` | seconds, sum of `dt` |
-| `int InstanceCount` | live instances including nested |
-| `int RealVoiceCount` | |
-| `IReadOnlyList<EventInstance> Instances` | top-level live instances |
-| `int Seed` | |
-| `string? Platform` | |
-| `int MaxRealVoices` | global real-voice cap |
-| `string Locale` | audio-table locale; `""` = first authored |
-| `EventInstance? Conductor` | playing instance of the latest `IsConductor` event |
-| `IApiSink? Recorder` | profiler recording hook |
-| `bool TryGetEvent(string path, out EventDescription description)` | |
-| `EventDescription GetEvent(string path)` / `EventDescription GetEvent(DirgeId id)` | throw `KeyNotFoundException` |
-| `void SetGlobalParameter(string name, float value, bool immediate = false)` / `float GetGlobalParameter(string name)` | |
-| `void SetListener(int index, Attributes3D attributes, float weight = 1f)` | index 0..7; weight 0 disables |
-| `void StopAll(StopMode mode)` | |
-| `void Feedback(Feedback feedback)` | driver → model, applied next `Update` |
-| `void Update(double dt)` | one tick |
+| `.new(project, seed=0, assets=null, platform="")` | project Dictionary, optional catalog/platform |
+| `project`, `mixer`, `global_parameters`, `commands`, `time`, `instances` | authored graph, evaluated state, command Array and clock |
+| `seed`, `platform`, `locale`, `max_real_voices`, `conductor` | playback configuration and conductor instance |
+| `instance_count`, `real_voice_count`, `recorder` | live counters and optional profiler recording hook |
+| `get_event(path_or_id)` | description or null; replace `TryGetEvent`/throwing C# lookups with a null check |
+| `set_global_parameter(name, value, immediate=false)`, `get_global_parameter(name)` | global control |
+| `set_listener(index, attributes, weight=1.0)` | up to eight listeners; weight 0 disables |
+| `stop_all(mode="AllowFadeout")` | stop live events |
+| `feedback(event: Dictionary)` | driver feedback |
+| `update(dt)` | one model tick; driver applies then clears `commands` |
 
 ### `EventDescription`
 
 | Member | Description |
 |---|---|
-| `AudioEvent Event`, `DirgeId Id`, `string Path`, `bool Is3D` | |
-| `bool IsOneshot` | not persistent, no loop region, no looping instrument |
-| `double Length` | timeline length in seconds |
-| `IReadOnlyList<ParameterDefinition> Parameters` | local parameters |
-| `int InstanceCount` | |
-| `EventInstance CreateInstance()` | pooled |
+| `event`, `id`, `path`, `is_3d`, `is_oneshot` | authored Dictionary, identity and traits |
+| `length`, `parameters`, `instance_count` | seconds, local definitions and live count |
+| `create_instance()` | instantiate for explicit lifecycle control |
 
 ### `EventInstance`
 
-Enums: `StopMode { AllowFadeout, Immediate }`, `PlaybackState { Starting, Playing, Sustaining, Stopping, Stopped }`, `CallbackMask` flags (`Started`, `Stopped`, `TimelineMarker`, `TimelineBeat`, `SoundPlayed`, `SoundStopped`, `Virtualized`, `Unvirtualized`, `Stolen`, `ProgrammerSound`, `All`). Callback payloads: `StartedCallback`, `StoppedCallback`, `MarkerCallback(Name, Position)`, `BeatCallback(Bar, Beat, Bpm, Position)`, `SoundPlayedCallback(Voice, Asset)`, `SoundStoppedCallback(Voice)`, `VirtualizedCallback`, `UnvirtualizedCallback`, `StolenCallback`, `ProgrammerSoundCallback(Key)` with settable `Asset`.
-
 | Member | Description |
 |---|---|
-| `EventDescription Description` | |
-| `PlaybackState State` | |
-| `bool IsVirtual` | |
-| `CallbackMask CallbackMask` | which callbacks are raised (default `All`) |
-| `event Action<EventInstance, CallbackEvent> Callback` | |
-| `double TimelinePosition` | seconds; setting seeks at the next update, magnet regions snap |
-| `bool IsInTransition` / `double TransitionPosition` | transition timeline state |
-| `void Start()` | honours max instances, stealing, cooldown, start quantization |
-| `void Stop(StopMode mode)` | |
-| `void KeyOff()` | release a sustain point and begin AHDSR releases |
-| `void SetPaused(bool paused)` | |
-| `void SetParameter(string name, float value, bool immediate = false)` / `float GetParameter(string name)` | local first, then global |
-| `float GetParameterVelocity(string name)` | units per second |
-| `void SetParameterByLabel(string name, string label)` | |
-| `void Set3DAttributes(Attributes3D attributes)` | |
-| `void SetVolume(float db)` / `void SetPitch(float ratio)` | per-instance offsets |
-| `void SetProgrammerSound(AssetRef asset)` | fallback asset for programmer instruments |
-| `void Release()` | destroy when stopped |
+| `description`, `state`, `is_virtual`, `callback_mask` | description, string playback state and callback filtering |
+| `callback(instance, event)` | signal with Dictionary callback payload |
+| `timeline_position` | seconds; seeking observes timeline/magnet logic |
+| `is_in_transition`, `transition_position` | transition timeline state |
+| `start()`, `stop(mode="AllowFadeout")`, `release()` | honours caps, stealing, cooldown, quantization; release destroys when stopped |
+| `key_off()`, `set_paused(paused)` | sustain/AHDSR release; pause |
+| `set_parameter(name, value, immediate=false)`, `get_parameter(name)` | local first then global |
+| `get_parameter_velocity(name)`, `set_parameter_by_label(name, label)` | units/second and labeled selection |
+| `set_3d_attributes(attributes)` | Dictionary of Godot vectors |
+| `set_volume(db)`, `set_pitch(ratio)` | per-instance offsets |
+| `set_programmer_sound(asset)` | fallback path for programmer instruments |
+
+States: `Starting`, `Playing`, `Sustaining`, `Stopping`, `Stopped`. Callback bits retain order: `Started`, `Stopped`, `TimelineMarker`, `TimelineBeat`, `SoundPlayed`, `SoundStopped`, `Virtualized`, `Unvirtualized`, `Stolen`, `ProgrammerSound` (bits 0–9; All = 1023).
+Callback `type` values retain record names: `StartedCallback`, `StoppedCallback`, `MarkerCallback` (`name`, `position`), `BeatCallback` (`bar`, `beat`, `bpm`, `position`), `SoundPlayedCallback` (`voice`, `asset`), `SoundStoppedCallback` (`voice`), `VirtualizedCallback`, `UnvirtualizedCallback`, `StolenCallback`, `ProgrammerSoundCallback` (`key`, settable `asset`).
 
 ### `MixerState`
 
 | Member | Description |
 |---|---|
-| `MixerState(AudioProject project, ParameterBank globals, CommandBuffer commands, DirgeRandom random, string? platform = null)` | constructed by `DirgeSystem` |
-| `int BusCount` / `int ActiveSnapshotCount` | |
-| `string BusName(DirgeId bus)` | |
-| `bool TryGetBus(string name, out DirgeId id)` / `bool TryGetVca(string name, out DirgeId id)` | |
-| `float EffectiveBusVolumeDb(DirgeId bus)` / `float EffectiveBusPitch(DirgeId bus)` / `float EffectiveVcaVolumeDb(DirgeId vca)` | values as of the last `Update` |
-| `void SetBusVolume(string bus, float db)` | runtime offset on top of the evaluated volume |
-| `void SetBusMute(string bus, bool mute)` / `void SetBusSolo(string bus, bool solo)` | |
-| `void SetVcaVolume(string vca, float db)` | runtime offset |
-| `bool HasSnapshot(string name)` | |
-| `SnapshotInstance StartSnapshot(string name)` | several instances may run; throws for unknown names |
-| `void AddAutomation(AutomationLane lane)` / `bool RemoveAutomation(DirgeId laneId)` | project-level mixer automation from global parameters |
-| `void Update(double dt)` | called by `DirgeSystem.Update` |
+| `.new(project, globals, commands, random, platform="")` | normally constructed by `DirgeSystem`; shared `RandomNumberGenerator` |
+| `bus_count`, `active_snapshot_count`, `active_snapshots` | mixer/snapshot state |
+| `bus_name(id)` | bus display name |
+| `effective_bus_volume_db(id)`, `effective_bus_pitch(id)`, `effective_vca_volume_db(id)` | values at last update |
+| `set_bus_volume(bus, db)`, `set_bus_mute(bus, mute)`, `set_bus_solo(bus, solo)` | runtime overrides |
+| `set_vca_volume(vca, db)` | runtime VCA offset |
+| `has_snapshot(name)`, `start_snapshot(name)` | existence and instance creation; check existence for authored names |
+| `add_automation(lane)`, `remove_automation(lane_id)` | global-parameter mixer automation |
+| `update(dt)` | called by system |
+
+`ParameterBank.get_value(id_or_name)` / `set_value(id_or_name, value, immediate=false)` replace typed parameter-bank access.
 
 ### `SnapshotInstance`
 
-| Member | Description |
-|---|---|
-| `Snapshot Snapshot` | authored definition |
-| `float Intensity` | 0..1 scale multiplied with the AHDSR envelope |
-| `bool IsActive` | |
-| `float EffectiveIntensity` | scalar × envelope |
-| `void Stop()` | begin the release; removed by the mixer when finished |
+`snapshot` is the authored Dictionary; `intensity` is the 0..1 scalar multiplied with the AHDSR envelope.
+`is_active` and `effective_intensity` expose state; `stop()` begins release and the mixer removes the finished instance.
 
 ## Commands (the T1 oracle)
 
-`DirgeSystem.Update` fills `Commands` with `VoicePlay`, `VoiceStop`, `VoiceSeek`, `VoiceSetVolume`, `VoiceSetPitch`, `VoiceSet3D`, `VoiceSetPaused`, `BusSetVolume`, `BusSetMute`, `BusSetSolo`, `BusSetBypass`, `EffectSetEnabled`, `EffectSetParameter`. `AudioDriver` applies them and reports `VoiceFinished`/`VoiceFailed` feedback. A `Recorder` captures API calls and commands into a `Recording`; `Replayer.Replay` re-runs it on a fresh system and `Replayer.Compare` returns the first divergence.
+`DirgeSystem.update` fills `commands` with Dictionaries whose `type` is `VoicePlay`, `VoiceStop`, `VoiceSeek`, `VoiceSetVolume`, `VoiceSetPitch`, `VoiceSet3D`, `VoiceSetPaused`, `BusSetVolume`, `BusSetMute`, `BusSetSolo`, `BusSetBypass`, `EffectSetEnabled`, or `EffectSetParameter`. Remaining fields retain camelCase command-field names. The audio driver applies commands and returns `VoiceFinished`/`VoiceFailed` feedback Dictionaries. Profiler recording captures API calls and commands; replay runs a fresh model and comparison reports divergence. `tests/gdscript/run.gd` is the headless regression entrypoint; `scripts/validate.sh` runs JSON validation. None of these descriptions asserts a passing cutover run.

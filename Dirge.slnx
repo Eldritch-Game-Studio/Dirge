@@ -1,6 +1,0 @@
-<Solution>
-  <Project Path="Dirge.Demo.csproj" />
-  <Project Path="addons/dirge/model/Dirge.Model.csproj" />
-  <Project Path="tests/Dirge.Model.Tests/Dirge.Model.Tests.csproj" />
-  <Project Path="tools/dirge-validate/dirge-validate.csproj" />
-</Solution>

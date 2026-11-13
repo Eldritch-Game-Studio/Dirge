@@ -2,9 +2,9 @@
 
 ![Dirge — adaptive game audio, authored inside Godot](https://raw.githubusercontent.com/Eldritch-Game-Studio/Dirge/main/docs/images/dirge-promo.png)
 
-FMOD-Studio-style adaptive audio for Godot 4 .NET. Author events with timelines and parameter sheets, local and
+FMOD-Studio-style adaptive audio for stock Godot 4.7.2, including non-.NET projects. Author events with timelines and parameter sheets, local and
 global parameters with automation and modulators, snapshots, VCAs and a mixer graph in an editor main screen, then
-play all of it through Godot's own `AudioServer` from GDScript or C#. The authoring tool is built with HTML/CSS
+play all of it through Godot's own `AudioServer` from GDScript. The authoring tool is built with HTML/CSS
 through [NecronomiDOM](https://github.com/Eldritch-Game-Studio/NecronomiDOM), and the same Mixer and Profiler panes
 mount over a running game.
 
@@ -52,15 +52,15 @@ switches a two-layer music event from Calm to Combat on the next beat, a dialogu
 on the Music bus through a localized programmer sound, and **F9** opens the in-game overlay with the same Mixer and
 Profiler panes bound to the game's `DirgeServer`.
 
-The recordings use the stock Godot 4.7.2 .NET editor with Forward+ rendering; captions are outside the interface.
+The recordings above are historical 1.0-era captures using the stock Godot 4.7.2 .NET editor with Forward+ rendering; captions are outside the interface. They are not screenshot or runtime qualification evidence for the 1.1.0 GDScript cutover.
 
 ### What's in the box
 
-- **A pure model.** `Dirge.Model` (`addons/dirge/model`) has no Godot reference: project graph, parameters, curves,
+- **A data/evaluation model.** `addons/dirge/model` contains GDScript `RefCounted` models and Dictionary/Array project data: project graph, parameters, curves,
   modulators, snapshots, timeline logic, voice scheduling, serialization (`*.dirge.json`), validation, profiler
-  recordings and ITU-R BS.1770-4 loudness. Each `Update(dt)` emits a deterministic command stream, which is what the
-  unit tests, the profiler replay and the headless smoke tests assert on.
-- **A Godot runtime.** `addons/dirge/runtime`: `DirgeServer` drives `DirgeSystem` from `_Process`, `AudioDriver`
+  recordings and ITU-R BS.1770-4 loudness. Each `update(dt)` emits a deterministic command stream, which is what the
+  model tests, profiler replay and headless smoke tests assert on. These models run under Godot, not a separate CLR assembly.
+- **A Godot runtime.** `addons/dirge/runtime`: `DirgeServer` drives `DirgeSystem` from `_process`, `AudioDriver`
   applies the commands to `AudioServer` buses/effects and a pooled set of `AudioStreamPlayer`/`AudioStreamPlayer3D`
   nodes, `BankLoader` preloads streams, `LoudnessCapture` meters Master, `LiveUpdateHost` serves the editor and
   `DirgeOverlay` shows the Mixer/Profiler panes in-game.
@@ -90,32 +90,23 @@ The recordings use the stock Godot 4.7.2 .NET editor with Forward+ rendering; ca
 
 ## Requirements
 
-- Godot **4.7.2 .NET** (stock build) and a .NET SDK able to target `net8.0` (`global.json` pins 10.x with roll-forward).
-- **NecronomiDOM ≥ 1.1.5** for the editor tool and the in-game overlay. The runtime alone (`DirgeServer`,
-  `AudioDriver`, banks, loudness, live update) does not use it.
-- Native effects: prebuilt binaries ship in the release ZIP under `addons/dirge/bin/<platform>/` (Linux x64, Windows
-  x64, macOS universal); building them yourself needs a C++17 compiler and SCons.
-- GDScript-only projects cannot use Dirge: the runtime is C# and needs the .NET edition. GDScript code in a .NET
-  project calls the `DirgeServer` autoload directly (see the quick start).
+- Stock **Godot 4.7.2**; the non-.NET editor is supported. No .NET SDK/runtime, NuGet restore, C# project imports or external validator executable is required to consume Dirge.
+- **NecronomiDOM native GDExtension** for the HTML/CSS editor tool and in-game overlay. Its NativeAOT implementation remains; removing Dirge's managed scripts does not remove this dependency.
+  Requires NecronomiDOM **1.1.6** or newer; released 1.1.5 lacks the selector/mutation/scroll bridge. Its packages include Linux x64/ARM64, Windows x64 and macOS ARM64/x64 libraries (see below).
+  The runtime alone (`DirgeServer`, audio driver, banks, loudness, live update) does not use Neo.
+- Native audio effects use six debug/release libraries: Linux x64, Windows x64 and macOS universal (ARM64 + x64). Android, iOS and Web native effects are not supported.
+- Building Dirge native audio from source needs C++17 and SCons. Building NecronomiDOM from source needs its own .NET NativeAOT SDK/compiler toolchain; consuming its precompiled GDExtension does not.
 
 ## Add it to your project
 
 1. Download `Dirge-v<version>.zip` from the [latest release](https://github.com/Eldritch-Game-Studio/Dirge/releases/latest)
    and copy its `addons/dirge/` folder into your project.
    The ZIP keeps its README, license, changelog and third-party notices inside `addons/dirge/`; it adds no root-level documents.
-2. Install NecronomiDOM into `addons/necronomidom/` from
-   [its release ZIP](https://github.com/Eldritch-Game-Studio/NecronomiDOM/releases/latest).
-3. Add both build imports to your project's `.csproj`, before `</Project>`:
-   ```xml
-   <Import Project="addons/necronomidom/NecronomiDom.targets" />
-   <Import Project="addons/dirge/Dirge.targets" />
-   ```
-   `Dirge.targets` builds `Dirge.Model` as its own assembly and compiles `runtime/` and `tool/` into your game assembly.
-4. Build (`dotnet build`), then enable **Dirge** in **Project → Project Settings → Plugins**. Enabling registers the
-   `DirgeServer` and `DirgeOverlay` autoloads and adds the `dirge/project_path` project setting; disabling removes the
-   autoloads.
-5. Set **`dirge/project_path`** to your `*.dirge.json` file (the Dirge main screen's **Save As…** writes one).
-   `DirgeServer` loads it in `_Ready`, rebuilds the `AudioServer` bus layout from the project's mixer graph (Master
+2. Install NecronomiDOM **1.1.6** into `addons/necronomidom/`, retaining its GDExtension manifest, platform binaries and notices: its Godot Asset Store package, or the runtime-only `NecronomiDOM-v1.1.6-runtime.zip` release asset pinned below, which omits C# integration sources. Released 1.1.5 is not sufficient.
+3. Open the project in stock Godot 4.7.2 and enable **Dirge** in **Project → Project Settings → Plugins**. No `.csproj` edits or `dotnet build` step are needed. Enabling registers the
+   `DirgeServer` and `DirgeOverlay` autoloads and adds the `dirge/project_path` project setting; disabling removes the autoloads.
+4. Set **`dirge/project_path`** to your `*.dirge.json` file (the Dirge main screen's **Save As…** writes one).
+   `DirgeServer` loads it in `_ready`, rebuilds the `AudioServer` bus layout from the project's mixer graph (Master
    stays at index 0) and starts updating.
 
 Alternatively place a `DirgeServer` node in a scene and set its `ProjectPath` export; the demo scenes do this.
@@ -147,37 +138,33 @@ DirgeServer.ProgrammerSound.connect(func(handle, key):
 DirgeServer.SetCallbackMask(wind, 0)                     # CallbackMask bits; 0 silences this handle's signals
 ```
 
-C#, with the full instance API:
+The full instance API is also GDScript:
 
-```csharp
-using Dirge.Driver;
-using Dirge.Runtime;
-
-var server = GetNode<DirgeServer>("/root/DirgeServer");
-DirgeSystem system = server.System;
-
-EventDescription music = system.GetEvent("Music/Theme");
-EventInstance instance = music.CreateInstance();
-instance.Callback += (sender, callback) =>
-{
-    if (callback is BeatCallback beat) GD.Print($"bar {beat.Bar} beat {beat.Beat}");
-};
-instance.Start();
-instance.SetParameter("Threat", 1f);
-instance.Set3DAttributes(new Attributes3D(position, velocity, forward, up));
-system.SetListener(0, new Attributes3D(cameraPosition, cameraVelocity, cameraForward, cameraUp));
-
-instance.Stop(StopMode.AllowFadeout);
-instance.Release();                       // destroyed once stopped
-
-SnapshotInstance duck = system.Mixer.StartSnapshot("Duck");
-duck.Intensity = 0.5f;
-duck.Stop();
+```gdscript
+var system = DirgeServer.System
+var music = system.get_event("Music/Theme")
+if music != null:
+    var instance = music.create_instance()
+    instance.callback.connect(func(_sender, event):
+        if event["type"] == "BeatCallback":
+            print("bar ", event["bar"], " beat ", event["beat"]))
+    instance.start()
+    instance.set_parameter("Threat", 1.0)
+    instance.set_3d_attributes({
+        "position": Vector3.ZERO, "velocity": Vector3.ZERO,
+        "forward": Vector3.FORWARD, "up": Vector3.UP})
+    instance.stop("AllowFadeout")
+    instance.release() # destroyed once stopped
+var duck = system.mixer.start_snapshot("Duck")
+if duck != null:
+    duck.intensity = 0.5
+    duck.stop()
 ```
 
-`Attributes3D` is the model's own vector type (`System.Numerics.Vector3`), so the model stays engine-free; convert
-from Godot vectors at the call site. The [getting started guide](https://github.com/Eldritch-Game-Studio/Dirge/blob/main/docs/getting-started.md) walks through authoring a
-bus, an event, a parameter with automation and a snapshot in ten minutes.
+Public `DirgeServer` methods and signals retain PascalCase; lower-level model methods and properties use snake_case.
+Authored JSON keys retain camelCase. See [migration and API reference](docs/capabilities.md#migration-from-10-c-consumers)
+for replacing typed C# consumers, constructors, callbacks and serialization. The [getting started guide](docs/getting-started.md)
+walks through authoring a bus, an event, a parameter with automation and a snapshot.
 
 ## Tool tour
 
@@ -242,7 +229,7 @@ The Mixer pane lists them when the extension is loaded. Routing rules (bus order
 ## Demos
 
 - `demo/demo.tscn` — a looping wind bed on an `Ambience` bus with a low-pass filter, a one-shot click and a `Muffled`
-  snapshot (any key clicks, Enter toggles the snapshot). Project data lives in `demo/DemoProject.cs`;
+  snapshot (any key clicks, Enter toggles the snapshot). Project data lives in `demo/demo_project.gd`;
   `demo/demo.dirge.json` is regenerated from it when missing.
 - `demo/sandbox/sandbox.tscn` — the 3D sandbox from the recording above: ambience scatterer, two-layer adaptive music
   with a beat-quantized Calm/Combat transition driven by the global `Threat` parameter, ducking snapshot, two-locale
@@ -255,8 +242,8 @@ script does it when they are missing).
 ## Validate from the command line
 
 ```sh
-dotnet run --project tools/dirge-validate -- demo/sandbox/sandbox.dirge.json          # one line per diagnostic
-dotnet run --project tools/dirge-validate -- demo/sandbox/sandbox.dirge.json --json   # diagnostics array
+scripts/validate.sh demo/sandbox/sandbox.dirge.json          # one line per diagnostic
+scripts/validate.sh demo/sandbox/sandbox.dirge.json --json   # diagnostics array
 ```
 
 Exit code 0 = no errors (warnings allowed), 1 = at least one error, 2 = usage or parse failure. CI runs it on both
@@ -267,17 +254,17 @@ demo projects.
 ```sh
 git clone --recurse-submodules https://github.com/Eldritch-Game-Studio/Dirge.git
 cd Dirge
-scripts/fetch-deps.sh                  # NecronomiDOM into addons/necronomidom
-dotnet build Dirge.slnx                # model, demo, tests, validate CLI
+scripts/fetch-deps.sh                  # exact bridge-enabled Neo package; see dependency note below
+godot --headless --path . --editor --import
 native/build.sh                        # Linux x86_64 debug + release → addons/dirge/bin/linux-x64/
 scripts/package.sh --suffix -partial   # Linux-only diagnostic; a full ZIP requires all native targets
 ```
 
 Other native platforms: from `native/`, run `scons platform=windows target=<target> arch=x86_64` or
 `scons platform=macos target=<target> arch=universal` for **both** `template_debug` and `template_release`.
-`scripts/package.sh` checks every library referenced by the final ZIP's GDExtension manifest, including debug and
-release targets. It also checks that both Mac frameworks contain ARM64 and x86_64 slices, plus a source/hash-matched
-Proton qualification receipt for both Windows DLLs. Missing or empty libraries prevent publication of the ZIP.
+`scripts/package.sh` checks all six libraries referenced by the final ZIP's GDExtension manifest, including debug and
+release targets and both Mac framework slices. This is structural closure, not runtime qualification.
+`scripts/package.sh --require-qualification` additionally requires a source/hash-matched Proton receipt for both Windows DLLs. Missing or empty libraries prevent a full ZIP.
 `scripts/ci-local.sh` runs Linux-only diagnostics directly with local tools.
 Tagged `v*` pushes publish only after Linux smoke/native builds, Windows cross-builds and stock-Windows-Godot
 demo/sandbox/native smoke under official Proton, portable tests/validation, and both Mac runtime architectures
@@ -287,22 +274,49 @@ local `[self-hosted, macOS, ARM64, eldritch-apple]` runner. Linux jobs and Windo
 `[self-hosted, Linux, X64, eldritch-linux]`; every CI/CD job is local, with no hosted fallback.
 PR execution requires the main-defined admission gate, with exact-head manual approval for reviewed forks.
 
+`scripts/fetch-deps.sh` reads the exact repository-root `dependency-lock.json`. Its current identity is:
+
+- Release: NecronomiDOM [v1.1.6](https://github.com/Eldritch-Game-Studio/NecronomiDOM/releases/tag/v1.1.6), source `9be2bdd22f1904525014501939afc493ef270592`.
+- Runtime-only package: `https://github.com/Eldritch-Game-Studio/NecronomiDOM/releases/download/v1.1.6/NecronomiDOM-v1.1.6-runtime.zip`.
+- Package SHA-256: `f8f60d5c9f78e3efb8eb529cce8d81c2259631b79354b5fd64860c28f9859dc0`.
+- It includes `linux-x64`, `linux-arm64`, `win-x64`, `osx-arm64` and `osx-x64`. Its `runtime-package.json` records the full release ZIP it was projected from. The general .NET/GDScript ZIP is not accepted by Dirge's runtime-only installer.
+
+Upstream platform passes do not qualify integrated Dirge; Dirge's own CI qualifies it with this exact package.
+Explicit package inputs use `NECRONOMIDOM_PACKAGE_URL`, `NECRONOMIDOM_PACKAGE_SHA256` and matching `NECRONOMIDOM_REVISION`; never substitute a guessed version or unverified latest release.
+
+The original bridge passed stock Godot 4.7.2 non-.NET checks for incremental DOM changes, focus, dirty input values,
+scrolling, child order, keyboard/wheel/capture events, resource lifetime and clean teardown.
+Those results do not qualify the integrated Dirge application. That NativeAOT build reported NU1903 for
+`Microsoft.DotNet.ILCompiler` 10.0.10, advisory [GHSA-p3jp-9v83-76w9](https://github.com/advisories/GHSA-p3jp-9v83-76w9);
+no bridge runtime failure was observed, but the runtime result does not resolve or waive the advisory.
+
 ## Verification
 
 ```sh
-dotnet test tests/Dirge.Model.Tests    # model unit tests
-GODOT=/path/to/Godot_v4.7.2-stable_mono_linux.x86_64 scripts/smoke.sh
+godot --headless --path . --script tests/gdscript/run.gd
+GODOT=/path/to/stock/godot scripts/smoke.sh
+```
+To qualify the **installed ZIP**, including the real editor main screen and F9 overlay, on a Linux Vulkan host:
+
+```sh
+python3 scripts/qualify-package.py --godot /path/to/stock/godot \
+  --package dist/Dirge-v1.1.0.zip \
+  --dependency /path/to/NecronomiDOM-v1.1.6-runtime.zip \
+  --dependency-sha256 f8f60d5c9f78e3efb8eb529cce8d81c2259631b79354b5fd64860c28f9859dc0 \
+  --output /tmp/dirge11-installed-proof --gui
 ```
 
-The smoke run imports and builds the project, then runs the demo and the sandbox headless with the Dummy audio driver:
-it asserts on the applied command stream and `AudioServer` state (`DIRGE_SMOKE PASS`), then records, replays and
-compares a sandbox profiler recording (`SANDBOX_SMOKE PASS`). `GODOT` may be omitted when `godot` is on `PATH`.
+The output directory must be new. The command installs both exact ZIPs into a fresh project, isolates editor
+preferences, and uses private headless gamescope for real Vulkan rendering. It retains hashes, logs, behavioral
+results, save/reopen artifacts and editor/overlay screenshots. Inspect those screenshots; a marker alone is not visual proof.
 
-On macOS, set `GODOT` to `Godot_mono.app/Contents/MacOS/Godot`. CI runs the demo, sandbox and native
-send/return scene on ARM64 and on x86_64 under Rosetta with matching .NET 8 runtimes. Native/managed work on
-the shared Apple host runs through `python3 scripts/apple-run.py <command>`, which holds the foreground
-`$HOME/.local/state/eldritch-macos/producer.lock` also used by engine/game workers. See
-[`CONTRIBUTING.md`](CONTRIBUTING.md) for runner prerequisites and the untrusted-PR policy.
+
+The smoke entrypoint imports the project, runs `tests/gdscript/run.gd`, then demo, sandbox and native-effect scenes
+headless with Dummy audio. These assert command streams, `AudioServer` state and profiler replay; they do not prove audible output or visual UI parity.
+`GODOT` may be omitted when `godot` is on `PATH`. On macOS use `Godot.app/Contents/MacOS/Godot`.
+The release contract requires Linux, Windows-on-Proton and macOS ARM64/x64 closure for both debug/release native effects.
+Per-release qualification results are recorded in [`CHANGELOG.md`](CHANGELOG.md).
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for runner prerequisites and the untrusted-PR policy.
 
 ## License
 

@@ -15,12 +15,9 @@ def main():
     import fcntl
 
     home = Path.home()
-    os.environ["PATH"] = f"{home}/.dotnet:{home}/.local/share/eldritch-macos/tools/bin:" + os.environ["PATH"]
-    os.environ["DOTNET_ROOT"] = str(home / ".dotnet")
-    os.environ["DOTNET_ROOT_ARM64"] = str(home / ".dotnet")
+    os.environ["PATH"] = f"{home}/.local/share/eldritch-macos/tools/bin:" + os.environ["PATH"]
     lock = home / ".local/state/eldritch-macos/producer.lock"
     lock.parent.mkdir(parents=True, exist_ok=True)
-    os.environ["DOTNET_ROOT_X64"] = str(home / ".dotnet-x64")
     with lock.open("a") as handle:
         fcntl.flock(handle, fcntl.LOCK_EX)
         child = None

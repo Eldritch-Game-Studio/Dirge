@@ -1,16 +1,14 @@
 # Getting started with Dirge
 
-A ten-minute walkthrough: install the addon, author a bus, an event with a clip, a parameter with automation and a snapshot in the Dirge main screen, then play it from game code. It assumes a Godot 4.7.2 .NET project that already builds.
+A ten-minute walkthrough: install the addon, author a bus, an event with a clip, a parameter with automation and a snapshot in the Dirge main screen, then play it from game code. It assumes stock Godot 4.7.2; no .NET installation is needed.
 
 ## 1. Install (2 minutes)
 
-1. Copy `addons/dirge/` from the [release ZIP](https://github.com/Eldritch-Game-Studio/Dirge/releases/latest) into your project, and NecronomiDOM ≥ 1.1.5 into `addons/necronomidom/` from [its release ZIP](https://github.com/Eldritch-Game-Studio/NecronomiDOM/releases/latest).
-2. Add to your `.csproj`, before `</Project>`:
-   ```xml
-   <Import Project="addons/necronomidom/NecronomiDom.targets" />
-   <Import Project="addons/dirge/Dirge.targets" />
-   ```
-3. `dotnet build`, then enable **Dirge** in **Project → Project Settings → Plugins**. A **Dirge** button appears in the editor's main-screen bar next to 2D/3D/Script, and two autoloads are registered: `DirgeServer` (runtime) and `DirgeOverlay` (debug-build overlay on **F9**).
+1. Copy `addons/dirge/` from the matching release ZIP into your project.
+2. Install the matching bridge-enabled **native NecronomiDOM GDExtension** into `addons/necronomidom/`. Released 1.1.5 is insufficient. Use 1.1.6 or newer: `dependency-lock.json` pins its released runtime-only package for Linux x64/ARM64, Windows x64 and macOS ARM64/x64; see [package identity](../README.md#building-from-source). Keep the native binaries and notices; the HTML/CSS UI still requires them.
+3. Open the project in stock Godot 4.7.2, then enable **Dirge** in **Project → Project Settings → Plugins**. A **Dirge** button appears in the editor's main-screen bar next to 2D/3D/Script, and two autoloads are registered: `DirgeServer` (runtime) and `DirgeOverlay` (debug-build overlay on **F9**).
+
+No `.csproj` imports, NuGet packages, `dotnet build`, or external executable are required. NecronomiDOM's NativeAOT build toolchain is needed only when compiling that dependency from source, not when loading its precompiled GDExtension.
 
 ## 2. Create a project (1 minute)
 
@@ -62,7 +60,7 @@ Global parameters (**Browser → Parameters**, **+ Parameter**) work the same wa
 **Project → Validate** (or the **Validation** tab) lists diagnostics with stable codes — missing master bus, routing cycles, duplicate names, missing assets, dangling references, unreachable instruments, unassigned parameters. The same check runs headless in CI:
 
 ```sh
-dotnet run --project tools/dirge-validate -- path/to/audio/game.dirge.json
+scripts/validate.sh path/to/audio/game.dirge.json
 ```
 
 `Ctrl+S` saves. **Build Banks** saves and reports what each bank preloads (banks are preload groups edited under **Browser → Banks**).
@@ -83,32 +81,30 @@ func _on_player_left_cave() -> void:
     DirgeServer.StopSnapshot("Muffled")
 ```
 
-C#:
+Lower-level instance access is GDScript too:
 
-```csharp
-using Dirge.Driver;
-using Dirge.Runtime;
+```gdscript
+var wind
 
-public partial class Weather : Node
-{
-    private EventInstance? _wind;
+func start_wind() -> void:
+    var description = DirgeServer.System.get_event("Ambience/Wind")
+    if description != null:
+        wind = description.create_instance()
+        wind.start()
 
-    public override void _Ready()
-    {
-        DirgeServer server = GetNode<DirgeServer>("/root/DirgeServer");
-        _wind = server.System.GetEvent("Ambience/Wind").CreateInstance();
-        _wind.Start();
-    }
+func set_storm(intensity: float) -> void:
+    if wind != null:
+        wind.set_parameter("Intensity", intensity)
 
-    public void SetStorm(float intensity) => _wind?.SetParameter("Intensity", intensity);
-
-    public override void _ExitTree()
-    {
-        _wind?.Stop(StopMode.AllowFadeout);
-        _wind?.Release();
-    }
-}
+func _exit_tree() -> void:
+    if wind != null:
+        wind.stop("AllowFadeout")
+        wind.release()
 ```
+
+Migrating a typed C# consumer? See [migration](capabilities.md#migration-from-10-c-consumers).
+Keep the public server's PascalCase names; use snake_case for lower-level runtime objects.
+Existing `*.dirge.json` files keep their camelCase schema, string enums, 32-hex IDs and `$type` discriminators.
 
 Run the game with `-- --dirge-live` and press **Live → Connect…** in the editor to see its instances in the Profiler and push mixer changes live; press **F9** in a debug build for the in-game Mixer/Profiler overlay.
 

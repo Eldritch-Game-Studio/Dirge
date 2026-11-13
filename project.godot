@@ -4,10 +4,11 @@ config_version=5
 [application]
 config/name="Dirge Demo"
 run/main_scene="res://demo/demo.tscn"
-config/features=PackedStringArray("4.7", "C#", "Forward Plus")
+config/features=PackedStringArray("4.7", "Forward Plus")
 
-[dotnet]
-project/assembly_name="Dirge.Demo"
+[autoload]
+DirgeServer="*res://addons/dirge/runtime/dirge_server.gd"
+DirgeOverlay="*res://addons/dirge/runtime/dirge_overlay.gd"
 
 [editor_plugins]
 enabled=PackedStringArray("res://addons/dirge/plugin.cfg")

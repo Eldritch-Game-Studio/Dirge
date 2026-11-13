@@ -2,13 +2,25 @@
 
 All notable changes to Dirge. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
-## Unreleased
+## 1.1.0 — 2026-11-13
+
+### Changed
+- Cut over Dirge models, runtime, editor panes, demos, validation and regression entrypoints to GDScript for stock Godot 4.7.2, including non-.NET projects. Consumers no longer need a .NET SDK/runtime, NuGet restore, C# build imports or an external validator executable.
+- Preserve the public PascalCase `DirgeServer` method/signal surface; replace typed C# model consumers with snake_case runtime objects and Dictionary/Array authored data. Existing camelCase JSON keys, string enums, 32-hex IDs and `$type` discriminators remain compatible. See the migration section in `docs/capabilities.md`.
+- Retain NecronomiDOM's native HTML/CSS GDExtension for editor and overlay UI. Requires NecronomiDOM **1.1.6** (source `9be2bdd22f1904525014501939afc493ef270592`); released 1.1.5 lacks the selector/mutation/scroll bridge. `dependency-lock.json` pins its runtime-only release package for Linux x64/ARM64, Windows x64 and macOS ARM64/x64 by URL and SHA-256 (`f8f60d5c9f78e3efb8eb529cce8d81c2259631b79354b5fd64860c28f9859dc0`). Using its precompiled native package does not require .NET.
+- Replace managed test/validator commands with `tests/gdscript/run.gd`, `scripts/validate.sh` and stock-Godot `scripts/smoke.sh`. Keep six-library native audio closure (Linux x64, Windows x64, universal macOS; debug and release) and strict release platform gates. Structural packaging is not runtime qualification.
+- Reacquire sandbox model instances when recording or live reload replaces their owning system; the overlay retains its recording and UI while ambience resumes on the new system.
+- Supply the source-owned `scripts/test.sh` delivery-test contract for trusted-main admission. GDScript behavioral suites remain mandatory in the separate runtime smoke gates; no .NET test-path fallback is retained.
+
+### Qualification
+- Qualification is recorded for each exact source and installed ZIP; no prior-version test pass, CI success, screenshot proof or platform requalification transfers. Existing Planned/Partial feature limits remain.
+- NecronomiDOM v1.1.6 passed its release pipeline ([run 43479352356](https://github.com/Eldritch-Game-Studio/NecronomiDOM/actions/runs/43479352356)): native builds and installed-package qualification on Linux x64/ARM64, macOS ARM64/x64 and Windows x64 under Proton. Its NativeAOT build reports NU1903 for `Microsoft.DotNet.ILCompiler` 10.0.10, advisory [GHSA-p3jp-9v83-76w9](https://github.com/advisories/GHSA-p3jp-9v83-76w9); no bridge runtime failure was observed.
+- With that exact package installed, official stock (non-.NET) Godot 4.7.2 on Linux x64 passed `scripts/test.sh` (43 tests), `scripts/validate.sh` (demo and sandbox projects: 0 errors, 0 warnings) and `scripts/smoke.sh` (843 GDScript assertions, 0 failures; demo, sandbox replay and native-audio smokes PASS).
+- The v1.1.0 release ZIP is published only after Dirge's tag pipeline builds all six native audio libraries and qualifies that exact installed ZIP with its exact NecronomiDOM dependency on Linux x64, macOS and Windows x64 under Proton. Windows-on-Proton coverage does not claim native Windows/MSVC or release-export-template qualification.
 
 ### Fixed
 - Serialize reviewed manual CI dispatches with their PR events and main dispatches with main pushes, without cancelling active native qualification. Preserve exact-head admission for delayed PR events and document safe source supersession separately from completed-build deduplication.
-- Invoke version-specific tests through a source-owned `scripts/test.sh` after exact-head admission, preserving unconditional .NET model tests and delivery regressions while allowing the GDScript cutover to retain its required behavioral smoke gates.
-- Preserve the remaining frame in native sample offsets when a transition enters new layers or an internally started quantized cue crosses its beat. The sandbox checks actual native sample/conductor alignment with the unchanged 20 ms tolerance; slow-frame regressions also require exact recording replay.
-- Isolate native-platform smoke builds from reusable MSBuild/Roslyn workers, just like compatibility builds, and retain managed logs/binlogs and the original failing exit code.
+- Preserve the remaining frame in native sample offsets for transition-entered layers and internally started quantized cues. Keep the sandbox's 20 ms alignment tolerance while comparing actual native sample offsets against the conductor; regressions cover slow frames and exact recording replay.
 
 ## 1.0.3 — 2026-11-11
 

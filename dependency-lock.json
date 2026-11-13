@@ -1,0 +1,15 @@
+{
+  "necronomidom": {
+    "url": "https://github.com/Eldritch-Game-Studio/NecronomiDOM/releases/download/v1.1.6/NecronomiDOM-v1.1.6-runtime.zip",
+    "sha256": "f8f60d5c9f78e3efb8eb529cce8d81c2259631b79354b5fd64860c28f9859dc0",
+    "revision": "9be2bdd22f1904525014501939afc493ef270592",
+    "version": "1.1.6",
+    "included_targets": [
+      "linux-x64",
+      "linux-arm64",
+      "win-x64",
+      "osx-arm64",
+      "osx-x64"
+    ]
+  }
+}

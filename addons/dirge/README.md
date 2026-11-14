@@ -1,6 +1,6 @@
 # Dirge
 
-Adaptive audio authoring for stock Godot 4.7.2, including non-.NET projects: events with timelines and parameter sheets, parameters with automation and modulators, snapshots, VCAs and a mixer graph played through `AudioServer`. The authoring tool is a Godot editor main screen rendered with NecronomiDOM's native HTML/CSS GDExtension; the same Mixer and Profiler panes mount over a running game.
+Adaptive audio authoring for stock Godot 4.7.2, standard or .NET edition (.NET is not required): events with timelines and parameter sheets, parameters with automation and modulators, snapshots, VCAs and a mixer graph played through `AudioServer`. The authoring tool is a Godot editor main screen rendered with NecronomiDOM's native HTML/CSS GDExtension; the same Mixer and Profiler panes mount over a running game.
 
 Full documentation lives in the source repository: `README.md`, `docs/getting-started.md` (ten-minute walkthrough) and `docs/capabilities.md` (feature matrix and runtime API reference). The installable ZIP keeps the full repository `README.md`, `LICENSE`, `CHANGELOG.md` and `THIRD_PARTY_NOTICES.md` inside `addons/dirge/`, with no ZIP-root documents.
 
@@ -8,7 +8,7 @@ Full documentation lives in the source repository: `README.md`, `docs/getting-st
 
 1. Copy this `addons/dirge/` folder into your project.
 2. Install the matching bridge-enabled NecronomiDOM native package into `addons/necronomidom/` (required by the editor tool and in-game overlay; the runtime does not use it). Use NecronomiDOM 1.1.6 or newer; released 1.1.5 lacks the required selector/mutation/scroll bridge. The bundled `dependency-lock.json` pins its runtime-only release package (Linux x64/ARM64, Windows x64, macOS ARM64/x64) by URL, SHA-256 and source revision. See the full repository README for the package identity and compiler advisory.
-3. Open in stock Godot 4.7.2. No `.csproj` imports, .NET installation, NuGet restore or build executable is required. Neo's .NET NativeAOT source/compiler toolchain is a dependency-build requirement only.
+3. Open in stock Godot 4.7.2. No `.csproj` imports, .NET installation, NuGet restore or build executable is required. NecronomiDOM's precompiled GDExtension needs no .NET either; only building NecronomiDOM from source needs its .NET NativeAOT toolchain.
 4. Enable **Dirge** in **Project → Project Settings → Plugins**. This registers the `DirgeServer` and `DirgeOverlay` autoloads and adds the `dirge/project_path` project setting.
 5. Open the **Dirge** main screen, **Save As…** a `*.dirge.json` project, and point `dirge/project_path` at it.
 
@@ -37,7 +37,7 @@ For UI profiling, launch the editor with `NECRONOMIDOM_UPDATE_TIMING=1`. Thresho
 
 ## Compatibility
 
-Requires **stock Godot 4.7.2**, not the .NET edition. Native audio package closure is six debug/release libraries for Windows x64, Linux x64 and macOS universal (ARM64/x64); Android, iOS and Web native effects are unsupported. NativeAOT NecronomiDOM remains a separate dependency. Historical screenshots and prior-version qualification do not requalify 1.1.0; no new platform/test/CI success is asserted here.
+Requires **stock Godot 4.7.2**, standard or .NET edition; the .NET edition is not required. Native audio package closure is six debug/release libraries for Windows x64, Linux x64 and macOS universal (ARM64/x64); Android, iOS and Web native effects are unsupported. NativeAOT NecronomiDOM remains a separate dependency. Historical screenshots and prior-version qualification do not requalify 1.1.0; no new platform/test/CI success is asserted here.
 
 ## License
 

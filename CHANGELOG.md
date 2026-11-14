@@ -2,6 +2,11 @@
 
 All notable changes to Dirge. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Fixed
+- State one Godot requirement in the addon and repository READMEs: stock Godot 4.7.2, standard or .NET edition, with .NET not required. The addon README's compatibility line no longer reads as excluding the .NET edition.
+
 ## 1.1.0 — 2026-11-13
 
 ### Changed

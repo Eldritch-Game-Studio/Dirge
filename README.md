@@ -90,7 +90,7 @@ The recordings above are historical 1.0-era captures using the stock Godot 4.7.2
 
 ## Requirements
 
-- Stock **Godot 4.7.2**; the non-.NET editor is supported. No .NET SDK/runtime, NuGet restore, C# project imports or external validator executable is required to consume Dirge.
+- Stock **Godot 4.7.2**, standard or .NET edition; the .NET edition is not required. No .NET SDK/runtime, NuGet restore, C# project imports or external validator executable is required to consume Dirge.
 - **NecronomiDOM native GDExtension** for the HTML/CSS editor tool and in-game overlay. Its NativeAOT implementation remains; removing Dirge's managed scripts does not remove this dependency.
   Requires NecronomiDOM **1.1.6** or newer; released 1.1.5 lacks the selector/mutation/scroll bridge. Its packages include Linux x64/ARM64, Windows x64 and macOS ARM64/x64 libraries (see below).
   The runtime alone (`DirgeServer`, audio driver, banks, loudness, live update) does not use Neo.

@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [managed/1.0.x]
     tags: ['v*']
   pull_request:
   workflow_dispatch:
@@ -12,7 +12,7 @@ on:
         type: boolean
         default: false
       approved_pr:
-        description: Reviewed fork PR number (manual approval only; leave empty for main)
+        description: Reviewed fork PR number (manual approval only; leave empty for managed/1.0.x)
         type: string
         default: ''
       approved_head:
@@ -27,8 +27,8 @@ permissions:
 
 jobs:
   local:
-    # Runner groups allow ONLY this main-defined reusable workflow, not this caller.
-    uses: Eldritch-Game-Studio/Dirge/.github/workflows/ci-local.yml@main
+    # Runner groups allow ONLY this line's reusable workflow at refs/heads/managed/1.0.x, not this caller.
+    uses: Eldritch-Game-Studio/Dirge/.github/workflows/ci-local.yml@managed/1.0.x
     with:
       partial: ${{ inputs.partial == true }}
       approved_pr: ${{ inputs.approved_pr || '' }}

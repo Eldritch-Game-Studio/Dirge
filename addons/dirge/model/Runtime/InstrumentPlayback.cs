@@ -465,7 +465,7 @@ internal sealed class InstrumentState
         }
     }
 
-    /// <summary>Voices entered by a clocked start/seek precede this tick's timeline advance.</summary>
+    /// <summary>Catch up fresh voices entered before the remainder of this tick, including jumps and quantized starts.</summary>
     public void AdvanceInitialVoices(double elapsed)
     {
         for (Voice? v = Head; v is not null; v = v.NextInOwner)
@@ -819,7 +819,7 @@ internal sealed class InstrumentState
             bool advanceVoice = !v.Fresh || v.InitialAdvance > 0;
             if (v.Fresh)
             {
-                // Region entries already include this tick's offset; clocked Begin entries do not.
+                // Region entries include their segment offset; initial/jump entries carry the remaining tick explicitly.
                 voiceDt = v.InitialAdvance;
                 v.InitialAdvance = 0;
                 v.Fresh = false;

@@ -1,6 +1,6 @@
 name: Local qualification
 
-# Runner groups must allow only this file at refs/heads/main, never caller workflows.
+# Runner groups must allow only this file at refs/heads/managed/1.0.x, never caller workflows.
 on:
   workflow_call:
     inputs:
@@ -66,13 +66,13 @@ jobs:
               const number = context.payload.pull_request.number;
               const {data: pr} = await github.rest.pulls.get({...context.repo, pull_number: number});
               if (pr.head.repo?.full_name !== expected || pr.head.repo.fork || context.actor === 'dependabot[bot]')
-                throw new Error('Untrusted PR: review it, then dispatch CI on main with approved_pr and its exact approved_head SHA. No PR source was executed.');
+                throw new Error('Untrusted PR: review it, then dispatch CI on managed/1.0.x with approved_pr and its exact approved_head SHA. No PR source was executed.');
               if (pr.head.sha !== context.payload.pull_request.head.sha)
                 throw new Error('PR head changed; run qualification for the current head.');
               revision = pr.head.sha;
             } else if (context.eventName === 'workflow_dispatch') {
-              if (context.ref !== 'refs/heads/main')
-                throw new Error('Manual approval must use the main workflow definition.');
+              if (context.ref !== 'refs/heads/managed/1.0.x')
+                throw new Error('Manual approval must use the managed/1.0.x workflow definition.');
               partial = process.env.PARTIAL === 'true';
               if (process.env.APPROVED_PR) {
                 if (!/^[1-9][0-9]*$/.test(process.env.APPROVED_PR) || !/^[0-9a-f]{40}$/.test(process.env.APPROVED_HEAD))
@@ -88,7 +88,7 @@ jobs:
               } else if (process.env.APPROVED_HEAD) {
                 throw new Error('approved_head requires approved_pr.');
               }
-            } else if (context.eventName !== 'push' || !(context.ref === 'refs/heads/main' || context.ref.startsWith('refs/tags/v'))) {
+            } else if (context.eventName !== 'push' || !(context.ref === 'refs/heads/managed/1.0.x' || context.ref.startsWith('refs/tags/v'))) {
               throw new Error('Unsupported producer event/ref.');
             }
             core.setOutput('repository', repository);

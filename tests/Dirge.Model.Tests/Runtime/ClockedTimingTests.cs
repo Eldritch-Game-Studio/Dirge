@@ -231,4 +231,62 @@ public sealed class ClockedTimingTests
             Is.EqualTo(50.025).Within(1e-9), "Begin's immediate jump must not emit the pre-advance destination.");
         Assert.That(system.Commands.Commands.OfType<VoicePlay>(), Is.Empty);
     }
+
+    [TestCase(0.0210284)]
+    [TestCase(0.125)]
+    public void QuantizedUnclockedStart_EmitsNativeSampleAtTheConductorPhase(double overshoot)
+    {
+        var project = TimingProject();
+        var conductorEvent = project.Events.Single(ev => ev.Path == "Music/Second");
+        conductorEvent.IsConductor = true;
+        conductorEvent.Tempo.Add(new TempoMarker { Position = 0, Bpm = 120 });
+        project.Events.Single(ev => ev.Path == "Music/First").Macros.StartQuantization = Quantization.Beat;
+        var system = new DirgeSystem(project);
+        var recorder = new Recorder(system);
+        var conductor = system.GetEvent("Music/Second").CreateInstance();
+        conductor.Start();
+        system.Update(0);
+        system.Commands.Clear();
+        system.Update(0.49);
+        system.Commands.Clear();
+        var cue = system.GetEvent("Music/First").CreateInstance();
+        cue.Start();
+        system.Update(0.01 + overshoot);
+
+        var play = system.Commands.Commands.OfType<VoicePlay>().Single();
+        Assert.That(cue.TimelinePosition, Is.EqualTo(overshoot).Within(1e-9));
+        Assert.That(play.StartSeconds, Is.EqualTo(conductor.TimelinePosition % 0.5).Within(1e-9),
+            "Internal/model-clock quantized starts must not lose the part of the frame after the beat.");
+        var recording = recorder.Stop();
+        Assert.That(Replayer.Compare(recording, Replayer.Replay(recording, project)), Is.Null);
+    }
+
+    [TestCase(0.0210284)]
+    [TestCase(0.125)]
+    public void TransitionJump_EmitsNewNativeLayerAtTheDestinationPhase(double overshoot)
+    {
+        var b = new ProjectBuilder();
+        var ev = b.AddEvent("Music/Transition");
+        b.AddClip(b.AddTrack(ev), "res://calm.wav", 0, 4);
+        b.AddClip(b.AddTrack(ev), "res://combat.wav", 4, 4);
+        b.Project.AssetLengths["res://calm.wav"] = 4;
+        b.Project.AssetLengths["res://combat.wav"] = 4;
+        var destination = b.AddMarker(ev, new DestinationMarker(), 4);
+        b.AddMarker(ev, new TransitionMarker { Destination = destination.Id }, 0.5f);
+        var project = b.Build();
+        var system = new DirgeSystem(project);
+        var recorder = new Recorder(system);
+        var music = system.GetEvent(ev.Path).CreateInstance();
+        music.Start();
+        system.Update(0);
+        system.Commands.Clear();
+        system.Update(0.5 + overshoot);
+
+        var play = system.Commands.Commands.OfType<VoicePlay>().Single(p => p.Asset.Path == "res://combat.wav");
+        Assert.That(music.TimelinePosition, Is.EqualTo(4 + overshoot).Within(1e-9));
+        Assert.That(play.StartSeconds, Is.EqualTo(overshoot).Within(1e-9),
+            "The layer entered by a jump must include the remaining frame in its native sample offset.");
+        var recording = recorder.Stop();
+        Assert.That(Replayer.Compare(recording, Replayer.Replay(recording, project)), Is.Null);
+    }
 }

@@ -50,20 +50,21 @@ pointing to stock universal Godot .NET and `RUNNER_TEMP` set to a job-specific t
 That command builds debug/release universal frameworks, verifies both slices with `lipo`, fetches the
 unchanged version-pinned NecronomiDOM release dependency, and runs demo/sandbox/native smoke on both architectures.
 
-All CI/CD jobs, including PR admission and release publication, use local runners. The thin `ci.yml` caller
-invokes `Eldritch-Game-Studio/Dirge/.github/workflows/ci-local.yml@main`. Both runner groups must restrict
-workflow access to **`Eldritch-Game-Studio/Dirge/.github/workflows/ci-local.yml@refs/heads/main` only**,
-not `ci.yml` or arbitrary PR workflows. Repository selection alone is insufficient protection.
-The main-defined admission job performs no checkout, verifies the caller's collaborator permission, and resolves
+All CI/CD jobs, including PR admission and release publication, use local runners. On the `managed/1.0.x`
+maintenance line the thin `ci.yml` caller invokes `Eldritch-Game-Studio/Dirge/.github/workflows/ci-local.yml@managed/1.0.x`,
+so this line's PRs, pushes and `v1.0.*` tags run this line's own tests and packaging. Runner groups must restrict
+workflow access to **`Eldritch-Game-Studio/Dirge/.github/workflows/ci-local.yml`** at `refs/heads/main` (the 1.1 line)
+and `refs/heads/managed/1.0.x` only, not `ci.yml` or arbitrary PR workflows. Repository selection alone is insufficient protection.
+The line-defined admission job performs no checkout, verifies the caller's collaborator permission, and resolves
 the exact source SHA from GitHub's event/API. Internal PR heads qualify automatically for collaborator actors.
 Unapproved forks/Dependabot receive a failing qualification check without executing source on either producer.
-To approve reviewed external code, a collaborator dispatches **CI on main**, supplying `approved_pr` and
+To approve reviewed external code, a collaborator dispatches **CI on managed/1.0.x**, supplying `approved_pr` and
 the exact 40-character reviewed `approved_head`; changed heads invalidate approval. Merely approving a fork's
 workflow run does not grant access. Every build checks out the resolved immutable SHA without retaining
 GitHub credentials; release publication is a separate no-build job.
 
 PR events and exact-head manual approvals for the same PR share one concurrency group;
-ordinary main dispatches share the main push group. Active qualification is not cancelled
+ordinary branch dispatches share the branch push group. Active qualification is not cancelled
 by a new event. Concurrency serializes active runs; it does not deduplicate completed work.
 A delayed PR event must still match the live PR head at admission or fail before checkout.
 Do not dispatch a replacement merely because a provider reports zero jobs: that event can

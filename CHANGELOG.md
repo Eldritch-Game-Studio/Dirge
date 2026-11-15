@@ -2,13 +2,14 @@
 
 All notable changes to Dirge. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
-## Unreleased
+## 1.0.4 — 2026-11-15
+
+First release from the `managed/1.0.x` maintenance line (C#/.NET-hosted edition).
 
 ### Changed
 - Designate `managed/1.0.x`, starting at v1.0.3, as the maintenance line for C#-hosted games (Kraken's Keg, God Complex). `main` continues with the 1.1 GDScript edition. The README documents the branch policy and managed-host packaging. CI on this line calls its own reusable workflow at `refs/heads/managed/1.0.x`, so its PRs, pushes and release tags qualify with the managed edition's tests and packaging.
 
 ### Fixed
-- Serialize reviewed manual CI dispatches with their PR events and main dispatches with main pushes, without cancelling active native qualification. Preserve exact-head admission for delayed PR events and document safe source supersession separately from completed-build deduplication.
 - Preserve the remaining frame in native sample offsets when a transition enters new layers or an internally started quantized cue crosses its beat. The sandbox checks actual native sample/conductor alignment with the unchanged 20 ms tolerance; slow-frame regressions also require exact recording replay. Backported from main (02f4da1).
 - Isolate native-platform smoke builds from reusable MSBuild/Roslyn workers, just like compatibility builds, and retain managed logs/binlogs and the original failing exit code.
 
@@ -19,6 +20,7 @@ All notable changes to Dirge. The format follows [Keep a Changelog](https://keep
 - Require real debug/release Windows DLLs to pass the existing demo, sandbox and native audio assertions with matching, upstream-digest-verified stock Windows Godot .NET under official Proton 11 on Linux. Isolate prefixes/projects, bound execution, retain identity/exit/assertion evidence, and reject packages whose Windows DLLs or source revision do not match the successful compatibility receipt. This does not claim native Windows/MSVC qualification; Linux and Mac gates remain mandatory.
 
 ### Fixed
+- Serialize reviewed manual CI dispatches with their PR events and main dispatches with main pushes, without cancelling active native qualification. Preserve exact-head admission for delayed PR events and document safe source supersession separately from completed-build deduplication.
 - Validate every library referenced by the packaged GDExtension manifest against the actual ZIP, including Windows x64 debug and both universal macOS framework executables. Reject missing or empty members before publishing, and keep the full README, license, changelog and third-party notices under `addons/dirge/` without conflicting ZIP-root documents.
 - Include the statically linked godot-cpp MIT notice in the addon, exclude editor/repository/OS junk, and reject standalone executables or NuGet packages in the installable ZIP, following the Godot Asset Store submission guidelines.
 - Keep Proton qualification's managed build on the native Linux SDK with isolated MSBuild/Roslyn processes, avoiding blocked shared compiler servers; capture explicit Windows Godot engine logs on private Xvfb displays instead of relying on console forwarding.

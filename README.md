@@ -275,10 +275,8 @@ that compile Dirge's managed sources into their own assembly, currently Kraken's
   then run `python3 scripts/package-managed.py`. It rebuilds the managed projects and writes
   `dist/dirge-managed-REVISION.zip`, which the host's addon installer pins by revision and hash.
 - Hosts never edit their installed copy. A fix lands here first, then the host installs the new package.
-- PR CI still runs the main-defined reusable workflow. Its portable test job calls `scripts/test.sh`, which here
-  runs the managed model and script tests. Its packaging and qualification jobs expect GDScript-edition scripts that
-  this line doesn't have. Qualify managed changes with this README's [Verification](#verification) commands and
-  the host's own gates.
+- CI on this branch runs its own reusable workflow (`ci-local.yml@managed/1.0.x`), so PRs, pushes and `v1.0.*`
+  release tags qualify with this line's tests, native builds, smoke and packaging, not main's GDScript-edition jobs.
 
 ## Building from source
 

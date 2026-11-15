@@ -3,7 +3,9 @@ import re
 from types import SimpleNamespace
 import unittest
 
-WORKFLOW = Path(__file__).resolve().parents[2] / ".github/workflows/ci-local.yml"
+WORKFLOWS = Path(__file__).resolve().parents[2] / ".github/workflows"
+WORKFLOW = WORKFLOWS / "ci-local.yml"
+LINE = "refs/heads/managed/1.0.x"
 
 
 class AdmissionConcurrencyTests(unittest.TestCase):
@@ -13,7 +15,7 @@ class AdmissionConcurrencyTests(unittest.TestCase):
         cls.concurrency = cls.workflow.split("\nconcurrency:\n", 1)[1].split("\nenv:\n", 1)[0]
         cls.expression = re.search(r"group: local-ci-\$\{\{ (.+) \}\}", cls.concurrency).group(1)
 
-    def group(self, event, number=0, approved_pr="", ref="refs/heads/main"):
+    def group(self, event, number=0, approved_pr="", ref=LINE):
         # This expression uses only boolean selection, equality and format; evaluate
         # the actual workflow expression rather than a second copy of its policy.
         expression = self.expression.replace("&&", "and").replace("||", "or")
@@ -31,13 +33,23 @@ class AdmissionConcurrencyTests(unittest.TestCase):
         self.assertEqual(self.group("workflow_dispatch", approved_pr="5"), "pr-5")
         self.assertNotEqual(self.group("pull_request", number=6), "pr-5")
 
-    def test_main_dispatch_shares_main_push_group(self):
+    def test_line_dispatch_shares_line_push_group(self):
         self.assertEqual(self.group("workflow_dispatch"), self.group("push"))
-        self.assertEqual(self.group("push"), "refs/heads/main")
+        self.assertEqual(self.group("push"), LINE)
 
-    def test_release_tags_remain_separate_from_main(self):
+    def test_release_tags_remain_separate_from_line(self):
         self.assertEqual(self.group("push", ref="refs/tags/v1.0.3"), "refs/tags/v1.0.3")
         self.assertNotEqual(self.group("push", ref="refs/tags/v1.0.3"), self.group("push"))
+
+    def test_line_runs_its_own_reusable_workflow(self):
+        caller = (WORKFLOWS / "ci.yml").read_text()
+        self.assertIn("uses: Eldritch-Game-Studio/Dirge/.github/workflows/ci-local.yml@managed/1.0.x\n", caller)
+        self.assertRegex(caller, r"(?m)^    branches: \[managed/1\.0\.x\]$")
+        trust = self.workflow.split("\n  trust:\n", 1)[1].split("\n  test:\n", 1)[0]
+        # Dispatches and pushes are admitted only from this line's branch (plus release tags).
+        self.assertIn(f"context.ref !== '{LINE}'", trust)
+        self.assertIn(f"context.ref === '{LINE}' || context.ref.startsWith('refs/tags/v')", trust)
+        self.assertNotIn("refs/heads/main", trust)
 
     def test_new_events_do_not_cancel_active_native_work(self):
         self.assertRegex(self.concurrency, r"(?m)^  cancel-in-progress: false$")

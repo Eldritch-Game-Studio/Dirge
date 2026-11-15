@@ -5,7 +5,7 @@ All notable changes to Dirge. The format follows [Keep a Changelog](https://keep
 ## Unreleased
 
 ### Changed
-- Designate `managed/1.0.x`, starting at v1.0.3, as the maintenance line for C#-hosted games (Kraken's Keg, God Complex). `main` continues with the 1.1 GDScript edition. The README documents the branch policy and managed-host packaging.
+- Designate `managed/1.0.x`, starting at v1.0.3, as the maintenance line for C#-hosted games (Kraken's Keg, God Complex). `main` continues with the 1.1 GDScript edition. The README documents the branch policy and managed-host packaging. `scripts/test.sh` gives main's reusable CI the managed model and script tests as its portable test entrypoint.
 
 ### Fixed
 - Serialize reviewed manual CI dispatches with their PR events and main dispatches with main pushes, without cancelling active native qualification. Preserve exact-head admission for delayed PR events and document safe source supersession separately from completed-build deduplication.

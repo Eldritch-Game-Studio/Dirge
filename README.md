@@ -262,6 +262,22 @@ dotnet run --project tools/dirge-validate -- demo/sandbox/sandbox.dirge.json --j
 Exit code 0 = no errors (warnings allowed), 1 = at least one error, 2 = usage or parse failure. CI runs it on both
 demo projects.
 
+## Managed 1.0.x maintenance line
+
+`main` continues with Dirge 1.1 and later, a stock-Godot GDScript edition. The C# (.NET-hosted) 1.0 edition is kept
+on the **`managed/1.0.x`** branch, which starts at the v1.0.3 release. It is the maintenance line for C#-hosted games
+that compile Dirge's managed sources into their own assembly, currently Kraken's Keg and God Complex.
+
+- Open fixes for those games as PRs against `managed/1.0.x`, not `main`. Releases from this branch stay on 1.0.x
+  (`v1.0.4`, …), and the branch takes no 1.1 GDScript features.
+- Hosts consume an exact revision as a `managed-host` source package. In a clean, committed checkout of the
+  branch or release tag, install NecronomiDOM (`scripts/fetch-deps.sh`, or the host's NecronomiDOM managed package),
+  then run `python3 scripts/package-managed.py`. It rebuilds the managed projects and writes
+  `dist/dirge-managed-REVISION.zip`, which the host's addon installer pins by revision and hash.
+- Hosts never edit their installed copy. A fix lands here first, then the host installs the new package.
+- PR CI still runs the main-defined reusable workflow, which expects the GDScript edition's entrypoints. Qualify
+  managed changes with this README's [Verification](#verification) commands and the host's own gates.
+
 ## Building from source
 
 ```sh

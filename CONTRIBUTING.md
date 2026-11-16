@@ -104,8 +104,10 @@ not native Windows, MSVC, or Windows release-export-template qualification; thos
 Every run uses a unique writable project/prefix beneath `RUNNER_TEMP` (or `/tmp`), bounded child processes,
 and prefix-scoped cleanup; it neither starts Steam nor touches user game prefixes. Evidence records source,
 DLL, stock Godot, .NET and Proton identities, actual command exit/timeout states and assertion results.
-`DIRGE_PROTON_LOG_DIR` optionally selects the parent of the unique evidence directory. The private working
-directory is retained for diagnosis; remove only that recorded directory once its processes have exited.
+`DIRGE_PROTON_LOG_DIR` optionally selects the parent of the unique evidence directory (default
+`$RUNNER_TEMP/dirge-proton-evidence`). After copying its logs there, every run removes its private working
+directory on success and failure alike, unlinking the prefix's `dosdevices` drive links (such as `z: -> /`)
+without following them. A run that cannot remove it fails and leaves no PASS receipt.
 A full release remains blocked if any required platform or compatibility smoke fails; there is no hosted fallback.
 
 The manual `partial=true` path and standalone `scripts/ci-local.sh` deliberately stay Linux-only, label the ZIP

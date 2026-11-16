@@ -43,6 +43,8 @@ def provenance(root: Path, package: Path, ref: str, run_id: int, run_attempt: in
         "ref": ref,
         "run_id": run_id,
         "run_attempt": run_attempt,
+        # Publication runs inside the qualifying run itself (after `qualification` passed), so they are the same run.
+        "qualified_run_id": run_id,
         "release_tag": "managed-" + sha[:12],
         "zip": package.name,
         "zip_sha256": hashlib.sha256(package.read_bytes()).hexdigest(),

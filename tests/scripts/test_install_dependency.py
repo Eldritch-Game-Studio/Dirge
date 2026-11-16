@@ -95,6 +95,25 @@ class DependencyInstallerTests(unittest.TestCase):
         self.assertIn("installed NecronomiDOM", result.stdout)
         self.assertEqual((self.destination / "runtime/DocumentHost.cs").read_bytes(), FILES["runtime/DocumentHost.cs"])
 
+    def test_installs_host_import_settings_and_refreshes_when_they_change(self):
+        archive = self.root / "nd.zip"
+        self.candidate(archive, managed_zip(archive, FILES))
+        settings = self.root / "host-imports/necronomidom/core/NecronomiDom.csproj.import"
+        settings.parent.mkdir(parents=True)
+        settings.write_text("[remap]\nimporter=\"keep\"\n")
+        self.assertEqual(self.command().returncode, 0)
+        installed = self.destination / "core/NecronomiDom.csproj.import"
+        self.assertEqual(installed.read_text(), settings.read_text())
+        settings.write_text("[remap]\nimporter=\"changed\"\n")
+        self.assertIn("installed NecronomiDOM", self.command().stdout)
+        self.assertEqual(installed.read_text(), settings.read_text())
+        orphan = self.root / "host-imports/necronomidom/fonts/missing.otf.import"
+        orphan.parent.mkdir(parents=True)
+        orphan.write_text("x")
+        result = self.command()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("no matching asset", result.stderr)
+
     def test_rejects_checksum_mismatch(self):
         archive = self.root / "nd.zip"
         managed_zip(archive, FILES)

@@ -130,9 +130,18 @@ def installed(root: Path) -> dict | None:
     return json.loads(marker.read_text()) if marker.is_file() else None
 
 
+def host_imports(root: Path) -> dict[str, bytes]:
+    """Dirge's own import settings for dependency assets (managed-host packages omit `.import`, which belongs to the
+    host). Without them the editor plugin loads the font before the first filesystem scan has imported it."""
+    base = root / "host-imports" / ADDON
+    return {path.relative_to(base).as_posix(): path.read_bytes() for path in sorted(base.rglob("*.import"))} if base.is_dir() else {}
+
+
 def install(root: Path) -> None:
     url, sha256, revision = source(root)
-    identity = {"url": url, "sha256": sha256, "revision": revision}
+    imports = host_imports(root)
+    identity = {"url": url, "sha256": sha256, "revision": revision,
+                "host_imports": {name: hashlib.sha256(content).hexdigest() for name, content in imports.items()}}
     destination = root / "addons" / ADDON
     current = installed(root)
     if current is not None and {key: current.get(key) for key in identity} == identity and all(
@@ -142,6 +151,10 @@ def install(root: Path) -> None:
         print(f"fetch-deps: NecronomiDOM {revision} already installed")
         return
     files = package_files(download(url), sha256, revision)
+    for name, content in imports.items():
+        if name[: -len(".import")] not in files:
+            raise ValueError(f"host-imports/{ADDON}/{name} has no matching asset in the package")
+        files[name] = content
     destination.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix=".necronomidom-", dir=destination.parent) as directory:
         work = Path(directory)

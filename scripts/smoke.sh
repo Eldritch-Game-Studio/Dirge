@@ -39,6 +39,19 @@ run_checked() {
 run_checked import '' --import
 cmp -s project.godot "$settings" || { echo 'smoke: import rewrote project.godot' >&2; exit 1; }
 run_checked gdscript 'DIRGE_TEST PASS' --script res://tests/gdscript/run.gd
+# The spatial-region suite's engine probe decides whether native pending-pause assertions were enforced or skipped.
+pending_pause="$(grep -m1 -oE '^DIRGE_NATIVE_PENDING_PAUSE engine .*' "$log_dir/gdscript.log" | sed 's/^DIRGE_NATIVE_PENDING_PAUSE //')" || true
+[[ -n "$pending_pause" ]] || { echo 'smoke: gdscript suite did not report its native pending-pause probe result' >&2; exit 1; }
+echo "smoke: $pending_pause"
+if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+  platform="$(uname -s)${GODOT_ARCH:+ $GODOT_ARCH}"
+  [[ -z "${DIRGE_PROTON_WORK:-}" ]] || platform="Windows under Proton"
+  echo "- Dirge spatial regions ($platform): $pending_pause" >> "$GITHUB_STEP_SUMMARY"
+fi
+if [[ "${GITHUB_ACTIONS:-}" = true ]]; then
+  if [[ "$pending_pause" = *lacks* ]]; then echo "::warning title=Native pending pause::$pending_pause"
+  else echo "::notice title=Native pending pause::$pending_pause"; fi
+fi
 run_checked demo 'DIRGE_SMOKE PASS' res://demo/demo.tscn -- --smoke
 run_checked sandbox 'SANDBOX_SMOKE PASS' res://demo/sandbox/sandbox.tscn -- --smoke
 run_checked native 'NATIVE_TEST PASS' res://native/tests/sendreturn.tscn

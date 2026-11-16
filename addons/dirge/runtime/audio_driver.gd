@@ -1,5 +1,7 @@
 @tool
 extends Node
+## Applies model commands to one AudioServer mixer and pooled stream players. Default voices are children of this
+## node; explicit spatial regions belong to registered World3D hosts. Use on the scene-tree (main) thread.
 
 signal feedback(message: Dictionary)
 signal voice_finished(voice: int)
@@ -27,10 +29,102 @@ var _faders: Dictionary = {}
 var _voices: Dictionary = {}
 var _all: Array = []
 var _free: Array = [[], [], [], []]
+# region id -> {"id", "host", "listener", "world", "exiting"}
+var _regions: Dictionary = {}
 
 func _init(catalog = null) -> void:
 	assets = catalog if catalog != null else Catalog.new()
 	name = "AudioDriver"
+
+## Registers nonzero `region` in a distinct live World3D. Host and current listener must share an audio-enabled
+## viewport with a current camera. Does not change the mixer or create listeners. Unregister before replacing a
+## world; host/listener tree exit also withdraws the route synchronously.
+func register_spatial_region(region: int, host: Node3D, listener: AudioListener3D) -> bool:
+	if not _on_scene_thread():
+		return false
+	if region == 0:
+		push_error("Dirge: spatial region 0 is reserved for the legacy host.")
+		return false
+	if _regions.has(region):
+		push_error("Dirge: unregister spatial region %d before replacing it." % region)
+		return false
+	if not is_instance_valid(host) or not host.is_inside_tree() or not is_instance_valid(listener) or not listener.is_inside_tree():
+		push_error("Dirge: spatial region host and listener must be live in the scene tree.")
+		return false
+	var route = {"id": region, "host": host, "listener": listener, "world": host.get_world_3d()}
+	if not _is_live(route):
+		push_error("Dirge: spatial region requires a current listener and camera in the same audio-enabled viewport/world.")
+		return false
+	if route.world == get_viewport().find_world_3d():
+		push_error("Dirge: an explicit spatial region must not share the default host's World3D.")
+		return false
+	for other in _regions.values():
+		if other.world == route.world:
+			push_error("Dirge: each spatial region must own a distinct World3D.")
+			return false
+	route.exiting = _withdraw_region.bind(region, true)
+	_regions[region] = route
+	host.tree_exiting.connect(route.exiting)
+	listener.tree_exiting.connect(route.exiting)
+	return true
+
+## Finishes all voices in `region` and returns their players to the default pool. Region 0 is not removable.
+func unregister_spatial_region(region: int) -> bool:
+	return _withdraw_region(region, false)
+
+func _withdraw_region(region: int, retire: bool) -> bool:
+	if not _on_scene_thread() or not _regions.has(region):
+		return false
+	var route: Dictionary = _regions[region]
+	_regions.erase(region)
+	_disconnect_route(route)
+	for i in range(_all.size() - 1, -1, -1):
+		var slot: Dictionary = _all[i]
+		if slot.active and slot.spatial and slot.region == region:
+			_on_finished(slot, retire)
+	return true
+
+func _disconnect_route(route: Dictionary) -> void:
+	for node in [route.host, route.listener]:
+		if is_instance_valid(node) and node.tree_exiting.is_connected(route.exiting):
+			node.tree_exiting.disconnect(route.exiting)
+
+func _on_scene_thread() -> bool:
+	if OS.get_thread_caller_id() == OS.get_main_thread_id():
+		return true
+	push_error("Dirge: AudioDriver must be used on the scene-tree thread.")
+	return false
+
+static func _is_live(route: Dictionary) -> bool:
+	var host = route.host
+	var listener = route.listener
+	if not is_instance_valid(host) or not is_instance_valid(listener) or not host.is_inside_tree() or not listener.is_inside_tree() \
+			or host.is_queued_for_deletion() or listener.is_queued_for_deletion():
+		return false
+	var viewport: Viewport = host.get_viewport()
+	var camera: Camera3D = viewport.get_camera_3d()
+	return viewport == listener.get_viewport() and viewport.audio_listener_enable_3d and camera != null \
+		and camera.is_inside_tree() and not camera.is_queued_for_deletion() and camera.get_world_3d() == route.world \
+		and listener.is_current() and host.get_world_3d() == route.world and listener.get_world_3d() == route.world
+
+# Once per command batch, including empty batches.
+func _withdraw_invalid_regions() -> void:
+	for region in _regions.keys():
+		if not _is_live(_regions[region]):
+			unregister_spatial_region(region)
+
+# Host node for a spatial region: this node for region 0, the registered host, or null for an unknown region.
+func _region_host(region: int) -> Node:
+	if region == 0:
+		return self
+	return _regions[region].host if _regions.has(region) else null
+
+static func _region_of(command: Dictionary) -> int:
+	return int(command.get("attributes", {}).get("region", 0))
+
+static func _move_player(slot: Dictionary, host: Node) -> void:
+	if slot.player.get_parent() != host:
+		slot.player.reparent(host, false)
 
 func load(project: Dictionary) -> bool:
 	return load_mixer(project.get("mixer", {}))
@@ -187,6 +281,9 @@ func is_synchronized(voice: int) -> bool:
 	return _voices.has(voice) and _voices[voice].slot.sync != null
 
 func apply(commands) -> void:
+	if not _on_scene_thread():
+		return
+	_withdraw_invalid_regions()
 	if commands is Dictionary:
 		_apply_one(commands)
 		return
@@ -201,7 +298,9 @@ func apply(commands) -> void:
 				var other: Dictionary = commands[j]
 				if group.size() == MAX_SYNC_STREAMS:
 					break
-				if not consumed.has(j) and other.get("type") == "VoicePlay" and other.get("syncGroup", 0) == command.syncGroup and other.get("spatial", false) == command.get("spatial", false):
+				# Sync groups never merge spatial worlds.
+				if not consumed.has(j) and other.get("type") == "VoicePlay" and other.get("syncGroup", 0) == command.syncGroup and other.get("spatial", false) == command.get("spatial", false) \
+						and (not command.get("spatial", false) or _region_of(other) == _region_of(command)):
 					group.append(other)
 					consumed[j] = true
 			if group.size() > 1:
@@ -230,9 +329,11 @@ func _apply_one(command: Dictionary) -> void:
 		"VoiceSetPitch":
 			if player != null: player.pitch_scale = command.pitch
 		"VoiceSetPaused":
-			if player != null: player.stream_paused = command.paused
-		"VoiceSet3D":
-			if player is AudioStreamPlayer3D: player.global_transform = to_transform(command.attributes)
+			if player != null:
+				# Commanded pause survives native stop/reparent/restart and pending physics registration.
+				_voices[voice].slot.paused = command.paused
+				player.stream_paused = command.paused
+		"VoiceSet3D": _set_spatial_attributes(voice, command.get("attributes", {}))
 		"BusSetVolume":
 			if index >= 0:
 				if _faders.has(bus):
@@ -258,6 +359,12 @@ func _apply_one(command: Dictionary) -> void:
 func _play(command: Dictionary) -> void:
 	var voice = int(command.voice)
 	var spatial: bool = command.get("spatial", false)
+	var host: Node = _region_host(_region_of(command)) if spatial else self
+	if host == null:
+		# Unknown nonzero regions finish without fallback playback.
+		_release(voice)
+		_finished_feedback(voice)
+		return
 	var slot: Dictionary = _voices[voice].slot if _voices.has(voice) else {}
 	if not slot.is_empty() and (slot.spatial != spatial or slot.sync != null):
 		_release(voice)
@@ -266,6 +373,11 @@ func _play(command: Dictionary) -> void:
 		slot = _acquire(spatial, false)
 		slot.members = [voice]
 		_voices[voice] = {"slot": slot, "index": -1}
+	slot.paused = false
+	if spatial:
+		slot.player.stop()
+		_move_player(slot, host)
+		slot.region = _region_of(command)
 	var stream = assets.get_looping_stream(command.asset) if command.get("loop", false) else assets.get_stream(command.asset)
 	if stream == null:
 		_release(voice)
@@ -277,7 +389,17 @@ func _play_group(group: Array) -> void:
 	for command in group:
 		_release(command.voice)
 	var lead: Dictionary = group[0]
-	var slot = _acquire(lead.get("spatial", false), true)
+	var spatial: bool = lead.get("spatial", false)
+	var host: Node = _region_host(_region_of(lead)) if spatial else self
+	if host == null:
+		for command in group:
+			_finished_feedback(command.voice)
+		return
+	var slot = _acquire(spatial, true)
+	slot.paused = false
+	if spatial:
+		_move_player(slot, host)
+		slot.region = _region_of(lead)
 	slot.sync.stream_count = group.size()
 	slot.members = []
 	for k in range(group.size()):
@@ -319,7 +441,7 @@ func _acquire(spatial: bool, synchronized: bool) -> Dictionary:
 	else:
 		var player: Node = AudioStreamPlayer3D.new() if spatial else AudioStreamPlayer.new()
 		player.name = "%s%s" % ["Sync" if synchronized else "Voice", _all.size()]
-		slot = {"player": player, "spatial": spatial, "sync": AudioStreamSynchronized.new() if synchronized else null, "members": [], "pool": pool, "active": false}
+		slot = {"player": player, "spatial": spatial, "sync": AudioStreamSynchronized.new() if synchronized else null, "members": [], "pool": pool, "active": false, "region": 0, "paused": false}
 		player.finished.connect(_on_finished.bind(slot))
 		add_child(player)
 		_all.append(slot)
@@ -346,39 +468,107 @@ func _release(voice: int) -> void:
 	if _live_members(slot) == 0:
 		_release_slot(slot)
 
-func _release_slot(slot: Dictionary) -> void:
+# `retire` discards the native slot instead of reparenting it: during tree_exiting an ancestor can be busy
+# traversing children, so the player is freed and later acquisition creates a clean one.
+func _release_slot(slot: Dictionary, retire: bool = false) -> void:
 	if not slot.active:
 		return
 	for voice in slot.members:
 		if voice >= 0: _voices.erase(voice)
 	slot.active = false
+	slot.paused = false
 	slot.player.stop()
 	slot.player.stream_paused = false
 	slot.player.stream = null
+	if slot.spatial:
+		if not retire:
+			_move_player(slot, self)
+		slot.player.transform = Transform3D.IDENTITY
+		slot.region = 0
 	if slot.sync != null:
 		for k in range(slot.members.size()):
 			slot.sync.set_sync_stream(k, null)
 	slot.members = []
-	_free[slot.pool].append(slot)
+	if retire:
+		_all.erase(slot)
+		slot.player.queue_free()
+	else:
+		_free[slot.pool].append(slot)
 
-func _on_finished(slot: Dictionary) -> void:
+func _on_finished(slot: Dictionary, retire: bool = false) -> void:
 	if not slot.active:
 		return
 	var members: Array = slot.members.duplicate()
-	_release_slot(slot)
+	_release_slot(slot, retire)
 	for voice in members:
 		if voice >= 0: _finished_feedback(voice)
+
+func _set_spatial_attributes(voice: int, attributes: Dictionary) -> void:
+	if not _voices.has(voice) or not _voices[voice].slot.spatial:
+		return
+	var region = int(attributes.get("region", 0))
+	var host = _region_host(region)
+	if host == null:
+		_release(voice)
+		_finished_feedback(voice)
+		return
+	var slot: Dictionary = _voices[voice].slot
+	var player: AudioStreamPlayer3D = slot.player
+	if slot.region == region:
+		player.global_transform = to_transform(attributes)
+		return
+	# Region change: move through the driver, keeping playback position and commanded pause across native restart.
+	var position = player.get_playback_position()
+	var paused: bool = slot.paused or player.stream_paused
+	var playing = player.playing
+	if slot.sync != null:
+		# A single layer moving worlds must not drag its siblings with it.
+		var index: int = _voices[voice].index
+		var stream = slot.sync.get_sync_stream(index)
+		var volume = slot.sync.get_sync_stream_volume(index)
+		var bus = player.bus
+		var pitch = player.pitch_scale
+		var unit = player.unit_size
+		var maximum = player.max_distance
+		var attenuation = player.attenuation_model
+		var doppler = player.doppler_tracking
+		_release(voice)
+		slot = _acquire(true, false)
+		slot.members = [voice]
+		_voices[voice] = {"slot": slot, "index": -1}
+		player = slot.player
+		player.stream = stream
+		player.bus = bus
+		player.volume_db = volume
+		player.pitch_scale = pitch
+		player.unit_size = unit
+		player.max_distance = maximum
+		player.attenuation_model = attenuation
+		player.doppler_tracking = doppler
+	player.stop()
+	_move_player(slot, host)
+	slot.region = region
+	slot.paused = paused
+	player.global_transform = to_transform(attributes)
+	if playing or paused:
+		player.play(position)
+	player.stream_paused = paused
 
 func _finished_feedback(voice: int) -> void:
 	voice_finished.emit(voice)
 	feedback.emit({"type": "VoiceFinished", "voice": voice})
 
 func stop_all() -> void:
+	if not _on_scene_thread():
+		return
 	for slot in _all:
 		_release_slot(slot)
 
 func shutdown() -> void:
 	stop_all()
+	for route in _regions.values():
+		_disconnect_route(route)
+	_regions.clear()
 	capture = null
 	for slot in _all:
 		slot.player.queue_free()

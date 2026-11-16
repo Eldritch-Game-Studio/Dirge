@@ -4,6 +4,10 @@ All notable changes to Dirge. The format follows [Keep a Changelog](https://keep
 
 ## Unreleased
 
+### Added
+- Explicit spatial regions, forward-ported from the managed/1.0.x line (God Complex's b8a7280, 5e2edab, b6cb375). An integer `region` in 3D attribute Dictionaries selects the nearest enabled listener and Furthest-stealing distance within that region only. `AudioDriver.register_spatial_region` / `unregister_spatial_region` route spatial voices into distinct live `World3D` hosts under one mixer. Players migrate through the driver, keeping position and commanded pause; unknown regions fail closed; sync groups never merge worlds; tree exit or world replacement withdraws a region. Recordings keep exact integer regions beside the coordinates. Projects that never set a region are unchanged, including listener-0 fallback, recordings and command text.
+- `tests/gdscript/test_spatial_regions.gd` covers listener selection, stealing, recording and real-engine routing and lifecycle. Its five native-pause assertions are mandatory on engines that keep a pause requested before physics registration. On engines that drop it, as stock Godot 4.7.2 does, they are skipped and `scripts/smoke.sh` reports `engine lacks pending-pause persistence: 5 native-pause assertions skipped` as a CI warning and in the job summary. Stock engines do not support paused migration.
+
 ### Fixed
 - State one Godot requirement in the addon and repository READMEs: stock Godot 4.7.2, standard or .NET edition, with .NET not required. The addon README's compatibility line no longer reads as excluding the .NET edition.
 

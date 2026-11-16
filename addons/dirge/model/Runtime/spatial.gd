@@ -1,8 +1,9 @@
 @tool
 extends RefCounted
 
+# "region" is the application-owned spatial world; 0 is the legacy host world.
 static func origin() -> Dictionary:
-	return {"position": Vector3.ZERO, "velocity": Vector3.ZERO, "forward": Vector3.FORWARD, "up": Vector3.UP}
+	return {"position": Vector3.ZERO, "velocity": Vector3.ZERO, "forward": Vector3.FORWARD, "up": Vector3.UP, "region": 0}
 
 static func attributes(value: Dictionary) -> Dictionary:
 	var result = origin()
@@ -14,7 +15,17 @@ static func attributes(value: Dictionary) -> Dictionary:
 			result[key] = Vector3(v.get("x", 0), v.get("y", 0), v.get("z", 0))
 		elif v is Array and v.size() >= 3:
 			result[key] = Vector3(v[0], v[1], v[2])
+	result.region = int(value.get("region", 0))
 	return result
+
+# Without a listener in the emitter's region: maximally distant, neutral relative direction/speed.
+# Parameter bounds clamp the distance; absolute speed does not need a listener.
+static func without_listener(kind: String, emitter: Dictionary) -> float:
+	match kind:
+		"Distance": return 3.4028235e38
+		"DistanceNormalized": return 1.0
+		"SpeedAbsolute": return emitter.velocity.length()
+	return 0.0
 
 static func compute(kind: String, emitter: Dictionary, listener: Dictionary, minimum: float, maximum: float) -> float:
 	var delta: Vector3 = emitter.position - listener.position

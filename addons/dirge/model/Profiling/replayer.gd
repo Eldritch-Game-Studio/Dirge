@@ -74,7 +74,7 @@ class Session extends RefCounted:
 		var name: String = call.name if call.name != null else ""
 		match call.method:
 			"SetGlobalParameter": system.set_global_parameter(name, call.value, call.flag)
-			"SetListener": system.set_listener(int(call.mode), Recording.unpack(call.vector), call.value)
+			"SetListener": system.set_listener(int(call.mode), Recording.unpack(call.vector, int(call.get("region", 0))), call.value)
 			"StopAll": system.stop_all("Immediate" if int(call.mode) == 1 else "AllowFadeout")
 			"SetLocale": system.locale = name
 			"SetMaxRealVoices": system.max_real_voices = int(call.value)
@@ -110,7 +110,7 @@ class Session extends RefCounted:
 			"SetPaused": instance.set_paused(call.flag)
 			"SetParameter": instance.set_parameter(name, call.value, call.flag)
 			"SetParameterByLabel": instance.set_parameter_by_label(name, call.text if call.text != null else "")
-			"Set3DAttributes": instance.set_3d_attributes(Recording.unpack(call.vector))
+			"Set3DAttributes": instance.set_3d_attributes(Recording.unpack(call.vector, int(call.get("region", 0))))
 			"SetVolume": instance.set_volume(call.value)
 			"SetPitch": instance.set_pitch(call.value)
 			"SetProgrammerSound": instance.set_programmer_sound(name)

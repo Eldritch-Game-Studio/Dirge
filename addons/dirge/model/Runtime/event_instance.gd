@@ -359,11 +359,11 @@ func update_internal(dt: float) -> void:
 		just_started = true
 	var macros = description.event.get("macros", {})
 	if description.is_3d:
-		var listener = system.nearest_listener(attributes.position)
+		var listener = system.nearest_listener(attributes)
 		for parameter in local_parameters.all:
 			var builtin = parameter.definition.get("builtIn", "None")
 			if builtin != "None":
-				parameter.set_value(Spatial.compute(builtin, attributes, listener, macros.get("minDistance", 1), macros.get("maxDistance", 20)), true)
+				parameter.set_value(Spatial.without_listener(builtin, attributes) if listener == null else Spatial.compute(builtin, attributes, listener, macros.get("minDistance", 1), macros.get("maxDistance", 20)), true)
 	local_parameters.advance(dt)
 	var bpm = description.bpm_at(_timeline.position)
 	var modulation = ModEval.advance(description.modulators, _mods, 0 if paused else dt, bpm)
@@ -514,7 +514,8 @@ func resolve_programmer_asset(key: String) -> String:
 func distance_to_nearest_listener() -> float:
 	if not description.is_3d:
 		return 0.0
-	return attributes.position.distance_to(system.nearest_listener(attributes.position).position)
+	var listener = system.nearest_listener(attributes)
+	return INF if listener == null else attributes.position.distance_to(listener.position)
 
 func raise_callback(kind: int, payload: Dictionary) -> void:
 	if callback_mask & kind:

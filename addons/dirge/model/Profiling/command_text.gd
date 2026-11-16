@@ -17,7 +17,9 @@ static func _vector(value: Vector3) -> String:
 	return "[%s %s %s]" % [number(value.x), number(value.y), number(value.z)]
 
 static func attributes(value: Dictionary) -> String:
-	return "p=%s v=%s f=%s u=%s" % [_vector(value.get("position", Vector3.ZERO)), _vector(value.get("velocity", Vector3.ZERO)), _vector(value.get("forward", Vector3.FORWARD)), _vector(value.get("up", Vector3.UP))]
+	var text: String = "p=%s v=%s f=%s u=%s" % [_vector(value.get("position", Vector3.ZERO)), _vector(value.get("velocity", Vector3.ZERO)), _vector(value.get("forward", Vector3.FORWARD)), _vector(value.get("up", Vector3.UP))]
+	var region: int = int(value.get("region", 0))
+	return text if region == 0 else "%s region=%d" % [text, region]
 
 static func format(command: Dictionary) -> String:
 	var type: String = command.get("type", "")

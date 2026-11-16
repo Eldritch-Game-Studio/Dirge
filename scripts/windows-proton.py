@@ -12,6 +12,7 @@ import re
 import shlex
 import shutil
 import signal
+import stat
 import subprocess
 import sys
 import tempfile
@@ -113,6 +114,31 @@ def quiesce_prefix(proton, work, log, env):
     if (stopped["timed_out"] or stopped["exit_code"] not in (0, 1)
             or (stopped["exit_code"] == 1 and log.read_text().strip())):
         raise RuntimeError(f"prefix cleanup failed: {log}")
+
+
+def remove_workspace(work):
+    """Delete the private run directory without following any link out of it.
+
+    Proton's prefix holds dosdevices drive links such as ``z: -> /``. Left in
+    RUNNER_TEMP, the Actions runner's next temp cleanup cannot remove that link,
+    aborts, and strands file-less directory skeletons that break other jobs.
+    """
+    dosdevices = work / "compat/pfx/dosdevices"
+    if dosdevices.is_dir() and not dosdevices.is_symlink():
+        for entry in dosdevices.iterdir():
+            if entry.is_symlink():
+                entry.unlink()
+
+    def make_writable(function, path, _error):
+        # Read-only prefix directories: allow the unlink, never chmod through a link.
+        os.chmod(os.path.dirname(path), stat.S_IRWXU)
+        if os.path.isdir(path) and not os.path.islink(path):
+            os.chmod(path, stat.S_IRWXU)
+        function(path)
+
+    shutil.rmtree(work, **{"onexc" if sys.version_info >= (3, 12) else "onerror": make_writable})
+    if os.path.lexists(work):
+        raise OSError(f"Proton workspace still exists: {work}")
 
 
 def validate_engine_log(path):
@@ -219,21 +245,22 @@ def qualify():
     receipt_path.unlink(missing_ok=True)
     hashes = {target: digest(binary_root / f"libdirge_native.windows.{target}.x86_64.dll") for target in TARGETS}
     temp_root = Path(os.environ.get("RUNNER_TEMP", tempfile.gettempdir()))
+    source_revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+    proton_sha256 = {name: digest(proton / name) for name in ("proton", "files/bin/wine", "files/bin/wineserver")}
     work = Path(tempfile.mkdtemp(prefix="dirge-proton-", dir=temp_root)).resolve()
-    log_root = Path(os.environ.get("DIRGE_PROTON_LOG_DIR", str(work / "logs"))).resolve()
-    if "DIRGE_PROTON_LOG_DIR" in os.environ:
-        log_root /= work.name
-    log_root.mkdir(parents=True, exist_ok=True)
+    # Evidence lives outside the workspace, which is removed after every run.
+    log_root = Path(os.environ.get("DIRGE_PROTON_LOG_DIR", str(temp_root / "dirge-proton-evidence"))).resolve() / work.name
     # Keep the unique run directory in logs even when setup fails. No stale PASS
     # receipt survives a new invocation; only all-success writes qualification.
     report = {"schema": 2, "coverage": "windows-x64-proton-compatibility", "godot_distribution": "standard",
-              "source_revision": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
+              "source_revision": source_revision,
               "workspace": str(work), "godot_version": version,
               "runner_sha256": digest(Path(__file__).resolve()),
-              "proton": {"path": str(proton), "version": proton_version,
-                         "sha256": {name: digest(proton / name) for name in ("proton", "files/bin/wine", "files/bin/wineserver")}},
+              "proton": {"path": str(proton), "version": proton_version, "sha256": proton_sha256},
               "targets": {}}
+    succeeded = False
     try:
+        log_root.mkdir(parents=True, exist_ok=True)
         release = metadata(f"https://api.github.com/repos/godotengine/godot/releases/tags/{version}-stable", work / "godot-release.json")
         archive_name = f"Godot_v{version}-stable_win64.exe.zip"
         asset = next(item for item in release["assets"] if item["name"] == archive_name)
@@ -289,6 +316,7 @@ def qualify():
                 "smoke": smoke, "native": native}
         report["status"] = "PASS"
         json_write(receipt_path, report)
+        succeeded = True
         print(f"Proton compatibility PASS (not native Windows/MSVC): {receipt_path}")
     except BaseException as error:
         report["status"] = "FAIL"
@@ -302,14 +330,25 @@ def qualify():
                 print(f"Additional prefix cleanup failure: {cleanup_error}", file=sys.stderr)
         raise
     finally:
-        json_write(work / "qualification.json", report)
-        if log_root != work / "logs" and (work / "logs").exists():
-            shutil.copytree(work / "logs", log_root, dirs_exist_ok=True)
-        shutil.copy2(work / "qualification.json", log_root / "qualification.json")
-        for name in ("godot-release.json",):
-            if (work / name).exists():
-                shutil.copy2(work / name, log_root / name)
-        print(f"Proton qualification evidence: {log_root}", flush=True)
+        try:
+            json_write(work / "qualification.json", report)
+            if (work / "logs").exists():
+                shutil.copytree(work / "logs", log_root, dirs_exist_ok=True)
+            shutil.copy2(work / "qualification.json", log_root / "qualification.json")
+            for name in ("godot-release.json",):
+                if (work / name).exists():
+                    shutil.copy2(work / name, log_root / name)
+            print(f"Proton qualification evidence: {log_root}", flush=True)
+        finally:
+            # Success and failure alike: the prefix is quiesced and its evidence copied.
+            try:
+                remove_workspace(work)
+            except OSError as cleanup_error:
+                print(f"Proton workspace removal failed: {cleanup_error}", file=sys.stderr, flush=True)
+                # Never mask a primary failure; never let a leaking run qualify.
+                if succeeded:
+                    receipt_path.unlink(missing_ok=True)
+                    raise
 
 
 if __name__ == "__main__":

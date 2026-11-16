@@ -1,9 +1,9 @@
 {
   "necronomidom": {
     "repository": "Eldritch-Game-Studio/NecronomiDOM",
-    "sha": "31366b0dfb9c867513fbfbac539977196f811982",
-    "release_tag": "managed-31366b0dfb9c",
-    "zip": "necronomidom-managed-31366b0dfb9c867513fbfbac539977196f811982.zip",
-    "zip_sha256": "36678580420f1534fea42ab856ad0412a332f2c5b0726dfa22f99663423fa5d4"
+    "sha": "07d9d598979bebd0dfec4b9a10feff7d2fecfe0f",
+    "release_tag": "managed-07d9d598979b",
+    "zip": "necronomidom-managed-07d9d598979bebd0dfec4b9a10feff7d2fecfe0f.zip",
+    "zip_sha256": "9e7597007e236aa9fd2cee30ec6ba98ea9454a5d5d37f2e6ecdfefa85c6b4fba"
   }
 }

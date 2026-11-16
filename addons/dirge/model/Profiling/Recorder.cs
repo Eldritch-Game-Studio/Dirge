@@ -105,7 +105,7 @@ public sealed class Recorder : IApiSink
         if (Suppressed) return;
         int handle = Resolve(target, out ApiTarget kind);
         if (handle < 0 && kind == ApiTarget.Instance) return;
-        _pending.Calls.Add(new ApiCall { Method = method, Target = kind, Handle = handle, Mode = index, Value = weight, Vector = ApiCall.Pack(attributes) });
+        _pending.Calls.Add(new ApiCall { Method = method, Target = kind, Handle = handle, Mode = index, Value = weight, Vector = ApiCall.Pack(attributes), Region = attributes.Region.Value });
     }
 
     void IApiSink.ProgrammerSound(EventInstance instance, string key, AssetRef asset)

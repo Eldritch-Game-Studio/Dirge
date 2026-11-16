@@ -51,6 +51,51 @@ class SmokeBuildTests(unittest.TestCase):
                 self.assertTrue((logs / "managed-build.log").is_file())
                 self.assertFalse((logs / "import.log").exists(), "A failed managed build must not run Godot.")
 
+    def test_native_pending_pause_probe_result_is_required_and_summarized(self):
+        cases = {
+            "lacks": ("DIRGE_NATIVE_PENDING_PAUSE engine lacks pending-pause persistence: 5 native-pause assertions skipped\n", 0, "::warning"),
+            "persists": ("DIRGE_NATIVE_PENDING_PAUSE engine persists pending pause: 5 native-pause assertions enforced\n", 0, "::notice"),
+            "missing": ("", 1, None),
+        }
+        for name, (probe, code, annotation) in cases.items():
+            with self.subTest(name), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                (root / "scripts").mkdir()
+                shutil.copy2(ROOT / "scripts/smoke.sh", root / "scripts/smoke.sh")
+                fetch = root / "scripts/fetch-deps.sh"
+                fetch.write_text("#!/usr/bin/env bash\n")
+                fetch.chmod(0o755)
+                for asset in ("demo/audio/wind.wav", "demo/audio/click.wav",
+                              "demo/sandbox/audio/calm_pad.wav", "demo/sandbox/audio/line_de.wav"):
+                    path = root / asset
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.touch()
+                tools = root / "tools"
+                tools.mkdir()
+                (tools / "dotnet").write_text("#!/usr/bin/env bash\nexit 0\n")
+                (tools / "dotnet").chmod(0o755)
+                godot = tools / "godot"
+                godot.write_text("#!/usr/bin/env python3\nimport os, sys\n"
+                                 "if 'res://demo/demo.tscn' in sys.argv: print(os.environ['DEMO_PROBE'] + 'DIRGE_SMOKE PASS')\n"
+                                 "if 'res://demo/sandbox/sandbox.tscn' in sys.argv: print('SANDBOX_SMOKE PASS')\n")
+                godot.chmod(0o755)
+                summary = root / "summary.md"
+                environment = dict(os.environ, PATH=str(tools) + os.pathsep + os.environ["PATH"],
+                                   GODOT=str(godot), DEMO_PROBE=probe, DIRGE_SMOKE_LOG_DIR=str(root / "logs"),
+                                   GITHUB_STEP_SUMMARY=str(summary), GITHUB_ACTIONS="true")
+                environment.pop("GODOT_ARCH", None)
+                environment.pop("DIRGE_WINDOWS_GODOT", None)
+                result = subprocess.run(["bash", "scripts/smoke.sh"], cwd=root,
+                                        env=environment, capture_output=True, text=True)
+                self.assertEqual(result.returncode, code, result.stdout + result.stderr)
+                if annotation is None:
+                    self.assertIn("did not report its native pending-pause probe result", result.stdout)
+                    self.assertFalse(summary.exists())
+                    continue
+                reported = probe.removeprefix("DIRGE_NATIVE_PENDING_PAUSE ").strip()
+                self.assertIn(f"{annotation} title=Native pending pause::{reported}", result.stdout)
+                self.assertIn(reported, summary.read_text())
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -88,7 +88,7 @@ public static class Replayer
             switch (call.Method)
             {
                 case "SetGlobalParameter": _system.SetGlobalParameter(call.Name ?? "", (float)call.Value, call.Flag); break;
-                case "SetListener": _system.SetListener(call.Mode, ApiCall.Unpack(call.Vector), (float)call.Value); break;
+                case "SetListener": _system.SetListener(call.Mode, ApiCall.Unpack(call.Vector, call.Region), (float)call.Value); break;
                 case "StopAll": _system.StopAll((StopMode)call.Mode); break;
                 case "SetLocale": _system.Locale = call.Name ?? ""; break;
                 case "SetMaxRealVoices": _system.MaxRealVoices = (int)call.Value; break;
@@ -123,7 +123,7 @@ public static class Replayer
                 case "SetPaused": instance.SetPaused(call.Flag); break;
                 case "SetParameter": instance.SetParameter(call.Name ?? "", (float)call.Value, call.Flag); break;
                 case "SetParameterByLabel": instance.SetParameterByLabel(call.Name ?? "", call.Text ?? ""); break;
-                case "Set3DAttributes": instance.Set3DAttributes(ApiCall.Unpack(call.Vector)); break;
+                case "Set3DAttributes": instance.Set3DAttributes(ApiCall.Unpack(call.Vector, call.Region)); break;
                 case "SetVolume": instance.SetVolume((float)call.Value); break;
                 case "SetPitch": instance.SetPitch((float)call.Value); break;
                 case "SetProgrammerSound": instance.SetProgrammerSound(new AssetRef(call.Name ?? "")); break;

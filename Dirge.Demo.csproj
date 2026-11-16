@@ -9,6 +9,8 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Remove="tests/**;tools/**;native/**;proof/**;proof-*/**" />
+    <!-- Headless installed-runtime proofs run as scenes of this project (scripts/ui-proof.sh). -->
+    <Compile Include="tests/godot/**/*.cs" />
   </ItemGroup>
   <Import Project="addons/necronomidom/NecronomiDom.targets" />
   <Import Project="addons/dirge/Dirge.targets" />

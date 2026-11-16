@@ -1,14 +1,8 @@
 #!/usr/bin/env bash
-# Installs the NecronomiDOM release the tool UI depends on into addons/necronomidom (git-ignored).
+# Installs the NecronomiDOM managed-host ZIP pinned by dependency-lock.json into addons/necronomidom (git-ignored).
+# The ZIP's SHA-256, its addon-package.json identity and every per-file hash are verified; there is no version fallback.
+# Qualifying a candidate instead of the lock requires NECRONOMIDOM_PACKAGE_URL, NECRONOMIDOM_PACKAGE_SHA256 and
+# NECRONOMIDOM_REVISION together (see scripts/install-dependency.py).
 set -euo pipefail
 cd "$(dirname "$0")/.."
-VERSION="${NECRONOMIDOM_VERSION:-1.1.5}"
-URL="https://github.com/Eldritch-Game-Studio/NecronomiDOM/releases/download/v${VERSION}/NecronomiDOM-v${VERSION}.zip"
-tmp="$(mktemp -d)"
-trap 'rm -rf "$tmp"' EXIT
-echo "fetch-deps: NecronomiDOM v${VERSION}"
-curl --fail --location --silent --show-error "$URL" -o "$tmp/nd.zip"
-unzip -oq "$tmp/nd.zip" -d "$tmp/nd"
-rm -rf addons/necronomidom
-cp -r "$tmp/nd/addons/necronomidom" addons/necronomidom
-echo "fetch-deps: installed addons/necronomidom ($(grep -m1 -o 'version=\"[^\"]*\"' addons/necronomidom/plugin.cfg 2>/dev/null || echo v${VERSION}))"
+exec python3 scripts/install-dependency.py

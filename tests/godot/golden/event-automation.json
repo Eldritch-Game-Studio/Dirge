@@ -1,0 +1,238 @@
+{
+  "document": "event-automation.html",
+  "width": 1280,
+  "height": 720,
+  "runs": [
+    {
+      "Bounds": {
+        "X": 0,
+        "Y": 0,
+        "Width": 1280,
+        "Height": 720
+      },
+      "Style": {
+        "Background": {
+          "R": 0.105882354,
+          "G": 0.11372549,
+          "B": 0.12941177,
+          "A": 1
+        },
+        "Border": {
+          "R": 0,
+          "G": 0,
+          "B": 0,
+          "A": 0
+        },
+        "BorderWidth": 0,
+        "Radius": 0
+      }
+    },
+    {
+      "Bounds": {
+        "X": 0,
+        "Y": 0,
+        "Width": 1280,
+        "Height": 720
+      },
+      "Style": {
+        "Background": {
+          "R": 0.105882354,
+          "G": 0.11372549,
+          "B": 0.12941177,
+          "A": 1
+        },
+        "Border": {
+          "R": 0.84705883,
+          "G": 0.85882354,
+          "B": 0.8784314,
+          "A": 1
+        },
+        "BorderWidth": 0,
+        "Radius": 0
+      }
+    },
+    {
+      "Bounds": {
+        "X": 0,
+        "Y": 0,
+        "Width": 1280,
+        "Height": 720
+      },
+      "Style": {
+        "Background": {
+          "R": 0.105882354,
+          "G": 0.11372549,
+          "B": 0.12941177,
+          "A": 1
+        },
+        "Border": {
+          "R": 0.84705883,
+          "G": 0.85882354,
+          "B": 0.8784314,
+          "A": 1
+        },
+        "BorderWidth": 0,
+        "Radius": 0
+      }
+    },
+    {
+      "Bounds": {
+        "X": 0,
+        "Y": 0,
+        "Width": 1280,
+        "Height": 720
+      }
+    },
+    {},
+    {
+      "Bounds": {
+        "X": 0,
+        "Y": 0,
+        "Width": 1280,
+        "Height": 720
+      }
+    },
+    {
+      "Bounds": {
+        "X": 0,
+        "Y": 0,
+        "Width": 1280,
+        "Height": 720
+      },
+      "Style": {
+        "Background": {
+          "R": 0.105882354,
+          "G": 0.11372549,
+          "B": 0.12941177,
+          "A": 1
+        },
+        "Border": {
+          "R": 0.84705883,
+          "G": 0.85882354,
+          "B": 0.8784314,
+          "A": 1
+        },
+        "BorderWidth": 0,
+        "Radius": 0
+      }
+    },
+    {
+      "Bounds": {
+        "X": 0,
+        "Y": 0,
+        "Width": 1280,
+        "Height": 24
+      },
+      "Background": {
+        "R": 0.14117648,
+        "G": 0.15294118,
+        "B": 0.17254902,
+        "A": 1
+      },
+      "Borders": {
+        "Top": {
+          "Width": 0,
+          "Color": {
+            "R": 0.84705883,
+            "G": 0.85882354,
+            "B": 0.8784314,
+            "A": 1
+          },
+          "Style": "none"
+        },
+        "Right": {
+          "Width": 0,
+          "Color": {
+            "R": 0.84705883,
+            "G": 0.85882354,
+            "B": 0.8784314,
+            "A": 1
+          },
+          "Style": "none"
+        },
+        "Bottom": {
+          "Width": 1,
+          "Color": {
+            "R": 0.22745098,
+            "G": 0.24705882,
+            "B": 0.2784314,
+            "A": 1
+          },
+          "Style": "solid"
+        },
+        "Left": {
+          "Width": 0,
+          "Color": {
+            "R": 0.84705883,
+            "G": 0.85882354,
+            "B": 0.8784314,
+            "A": 1
+          },
+          "Style": "none"
+        }
+      },
+      "Radii": {
+        "TopLeft": {
+          "X": 0,
+          "Y": 0
+        },
+        "TopRight": {
+          "X": 0,
+          "Y": 0
+        },
+        "BottomRight": {
+          "X": 0,
+          "Y": 0
+        },
+        "BottomLeft": {
+          "X": 0,
+          "Y": 0
+        }
+      }
+    },
+    {
+      "Text": "AUTOMATION & MODULATORS",
+      "X": 8,
+      "Baseline": 15,
+      "FontSize": 11,
+      "Color": {
+        "R": 0.5411765,
+        "G": 0.5647059,
+        "B": 0.6,
+        "A": 1
+      },
+      "Owner": "",
+      "FontWeight": 400,
+      "FontItalic": false,
+      "LetterSpacing": 1,
+      "FontFamily": "Noto Sans",
+      "TextControl": null,
+      "TextOffset": 0,
+      "ControlLine": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "TextControlLineEnd": true,
+      "TextControlViewport": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "ShapingText": null,
+      "InlineFragment": null
+    },
+    {
+      "Bounds": {
+        "X": 0,
+        "Y": 24,
+        "Width": 1280,
+        "Height": 696
+      }
+    },
+    {},
+    {}
+  ]
+}

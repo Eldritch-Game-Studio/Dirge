@@ -1,0 +1,46 @@
+name: Upstream package receiver
+
+# NecronomiDOM CI dispatches `upstream-package-published` after publishing a managed-<sha12> release. Repository
+# dispatches run from the default branch, so main's managed-upstream.yml forwards the payload to this definition at
+# refs/heads/managed/1.0.x; maintainers may also run it here by hand with the same four values.
+on:
+  workflow_call:
+    inputs:
+      package: {type: string, required: true}
+      sha: {type: string, required: true}
+      release_tag: {type: string, required: true}
+      zip_sha256: {type: string, required: true}
+  workflow_dispatch:
+    inputs:
+      package: {type: string, required: true, default: necronomidom}
+      sha: {type: string, required: true, description: NecronomiDOM main commit (40 hex)}
+      release_tag: {type: string, required: true, description: managed-<sha12>}
+      zip_sha256: {type: string, required: true, description: SHA-256 of necronomidom-managed-<sha>.zip}
+
+permissions:
+  contents: read
+
+jobs:
+  receive:
+    if: github.repository == 'Eldritch-Game-Studio/Dirge'
+    # Dirge's own Crucible runner: its host gh login pushes the PR branch so qualification runs on it.
+    runs-on: [self-hosted, Linux, X64, crucible, dirge]
+    timeout-minutes: 30
+    concurrency:
+      group: upstream-receiver-necronomidom
+      cancel-in-progress: false
+    steps:
+      # Receiver logic always comes from the protected line, never from the payload or the PR branch.
+      - uses: actions/checkout@v4
+        with:
+          repository: Eldritch-Game-Studio/Dirge
+          ref: managed/1.0.x
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify the published package; open or update upstream/necronomidom with auto-merge
+        env:
+          PACKAGE: ${{ inputs.package }}
+          SHA: ${{ inputs.sha }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          ZIP_SHA256: ${{ inputs.zip_sha256 }}
+        run: scripts/receive-upstream.sh

@@ -1,0 +1,1076 @@
+{
+  "document": "shell.html",
+  "width": 1280,
+  "height": 720,
+  "runs": [
+    {
+      "Bounds": {
+        "X": 0,
+        "Y": 0,
+        "Width": 1280,
+        "Height": 720
+      },
+      "Style": {
+        "Background": {
+          "R": 0.105882354,
+          "G": 0.11372549,
+          "B": 0.12941177,
+          "A": 1
+        },
+        "Border": {
+          "R": 0,
+          "G": 0,
+          "B": 0,
+          "A": 0
+        },
+        "BorderWidth": 0,
+        "Radius": 0
+      }
+    },
+    {
+      "Bounds": {
+        "X": 0,
+        "Y": 0,
+        "Width": 1280,
+        "Height": 720
+      },
+      "Style": {
+        "Background": {
+          "R": 0.105882354,
+          "G": 0.11372549,
+          "B": 0.12941177,
+          "A": 1
+        },
+        "Border": {
+          "R": 0.84705883,
+          "G": 0.85882354,
+          "B": 0.8784314,
+          "A": 1
+        },
+        "BorderWidth": 0,
+        "Radius": 0
+      }
+    },
+    {
+      "Bounds": {
+        "X": 0,
+        "Y": 0,
+        "Width": 1280,
+        "Height": 720
+      },
+      "Style": {
+        "Background": {
+          "R": 0.105882354,
+          "G": 0.11372549,
+          "B": 0.12941177,
+          "A": 1
+        },
+        "Border": {
+          "R": 0.84705883,
+          "G": 0.85882354,
+          "B": 0.8784314,
+          "A": 1
+        },
+        "BorderWidth": 0,
+        "Radius": 0
+      }
+    },
+    {
+      "Bounds": {
+        "X": 0,
+        "Y": 0,
+        "Width": 1280,
+        "Height": 720
+      }
+    },
+    {
+      "Bounds": {
+        "X": 0,
+        "Y": 0,
+        "Width": 1280,
+        "Height": 720
+      },
+      "Background": {
+        "R": 0.14117648,
+        "G": 0.15294118,
+        "B": 0.17254902,
+        "A": 1
+      },
+      "Borders": {
+        "Top": {
+          "Width": 0,
+          "Color": {
+            "R": 0.84705883,
+            "G": 0.85882354,
+            "B": 0.8784314,
+            "A": 1
+          },
+          "Style": "none"
+        },
+        "Right": {
+          "Width": 0,
+          "Color": {
+            "R": 0.84705883,
+            "G": 0.85882354,
+            "B": 0.8784314,
+            "A": 1
+          },
+          "Style": "none"
+        },
+        "Bottom": {
+          "Width": 1,
+          "Color": {
+            "R": 0.22745098,
+            "G": 0.24705882,
+            "B": 0.2784314,
+            "A": 1
+          },
+          "Style": "solid"
+        },
+        "Left": {
+          "Width": 0,
+          "Color": {
+            "R": 0.84705883,
+            "G": 0.85882354,
+            "B": 0.8784314,
+            "A": 1
+          },
+          "Style": "none"
+        }
+      },
+      "Radii": {
+        "TopLeft": {
+          "X": 0,
+          "Y": 0
+        },
+        "TopRight": {
+          "X": 0,
+          "Y": 0
+        },
+        "BottomRight": {
+          "X": 0,
+          "Y": 0
+        },
+        "BottomLeft": {
+          "X": 0,
+          "Y": 0
+        }
+      }
+    },
+    {
+      "Text": "DIRGE",
+      "X": 8,
+      "Baseline": 363,
+      "FontSize": 11,
+      "Color": {
+        "R": 0.9098039,
+        "G": 0.6392157,
+        "B": 0.23921569,
+        "A": 1
+      },
+      "Owner": "",
+      "FontWeight": 700,
+      "FontItalic": false,
+      "LetterSpacing": 2,
+      "FontFamily": "Noto Sans",
+      "TextControl": null,
+      "TextOffset": 0,
+      "ControlLine": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "TextControlLineEnd": true,
+      "TextControlViewport": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "ShapingText": null,
+      "InlineFragment": null
+    },
+    {
+      "Text": "File",
+      "X": 70.734375,
+      "Baseline": 363,
+      "FontSize": 11,
+      "Color": {
+        "R": 0.5411765,
+        "G": 0.5647059,
+        "B": 0.6,
+        "A": 1
+      },
+      "Owner": "",
+      "FontWeight": 400,
+      "FontItalic": false,
+      "LetterSpacing": 0,
+      "FontFamily": "Noto Sans",
+      "TextControl": null,
+      "TextOffset": 0,
+      "ControlLine": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "TextControlLineEnd": true,
+      "TextControlViewport": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "ShapingText": null,
+      "InlineFragment": null
+    },
+    {
+      "Bounds": {
+        "X": 94.328125,
+        "Y": 349.5,
+        "Width": 39.09375,
+        "Height": 20
+      },
+      "Style": {
+        "Background": {
+          "R": 0.14117648,
+          "G": 0.15294118,
+          "B": 0.17254902,
+          "A": 1
+        },
+        "Border": {
+          "R": 0.14117648,
+          "G": 0.15294118,
+          "B": 0.17254902,
+          "A": 1
+        },
+        "BorderWidth": 1,
+        "Radius": 3
+      }
+    },
+    {
+      "Text": "New",
+      "X": 101.328125,
+      "Baseline": 364,
+      "FontSize": 12,
+      "Color": {
+        "R": 0.84705883,
+        "G": 0.85882354,
+        "B": 0.8784314,
+        "A": 1
+      },
+      "Owner": "file-new",
+      "FontWeight": 400,
+      "FontItalic": false,
+      "LetterSpacing": 0,
+      "FontFamily": "Noto Sans",
+      "TextControl": null,
+      "TextOffset": 0,
+      "ControlLine": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "TextControlLineEnd": true,
+      "TextControlViewport": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "ShapingText": null,
+      "InlineFragment": null
+    },
+    {
+      "Bounds": {
+        "X": 135.421875,
+        "Y": 349.5,
+        "Width": 54.421875,
+        "Height": 20
+      },
+      "Style": {
+        "Background": {
+          "R": 0.14117648,
+          "G": 0.15294118,
+          "B": 0.17254902,
+          "A": 1
+        },
+        "Border": {
+          "R": 0.14117648,
+          "G": 0.15294118,
+          "B": 0.17254902,
+          "A": 1
+        },
+        "BorderWidth": 1,
+        "Radius": 3
+      }
+    },
+    {
+      "Text": "Open…",
+      "X": 142.421875,
+      "Baseline": 364,
+      "FontSize": 12,
+      "Color": {
+        "R": 0.84705883,
+        "G": 0.85882354,
+        "B": 0.8784314,
+        "A": 1
+      },
+      "Owner": "file-open",
+      "FontWeight": 400,
+      "FontItalic": false,
+      "LetterSpacing": 0,
+      "FontFamily": "Noto Sans",
+      "TextControl": null,
+      "TextOffset": 0,
+      "ControlLine": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "TextControlLineEnd": true,
+      "TextControlViewport": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "ShapingText": null,
+      "InlineFragment": null
+    },
+    {
+      "Bounds": {
+        "X": 191.84375,
+        "Y": 349.5,
+        "Width": 40.1875,
+        "Height": 20
+      },
+      "Style": {
+        "Background": {
+          "R": 0.14117648,
+          "G": 0.15294118,
+          "B": 0.17254902,
+          "A": 1
+        },
+        "Border": {
+          "R": 0.14117648,
+          "G": 0.15294118,
+          "B": 0.17254902,
+          "A": 1
+        },
+        "BorderWidth": 1,
+        "Radius": 3
+      }
+    },
+    {
+      "Text": "Save",
+      "X": 198.84375,
+      "Baseline": 364,
+      "FontSize": 12,
+      "Color": {
+        "R": 0.84705883,
+        "G": 0.85882354,
+        "B": 0.8784314,
+        "A": 1
+      },
+      "Owner": "file-save",
+      "FontWeight": 400,
+      "FontItalic": false,
+      "LetterSpacing": 0,
+      "FontFamily": "Noto Sans",
+      "TextControl": null,
+      "TextOffset": 0,
+      "ControlLine": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "TextControlLineEnd": true,
+      "TextControlViewport": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "ShapingText": null,
+      "InlineFragment": null
+    },
+    {
+      "Bounds": {
+        "X": 234.03125,
+        "Y": 349.5,
+        "Width": 66.21875,
+        "Height": 20
+      },
+      "Style": {
+        "Background": {
+          "R": 0.14117648,
+          "G": 0.15294118,
+          "B": 0.17254902,
+          "A": 1
+        },
+        "Border": {
+          "R": 0.14117648,
+          "G": 0.15294118,
+          "B": 0.17254902,
+          "A": 1
+        },
+        "BorderWidth": 1,
+        "Radius": 3
+      }
+    },
+    {
+      "Text": "Save As…",
+      "X": 241.03125,
+      "Baseline": 364,
+      "FontSize": 12,
+      "Color": {
+        "R": 0.84705883,
+        "G": 0.85882354,
+        "B": 0.8784314,
+        "A": 1
+      },
+      "Owner": "file-save-as",
+      "FontWeight": 400,
+      "FontItalic": false,
+      "LetterSpacing": 0,
+      "FontFamily": "Noto Sans",
+      "TextControl": null,
+      "TextOffset": 0,
+      "ControlLine": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "TextControlLineEnd": true,
+      "TextControlViewport": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "ShapingText": null,
+      "InlineFragment": null
+    },
+    {
+      "Bounds": {
+        "X": 308.25,
+        "Y": 351.5,
+        "Width": 1,
+        "Height": 16
+      },
+      "Style": {
+        "Background": {
+          "R": 0.22745098,
+          "G": 0.24705882,
+          "B": 0.2784314,
+          "A": 1
+        },
+        "Border": {
+          "R": 0.84705883,
+          "G": 0.85882354,
+          "B": 0.8784314,
+          "A": 1
+        },
+        "BorderWidth": 0,
+        "Radius": 0
+      }
+    },
+    {
+      "Text": "Edit",
+      "X": 321.25,
+      "Baseline": 363,
+      "FontSize": 11,
+      "Color": {
+        "R": 0.5411765,
+        "G": 0.5647059,
+        "B": 0.6,
+        "A": 1
+      },
+      "Owner": "",
+      "FontWeight": 400,
+      "FontItalic": false,
+      "LetterSpacing": 0,
+      "FontFamily": "Noto Sans",
+      "TextControl": null,
+      "TextOffset": 0,
+      "ControlLine": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "TextControlLineEnd": true,
+      "TextControlViewport": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "ShapingText": null,
+      "InlineFragment": null
+    },
+    {
+      "Bounds": {
+        "X": 346.9375,
+        "Y": 349.5,
+        "Width": 44.828125,
+        "Height": 20
+      },
+      "Style": {
+        "Background": {
+          "R": 0.14117648,
+          "G": 0.15294118,
+          "B": 0.17254902,
+          "A": 1
+        },
+        "Border": {
+          "R": 0.14117648,
+          "G": 0.15294118,
+          "B": 0.17254902,
+          "A": 1
+        },
+        "BorderWidth": 1,
+        "Radius": 3
+      }
+    },
+    {
+      "Text": "Undo",
+      "X": 353.9375,
+      "Baseline": 364,
+      "FontSize": 12,
+      "Color": {
+        "R": 0.5411765,
+        "G": 0.5647059,
+        "B": 0.6,
+        "A": 1
+      },
+      "Owner": "edit-undo",
+      "FontWeight": 400,
+      "FontItalic": false,
+      "LetterSpacing": 0,
+      "FontFamily": "Noto Sans",
+      "TextControl": null,
+      "TextOffset": 0,
+      "ControlLine": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "TextControlLineEnd": true,
+      "TextControlViewport": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "ShapingText": null,
+      "InlineFragment": null
+    },
+    {
+      "Bounds": {
+        "X": 393.765625,
+        "Y": 349.5,
+        "Width": 42.875,
+        "Height": 20
+      },
+      "Style": {
+        "Background": {
+          "R": 0.14117648,
+          "G": 0.15294118,
+          "B": 0.17254902,
+          "A": 1
+        },
+        "Border": {
+          "R": 0.14117648,
+          "G": 0.15294118,
+          "B": 0.17254902,
+          "A": 1
+        },
+        "BorderWidth": 1,
+        "Radius": 3
+      }
+    },
+    {
+      "Text": "Redo",
+      "X": 400.765625,
+      "Baseline": 364,
+      "FontSize": 12,
+      "Color": {
+        "R": 0.5411765,
+        "G": 0.5647059,
+        "B": 0.6,
+        "A": 1
+      },
+      "Owner": "edit-redo",
+      "FontWeight": 400,
+      "FontItalic": false,
+      "LetterSpacing": 0,
+      "FontFamily": "Noto Sans",
+      "TextControl": null,
+      "TextOffset": 0,
+      "ControlLine": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "TextControlLineEnd": true,
+      "TextControlViewport": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "ShapingText": null,
+      "InlineFragment": null
+    },
+    {
+      "Bounds": {
+        "X": 444.640625,
+        "Y": 351.5,
+        "Width": 1,
+        "Height": 16
+      },
+      "Style": {
+        "Background": {
+          "R": 0.22745098,
+          "G": 0.24705882,
+          "B": 0.2784314,
+          "A": 1
+        },
+        "Border": {
+          "R": 0.84705883,
+          "G": 0.85882354,
+          "B": 0.8784314,
+          "A": 1
+        },
+        "BorderWidth": 0,
+        "Radius": 0
+      }
+    },
+    {
+      "Text": "Project",
+      "X": 457.640625,
+      "Baseline": 363,
+      "FontSize": 11,
+      "Color": {
+        "R": 0.5411765,
+        "G": 0.5647059,
+        "B": 0.6,
+        "A": 1
+      },
+      "Owner": "",
+      "FontWeight": 400,
+      "FontItalic": false,
+      "LetterSpacing": 0,
+      "FontFamily": "Noto Sans",
+      "TextControl": null,
+      "TextOffset": 0,
+      "ControlLine": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "TextControlLineEnd": true,
+      "TextControlViewport": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "ShapingText": null,
+      "InlineFragment": null
+    },
+    {
+      "Bounds": {
+        "X": 499.578125,
+        "Y": 349.5,
+        "Width": 59.09375,
+        "Height": 20
+      },
+      "Style": {
+        "Background": {
+          "R": 0.14117648,
+          "G": 0.15294118,
+          "B": 0.17254902,
+          "A": 1
+        },
+        "Border": {
+          "R": 0.14117648,
+          "G": 0.15294118,
+          "B": 0.17254902,
+          "A": 1
+        },
+        "BorderWidth": 1,
+        "Radius": 3
+      }
+    },
+    {
+      "Text": "Validate",
+      "X": 506.578125,
+      "Baseline": 364,
+      "FontSize": 12,
+      "Color": {
+        "R": 0.84705883,
+        "G": 0.85882354,
+        "B": 0.8784314,
+        "A": 1
+      },
+      "Owner": "project-validate",
+      "FontWeight": 400,
+      "FontItalic": false,
+      "LetterSpacing": 0,
+      "FontFamily": "Noto Sans",
+      "TextControl": null,
+      "TextOffset": 0,
+      "ControlLine": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "TextControlLineEnd": true,
+      "TextControlViewport": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "ShapingText": null,
+      "InlineFragment": null
+    },
+    {
+      "Bounds": {
+        "X": 560.671875,
+        "Y": 349.5,
+        "Width": 80.015625,
+        "Height": 20
+      },
+      "Style": {
+        "Background": {
+          "R": 0.14117648,
+          "G": 0.15294118,
+          "B": 0.17254902,
+          "A": 1
+        },
+        "Border": {
+          "R": 0.14117648,
+          "G": 0.15294118,
+          "B": 0.17254902,
+          "A": 1
+        },
+        "BorderWidth": 1,
+        "Radius": 3
+      }
+    },
+    {
+      "Text": "Build Banks",
+      "X": 567.671875,
+      "Baseline": 364,
+      "FontSize": 12,
+      "Color": {
+        "R": 0.84705883,
+        "G": 0.85882354,
+        "B": 0.8784314,
+        "A": 1
+      },
+      "Owner": "project-build-banks",
+      "FontWeight": 400,
+      "FontItalic": false,
+      "LetterSpacing": 0,
+      "FontFamily": "Noto Sans",
+      "TextControl": null,
+      "TextOffset": 0,
+      "ControlLine": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "TextControlLineEnd": true,
+      "TextControlViewport": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "ShapingText": null,
+      "InlineFragment": null
+    },
+    {
+      "Bounds": {
+        "X": 648.6875,
+        "Y": 351.5,
+        "Width": 1,
+        "Height": 16
+      },
+      "Style": {
+        "Background": {
+          "R": 0.22745098,
+          "G": 0.24705882,
+          "B": 0.2784314,
+          "A": 1
+        },
+        "Border": {
+          "R": 0.84705883,
+          "G": 0.85882354,
+          "B": 0.8784314,
+          "A": 1
+        },
+        "BorderWidth": 0,
+        "Radius": 0
+      }
+    },
+    {
+      "Text": "Live",
+      "X": 661.6875,
+      "Baseline": 363,
+      "FontSize": 11,
+      "Color": {
+        "R": 0.5411765,
+        "G": 0.5647059,
+        "B": 0.6,
+        "A": 1
+      },
+      "Owner": "",
+      "FontWeight": 400,
+      "FontItalic": false,
+      "LetterSpacing": 0,
+      "FontFamily": "Noto Sans",
+      "TextControl": null,
+      "TextOffset": 0,
+      "ControlLine": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "TextControlLineEnd": true,
+      "TextControlViewport": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "ShapingText": null,
+      "InlineFragment": null
+    },
+    {
+      "Bounds": {
+        "X": 688.09375,
+        "Y": 349.5,
+        "Width": 70.03125,
+        "Height": 20
+      },
+      "Style": {
+        "Background": {
+          "R": 0.14117648,
+          "G": 0.15294118,
+          "B": 0.17254902,
+          "A": 1
+        },
+        "Border": {
+          "R": 0.14117648,
+          "G": 0.15294118,
+          "B": 0.17254902,
+          "A": 1
+        },
+        "BorderWidth": 1,
+        "Radius": 3
+      }
+    },
+    {
+      "Text": "Connect…",
+      "X": 695.09375,
+      "Baseline": 364,
+      "FontSize": 12,
+      "Color": {
+        "R": 0.84705883,
+        "G": 0.85882354,
+        "B": 0.8784314,
+        "A": 1
+      },
+      "Owner": "live-connect",
+      "FontWeight": 400,
+      "FontItalic": false,
+      "LetterSpacing": 0,
+      "FontFamily": "Noto Sans",
+      "TextControl": null,
+      "TextOffset": 0,
+      "ControlLine": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "TextControlLineEnd": true,
+      "TextControlViewport": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "ShapingText": null,
+      "InlineFragment": null
+    },
+    {
+      "Bounds": {
+        "X": 766.125,
+        "Y": 351.5,
+        "Width": 1,
+        "Height": 16
+      },
+      "Style": {
+        "Background": {
+          "R": 0.22745098,
+          "G": 0.24705882,
+          "B": 0.2784314,
+          "A": 1
+        },
+        "Border": {
+          "R": 0.84705883,
+          "G": 0.85882354,
+          "B": 0.8784314,
+          "A": 1
+        },
+        "BorderWidth": 0,
+        "Radius": 0
+      }
+    },
+    {
+      "Text": "View",
+      "X": 779.125,
+      "Baseline": 363,
+      "FontSize": 11,
+      "Color": {
+        "R": 0.5411765,
+        "G": 0.5647059,
+        "B": 0.6,
+        "A": 1
+      },
+      "Owner": "",
+      "FontWeight": 400,
+      "FontItalic": false,
+      "LetterSpacing": 0,
+      "FontFamily": "Noto Sans",
+      "TextControl": null,
+      "TextOffset": 0,
+      "ControlLine": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "TextControlLineEnd": true,
+      "TextControlViewport": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "ShapingText": null,
+      "InlineFragment": null
+    },
+    {
+      "Bounds": {
+        "X": 809.1875,
+        "Y": 349.5,
+        "Width": 92.875,
+        "Height": 20
+      },
+      "Style": {
+        "Background": {
+          "R": 0.14117648,
+          "G": 0.15294118,
+          "B": 0.17254902,
+          "A": 1
+        },
+        "Border": {
+          "R": 0.14117648,
+          "G": 0.15294118,
+          "B": 0.17254902,
+          "A": 1
+        },
+        "BorderWidth": 1,
+        "Radius": 3
+      }
+    },
+    {
+      "Text": "Theme: Editor",
+      "X": 816.1875,
+      "Baseline": 364,
+      "FontSize": 12,
+      "Color": {
+        "R": 0.84705883,
+        "G": 0.85882354,
+        "B": 0.8784314,
+        "A": 1
+      },
+      "Owner": "view-theme",
+      "FontWeight": 400,
+      "FontItalic": false,
+      "LetterSpacing": 0,
+      "FontFamily": "Noto Sans",
+      "TextControl": null,
+      "TextOffset": 0,
+      "ControlLine": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "TextControlLineEnd": true,
+      "TextControlViewport": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "ShapingText": null,
+      "InlineFragment": null
+    },
+    {
+      "Text": "Untitled",
+      "X": 1226.828125,
+      "Baseline": 364,
+      "FontSize": 12,
+      "Color": {
+        "R": 0.5411765,
+        "G": 0.5647059,
+        "B": 0.6,
+        "A": 1
+      },
+      "Owner": "project-name",
+      "FontWeight": 400,
+      "FontItalic": false,
+      "LetterSpacing": 0,
+      "FontFamily": "Noto Sans",
+      "TextControl": null,
+      "TextOffset": 0,
+      "ControlLine": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "TextControlLineEnd": true,
+      "TextControlViewport": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "ShapingText": null,
+      "InlineFragment": null
+    },
+    {}
+  ]
+}

@@ -91,7 +91,8 @@ The recordings use the stock Godot 4.7.2 .NET editor with Forward+ rendering; ca
 ## Requirements
 
 - Godot **4.7.2 .NET** (stock build) and a .NET SDK able to target `net8.0` (`global.json` pins 10.x with roll-forward).
-- **NecronomiDOM ≥ 1.1.5** for the editor tool and the in-game overlay. The runtime alone (`DirgeServer`,
+- **NecronomiDOM** for the editor tool and the in-game overlay: this line is qualified against the exact
+  managed-host package locked in `dependency-lock.json` (`scripts/fetch-deps.sh`). The runtime alone (`DirgeServer`,
   `AudioDriver`, banks, loudness, live update) does not use it.
 - Native effects: prebuilt binaries ship in the release ZIP under `addons/dirge/bin/<platform>/` (Linux x64, Windows
   x64, macOS universal); building them yourself needs a C++17 compiler and SCons.
@@ -270,13 +271,24 @@ that compile Dirge's managed sources into their own assembly, currently Kraken's
 
 - Open fixes for those games as PRs against `managed/1.0.x`, not `main`. Releases from this branch stay on 1.0.x
   (`v1.0.4`, …), and the branch takes no 1.1 GDScript features.
-- Hosts consume an exact revision as a `managed-host` source package. In a clean, committed checkout of the
-  branch or release tag, install NecronomiDOM (`scripts/fetch-deps.sh`, or the host's NecronomiDOM managed package),
-  then run `python3 scripts/package-managed.py`. It rebuilds the managed projects and writes
-  `dist/dirge-managed-REVISION.zip`, which the host's addon installer pins by revision and hash.
+- Hosts consume an exact revision as a `managed-host` source package built by CI, never by hand. After this line's
+  full qualification passes on a `managed/1.0.x` push or `v1.0.*` tag, CI runs `scripts/package-managed.py` and
+  publishes `dist/dirge-managed-REVISION.zip` with `provenance.json` as the GitHub release `managed-<sha12>`
+  (a prerelease unless tagged). The provenance (schema `eldritch.managed-provenance/1`) records the commit, CI run,
+  ZIP SHA-256 and the exact NecronomiDOM package this commit was qualified against (`upstream.necronomidom`). CI then
+  sends `upstream-package-published` to Kraken's Keg. Hosts must ship that same NecronomiDOM.
+- NecronomiDOM is hash-locked in `dependency-lock.json` to a CI-published NecronomiDOM `managed-<sha12>` release;
+  `scripts/fetch-deps.sh` installs only that ZIP after verifying its SHA-256, `addon-package.json` identity and
+  per-file hashes. When NecronomiDOM publishes a newer package, its dispatch runs the upstream receiver, which verifies
+  the release provenance and opens (or updates in place) one PR from `upstream/necronomidom` changing only the lock,
+  with auto-merge once `local / qualification` passes.
 - Hosts never edit their installed copy. A fix lands here first, then the host installs the new package.
 - CI on this branch runs its own reusable workflow (`ci-local.yml@managed/1.0.x`), so PRs, pushes and `v1.0.*`
-  release tags qualify with this line's tests, native builds, smoke and packaging, not main's GDScript-edition jobs.
+  release tags qualify with this line's tests, native builds, smoke, tool-UI document proof and packaging, not
+  main's GDScript-edition jobs. `scripts/ui-proof.sh` mounts every `tool/ui` document and the in-game overlay in real
+  NecronomiDOM `DocumentHost`s and compares each document's paint runs with its PaintRun-JSON golden in
+  `tests/godot/golden/`; after an intended UI or NecronomiDOM change, rerun it with `--update-goldens` and review
+  the diff.
 
 ## Building from source
 

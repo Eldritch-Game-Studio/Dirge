@@ -7,26 +7,31 @@ Issues and pull requests are welcome.
 ```sh
 git clone --recurse-submodules https://github.com/Eldritch-Game-Studio/Dirge.git
 cd Dirge
-scripts/fetch-deps.sh        # NecronomiDOM into addons/necronomidom (git-ignored)
+scripts/fetch-deps.sh        # locked NecronomiDOM (dependency-lock.json) into addons/necronomidom (git-ignored)
 dotnet build Dirge.slnx
 ```
 
 Godot **4.7.2 .NET** (stock build) is the supported editor; put its binary on `PATH` as `godot` or export `GODOT` to the executable (`Godot_mono.app/Contents/MacOS/Godot` on macOS).
 
-For a .NET host that already supplies native audio effects (such as Eldritch), commit source changes
-and run `python3 scripts/package-managed.py`. It rebuilds the Release demo and writes a deterministic
-`dist/dirge-managed-<commit>.zip` containing the exact committed addon source, its per-file hashes,
-and upstream revision in `addon-package.json`. The host compiles the C# addon through `Dirge.targets`;
-the package deliberately omits GDExtension registration and native binaries. Standalone users should
-continue using the regular release package. Install the matching NecronomiDOM addon before building;
-`unzip -oq <necronomidom-managed-package.zip> 'addons/necronomidom/*' -d .` installs a source package.
-Host-generated `.import` files are excluded; installing this package preserves the host's asset-import settings.
+For a .NET host that already supplies native audio effects (such as Eldritch), CI builds the managed-host package
+with `python3 scripts/package-managed.py` and publishes it as the `managed-<sha12>` release with `provenance.json`
+(see the README's managed line section). It writes a deterministic `dist/dirge-managed-<commit>.zip` containing the
+exact committed addon source, its per-file hashes, and upstream revision in `addon-package.json`. The host compiles
+the C# addon through `Dirge.targets`; the package deliberately omits GDExtension registration and native binaries.
+Standalone users should continue using the regular release package. Running the script locally is a diagnostic;
+hosts install only CI-published packages. Host-generated `.import` files are excluded; installing this package
+preserves the host's asset-import settings.
+
+To qualify a NecronomiDOM candidate instead of the lock, set `NECRONOMIDOM_PACKAGE_URL` (HTTPS or `file://`),
+`NECRONOMIDOM_PACKAGE_SHA256` and `NECRONOMIDOM_REVISION` together before `scripts/fetch-deps.sh` or
+`scripts/smoke.sh`.
 
 ## Before opening a pull request
 
 ```sh
 dotnet test tests/Dirge.Model.Tests    # model unit tests
 scripts/smoke.sh                       # import, build, demo + sandbox headless smoke
+scripts/ui-proof.sh                    # tool UI documents + overlay in DocumentHost, PaintRun-JSON goldens
 native/build.sh                        # only when native/ changed
 ```
 

@@ -115,17 +115,22 @@ func set_listener(index: int, attributes: Dictionary, weight: float = 1.0) -> vo
 	if recorder != null:
 		recorder.call_3d(null, "SetListener", index, _listeners[index], weight)
 
-func nearest_listener(position: Vector3) -> Dictionary:
-	var best = 0
+# Nearest enabled listener in the emitter's region, or null. Never borrows another region's listener; region 0 keeps
+# the legacy all-disabled fallback to listener 0 when that listener is also in region 0.
+func nearest_listener(emitter: Dictionary):
+	var region: int = emitter.get("region", 0)
+	var best = -1
 	var distance = INF
 	for i in range(MAX_LISTENERS):
-		if _weights[i] <= 0:
+		if _weights[i] <= 0 or _listeners[i].region != region:
 			continue
-		var candidate = position.distance_squared_to(_listeners[i].position)
+		var candidate = emitter.position.distance_squared_to(_listeners[i].position)
 		if candidate < distance:
 			distance = candidate
 			best = i
-	return _listeners[best]
+	if best < 0 and region == 0 and _listeners[0].region == 0:
+		best = 0
+	return _listeners[best] if best >= 0 else null
 
 func resolve_table_asset(key: String) -> String:
 	var locales = _tables.get(key, {})

@@ -348,8 +348,12 @@ func update(dt: float, paused: bool, bpm: float) -> void:
 					continue
 		voice.volume_db = instance.event_volume_db + chain_volume_db + voice.random_volume_db + voice.fade_db()
 		voice.pitch = instance.event_pitch * chain_pitch * voice.random_pitch
-		if voice.spatial and not voice.own_attributes:
-			voice.attributes = instance.attributes.duplicate()
+		if voice.spatial:
+			if voice.own_attributes:
+				# Scatter voices keep their own position but always live in the instance's region.
+				voice.attributes.region = instance.attributes.region
+			else:
+				voice.attributes = instance.attributes.duplicate()
 	for child in children:
 		child.inherited_volume_db = instance.event_volume_db + chain_volume_db
 		child.inherited_pitch = instance.event_pitch * chain_pitch

@@ -58,7 +58,7 @@ Priority tiers: P0 ships with 1.0, P1 in 1.x, P2 after; `—` is a deliberate no
 | Local and global | `AudioEvent.LocalParameters`, `AudioProject.GlobalParameters` | P0 | Done | |
 | Seek speed (asymmetric), hold | `SeekSpeedUp`, `SeekSpeedDown`, `Hold` | P0 | Done | |
 | Velocity | `EventInstance.GetParameterVelocity` | P1 | Done | |
-| Built-ins: distance, distance normalized, direction, elevation, cone angle, orientation, speed, speed absolute | `BuiltInParameter` | P0 | Done | from the nearest weighted listener |
+| Built-ins: distance, distance normalized, direction, elevation, cone angle, orientation, speed, speed absolute | `BuiltInParameter` | P0 | Done | from the nearest enabled listener in the emitter's spatial region; positive weights enable, not weighted mixing |
 | Automation of any property (linear / smooth / stepped curves) | `AutomationLane`, `Curve`, `CurveShape`, `PropertyRef` | P0 | Done | mixer, event and instrument properties |
 | Modulators: random, AHDSR, LFO (sine / square / triangle / saw / noise, tempo sync), sidechain, autopitch | `RandomModulator`, `AhdsrModulator`, `LfoModulator`, `AutopitchModulator` (`AutopitchMath`); `AudioProject.MixerModulators` (LFO/Random on bus volume/pitch, VCA, effect parameters, evaluated by `MixerState`) | P0 (sidechain P2) | Done | sidechain modulator Planned (P2); mixer LFOs read `RateHz` as Hz (no tempo map) |
 | Conditions on instruments, transitions, logic markers | `TriggerCondition` | P0 | Done | |
@@ -186,7 +186,7 @@ Exports: `ProjectPath` (file, `*.json`; empty = read `dirge/project_path`), `See
 | `instance_count`, `real_voice_count`, `recorder` | live counters and optional profiler recording hook |
 | `get_event(path_or_id)` | description or null; replace `TryGetEvent`/throwing C# lookups with a null check |
 | `set_global_parameter(name, value, immediate=false)`, `get_global_parameter(name)` | global control |
-| `set_listener(index, attributes, weight=1.0)` | up to eight listeners; weight 0 disables |
+| `set_listener(index, attributes, weight=1.0)` | up to eight listeners; weight 0 disables; built-ins use the nearest enabled listener in the emitter's `region` |
 | `stop_all(mode="AllowFadeout")` | stop live events |
 | `feedback(event: Dictionary)` | driver feedback |
 | `update(dt)` | one model tick; driver applies then clears `commands` |
@@ -211,7 +211,7 @@ Exports: `ProjectPath` (file, `*.json`; empty = read `dirge/project_path`), `See
 | `key_off()`, `set_paused(paused)` | sustain/AHDSR release; pause |
 | `set_parameter(name, value, immediate=false)`, `get_parameter(name)` | local first then global |
 | `get_parameter_velocity(name)`, `set_parameter_by_label(name, label)` | units/second and labeled selection |
-| `set_3d_attributes(attributes)` | Dictionary of Godot vectors |
+| `set_3d_attributes(attributes)` | Dictionary of Godot vectors plus optional integer `region` (0 = legacy host world) |
 | `set_volume(db)`, `set_pitch(ratio)` | per-instance offsets |
 | `set_programmer_sound(asset)` | fallback path for programmer instruments |
 
@@ -238,6 +238,45 @@ Callback `type` values retain record names: `StartedCallback`, `StoppedCallback`
 
 `snapshot` is the authored Dictionary; `intensity` is the 0..1 scalar multiplied with the AHDSR envelope.
 `is_active` and `effective_intensity` expose state; `stop()` begins release and the mixer removes the finished instance.
+
+### Spatial regions (several `World3D`s under one mixer)
+
+An integer `region` in a 3D attribute Dictionary identifies a coordinate/world domain, not a seat or mixer. Omitted or
+0 keeps the legacy host world, so projects that never set a region behave exactly as before. `VoicePlay`/`VoiceSet3D`
+commands, `set_3d_attributes` and `set_listener` carry the region inside their attribute Dictionaries.
+
+On the scene-tree thread call `server.Driver.register_spatial_region(region, host: Node3D, listener: AudioListener3D)`
+for each nonzero region (returns `false` and reports an error on misuse). Host and current listener must be live in the
+**same audio-enabled viewport**, with a current `Camera3D` in the same `World3D`; Godot's native spatial player needs
+that camera. Each region uses a distinct world, separate from the default host world. Registration never creates
+listeners, rebuilds buses or duplicates the mixer.
+
+Give the event and its model listener (`set_listener`) the same region and keep that listener's transform in step with
+the native listener. The model never searches another region: without an enabled listener there, distance is maximally
+far (clamped to the parameter maximum), normalized distance is 1, relative angles/speed are 0 and absolute speed is the
+emitter's own; Furthest stealing treats it as infinitely far. Region 0 keeps its listener-0 fallback only when that
+listener is also in region 0.
+
+Call `unregister_spatial_region(region)` before changing/freeing a world or withdrawing a view; it finishes the region's
+voices and returns clean players to the default pool. Also disable its model listeners and stop its instances. A host or
+listener tree exit withdraws the route synchronously and retires its native players instead of reparenting them while
+the tree is busy. Invalid or replaced worlds, disabled audio viewports and lost current listeners/cameras are withdrawn
+before the next command batch, including an empty one. Unknown nonzero regions finish without fallback playback,
+including live attribute changes. Do not reparent `player_of` results yourself.
+
+Region changes move ordinary voices through the driver, keeping playback position and commanded pause across a native
+restart (not sample-continuous). Sync groups only combine voices in the same region; moving one layer to another region
+splits it out. Nonspatial voices ignore regions. Recordings store an exact integer `region` beside the twelve coordinate
+floats (absent = 0); default command text is unchanged and nonzero regions append ` region=N`. Replay reproduces model
+state, not host registration.
+
+**Native pause prerequisite:** the engine must persist a spatial player's pause request until its deferred physics
+playback registration. Stock Godot 4.7.2 forwards pause only to already-registered playbacks: **stock engines do not
+support paused migration**, and Dirge does not claim it there or substitute managed echoes or delayed retries. The
+`test_spatial_regions.gd` suite probes the engine with a plain `AudioStreamPlayer3D`. Where the pause persists, its five
+native-pause assertions are mandatory; where it does not, they are skipped and `scripts/smoke.sh` reports `engine lacks
+pending-pause persistence: 5 native-pause assertions skipped` as a CI warning and in the job summary. Its world,
+lifecycle and resume assertions always run. None of this is evidence of audible isolation or multi-world performance.
 
 ## Commands (the T1 oracle)
 

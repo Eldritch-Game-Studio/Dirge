@@ -76,6 +76,9 @@ func call_3d(target, method: String, index: int, attributes: Dictionary, weight:
 		return
 	var call: Dictionary = Recording.api_call(method, kind)
 	call.merge({"handle": handle, "mode": index, "value": weight, "vector": Recording.pack(attributes)}, true)
+	# Exact integer region, omitted for the legacy world so existing recordings serialize unchanged.
+	if int(attributes.get("region", 0)) != 0:
+		call.region = int(attributes.region)
 	_pending.calls.append(call)
 
 func programmer_sound(instance, key: String, asset) -> void:

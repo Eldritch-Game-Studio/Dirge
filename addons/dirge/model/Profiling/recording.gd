@@ -18,7 +18,13 @@ static func pack(attributes: Dictionary) -> Array:
 		result.append_array([vector.x, vector.y, vector.z])
 	return result
 
-static func unpack(vector) -> Dictionary:
+# The region is an exact integer kept beside the twelve coordinate floats; absent (legacy) = 0 and omitted.
+static func unpack(vector, region: int = 0) -> Dictionary:
+	var result: Dictionary
 	if vector == null or vector.size() < 12:
-		return {"position": Vector3.ZERO, "velocity": Vector3.ZERO, "forward": Vector3.FORWARD, "up": Vector3.UP}
-	return {"position": Vector3(vector[0], vector[1], vector[2]), "velocity": Vector3(vector[3], vector[4], vector[5]), "forward": Vector3(vector[6], vector[7], vector[8]), "up": Vector3(vector[9], vector[10], vector[11])}
+		result = {"position": Vector3.ZERO, "velocity": Vector3.ZERO, "forward": Vector3.FORWARD, "up": Vector3.UP}
+	else:
+		result = {"position": Vector3(vector[0], vector[1], vector[2]), "velocity": Vector3(vector[3], vector[4], vector[5]), "forward": Vector3(vector[6], vector[7], vector[8]), "up": Vector3(vector[9], vector[10], vector[11])}
+	if region != 0:
+		result.region = region
+	return result

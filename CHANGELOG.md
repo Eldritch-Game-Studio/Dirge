@@ -2,6 +2,11 @@
 
 All notable changes to Dirge. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Fixed
+- `scripts/windows-proton.py` removes its private Proton workspace from `RUNNER_TEMP` after every run, success or failure, once logs are copied to the evidence directory. It unlinks the prefix's `dosdevices` links (`z: -> /`) without following them. Previously the retained prefix made the Actions runner's next temp cleanup abort with "Directory not empty" and leave file-less directory skeletons that broke other repositories' jobs.
+
 ## 1.0.5 — 2026-11-16
 
 Adds explicit spatial regions (several live `World3D`s under one mixer) to the `managed/1.0.x` line, ported from `feature/god-complex-spatial-audio-20261111` (b8a7280, 5e2edab, b6cb375). Source-compatible for hosts that never set a region: default-region listener selection, stealing, recordings and command text are unchanged.

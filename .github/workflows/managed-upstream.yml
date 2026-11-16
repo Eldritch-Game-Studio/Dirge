@@ -1,0 +1,19 @@
+name: Managed upstream receiver
+
+# Repository dispatches only run default-branch workflows. NecronomiDOM's `upstream-package-published` concerns the
+# managed/1.0.x (C#) line, so this forwards the payload to that line's own receiver definition, unchanged.
+on:
+  repository_dispatch:
+    types: [upstream-package-published]
+
+permissions:
+  contents: read
+
+jobs:
+  managed:
+    uses: Eldritch-Game-Studio/Dirge/.github/workflows/upstream-receiver.yml@managed/1.0.x
+    with:
+      package: ${{ github.event.client_payload.package }}
+      sha: ${{ github.event.client_payload.sha }}
+      release_tag: ${{ github.event.client_payload.release_tag }}
+      zip_sha256: ${{ github.event.client_payload.zip_sha256 }}

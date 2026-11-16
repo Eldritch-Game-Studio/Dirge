@@ -2,10 +2,12 @@
 
 All notable changes to Dirge. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
-## Unreleased
+## 1.0.5 — 2026-11-16
+
+Adds explicit spatial regions (several live `World3D`s under one mixer) to the `managed/1.0.x` line, ported from `feature/god-complex-spatial-audio-20261111` (b8a7280, 5e2edab, b6cb375). Source-compatible for hosts that never set a region: default-region listener selection, stealing, recordings and command text are unchanged.
 
 ### Changed
-- Hash-lock NecronomiDOM in `dependency-lock.json` to the CI-published managed-host package `managed-31366b0dfb9c`, the same NecronomiDOM Kraken's Keg ships, instead of the floating v1.1.5 release. `scripts/fetch-deps.sh` verifies the ZIP SHA-256, its `addon-package.json` identity and every per-file hash, and keeps a matching install. A candidate can be qualified only through all three `NECRONOMIDOM_PACKAGE_*`/`NECRONOMIDOM_REVISION` variables.
+- Hash-lock NecronomiDOM in `dependency-lock.json` to a CI-published managed-host package (`managed-07d9d598979b` in this release, advanced from `managed-31366b0dfb9c` by the upstream receiver) instead of the floating v1.1.5 release. `scripts/fetch-deps.sh` verifies the ZIP SHA-256, its `addon-package.json` identity and every per-file hash, and keeps a matching install. A candidate can be qualified only through all three `NECRONOMIDOM_PACKAGE_*`/`NECRONOMIDOM_REVISION` variables.
 - CI builds the managed-host package on every run. On `managed/1.0.x` pushes and `v1.0.*` tags it publishes `dirge-managed-<sha>.zip` with `provenance.json` (commit, run, ZIP SHA-256, locked NecronomiDOM) as the `managed-<sha12>` release, but only after full qualification passes. It then dispatches `upstream-package-published` to Kraken's Keg.
 - Add an upstream receiver. NecronomiDOM's `upstream-package-published` is verified (release provenance, CI run, main ancestry, ZIP and manifest hashes), then advances the lock in a single `upstream/necronomidom` PR. Newer packages coalesce into it, older ones never move the lock, and the PR auto-merges once `local / qualification` passes.
 

@@ -177,7 +177,9 @@ class WindowsProtonTests(unittest.TestCase):
         environment = {"RUNNER_TEMP": str(runner_temp), "DIRGE_PROTON_LOG_DIR": str(root / "evidence"),
                        "PROTON_HOME": str(proton), "GODOT_VERSION": "4.7.2"}
         removal = {"side_effect": removal_error} if removal_error else {"wraps": windows_proton.remove_workspace}
-        with patch.dict(windows_proton.os.environ, environment), \
+        # Portable script tests also run on the macOS runner; qualify() itself admits only Linux hosts.
+        with patch.object(windows_proton.sys, "platform", "linux"), \
+             patch.dict(windows_proton.os.environ, environment), \
              patch.object(windows_proton, "ROOT", repository), \
              patch.object(windows_proton, "metadata", side_effect=fake_metadata), \
              patch.object(windows_proton, "install_archive", side_effect=fake_install), \
@@ -191,7 +193,7 @@ class WindowsProtonTests(unittest.TestCase):
             except Exception as error:
                 outcome = error
         self.assertEqual((outside / "keep.txt").read_text(), "not ours")
-        self.assertEqual(len(workspaces), 1)
+        self.assertEqual(len(workspaces), 1, f"qualify() stopped before creating its workspace: {outcome!r}")
         work = workspaces[0]
         self.assertEqual(work.parent, runner_temp.resolve())
         receipt = repository / "addons/dirge/bin/windows-x64/proton-qualification.json"

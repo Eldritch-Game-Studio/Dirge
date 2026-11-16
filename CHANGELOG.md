@@ -10,6 +10,7 @@ All notable changes to Dirge. The format follows [Keep a Changelog](https://keep
 
 ### Fixed
 - State one Godot requirement in the addon and repository READMEs: stock Godot 4.7.2, standard or .NET edition, with .NET not required. The addon README's compatibility line no longer reads as excluding the .NET edition.
+- `scripts/windows-proton.py` removes its private Proton workspace from `RUNNER_TEMP` after every run, success or failure, once logs are copied to the evidence directory. It unlinks the prefix's `dosdevices` links (`z: -> /`) without following them. Previously the retained prefix made the Actions runner's next temp cleanup abort with "Directory not empty" and leave file-less directory skeletons that broke other repositories' jobs.
 
 ## 1.1.0 — 2026-11-13
 

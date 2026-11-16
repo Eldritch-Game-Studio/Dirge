@@ -74,6 +74,42 @@ public sealed class SpatialRegionTests
     }
 
     [Test]
+    public void NearestListener_IsSelectedWithinTheEmittersRegion()
+    {
+        var system = new DirgeSystem(Build().Build());
+        system.SetListener(0, At(10, 1));
+        system.SetListener(1, At(4, 1));
+        system.SetListener(2, At(0.5f, 2));
+        EventInstance instance = Start(system, At(0, 1));
+        system.Update(0.01);
+        Assert.That(instance.GetParameter("Distance"), Is.EqualTo(4));
+        system.SetListener(1, At(4, 1), 0);
+        system.Update(0.01);
+        Assert.That(instance.GetParameter("Distance"), Is.EqualTo(10));
+        system.SetListener(0, At(10, 1), 0);
+        system.Update(0.01);
+        Assert.That(instance.GetParameter("Distance"), Is.EqualTo(1000), "a nearer listener in region 2 must not be borrowed");
+    }
+
+    [Test]
+    public void DefaultRegionOnly_KeepsLegacyNearestEnabledListenerAndListenerZeroFallback()
+    {
+        var system = new DirgeSystem(Build().Build());
+        system.SetListener(0, At(5));
+        system.SetListener(1, At(-2));
+        EventInstance instance = Start(system, At(0));
+        system.Update(0.01);
+        Assert.That(instance.GetParameter("Distance"), Is.EqualTo(2));
+        system.SetListener(1, At(-2), 0);
+        system.Update(0.01);
+        Assert.That(instance.GetParameter("Distance"), Is.EqualTo(5));
+        system.SetListener(0, At(5), 0);
+        system.Update(0.01);
+        Assert.That(instance.GetParameter("Distance"), Is.EqualTo(5), "all-disabled default listeners fall back to listener 0");
+        Assert.That(system.Commands.Commands.OfType<VoicePlay>().Single().Attributes.Region, Is.EqualTo(default(SpatialRegionId)));
+    }
+
+    [Test]
     public void FurthestStealing_UsesEachCandidatesOwnRegion()
     {
         ProjectBuilder builder = Build();

@@ -63,6 +63,23 @@ else
   exit 1
 fi
 
+# The spatial smoke's engine probe decides whether native pending-pause assertions were enforced or skipped.
+pending_pause="$(grep -m1 -oE '^DIRGE_NATIVE_PENDING_PAUSE engine .*' "$log_dir/demo.log" | sed 's/^DIRGE_NATIVE_PENDING_PAUSE //')" || true
+if [[ -z "$pending_pause" ]]; then
+  echo "smoke: demo did not report its native pending-pause probe result"
+  exit 1
+fi
+echo "smoke: $pending_pause"
+if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+  platform="$(uname -s)${GODOT_ARCH:+ $GODOT_ARCH}"
+  [[ -z "${DIRGE_WINDOWS_GODOT:-}" ]] || platform="Windows under Proton"
+  echo "- Dirge spatial smoke ($platform): $pending_pause" >> "$GITHUB_STEP_SUMMARY"
+fi
+if [[ "${GITHUB_ACTIONS:-}" = true ]]; then
+  if [[ "$pending_pause" = *lacks* ]]; then echo "::warning title=Native pending pause::$pending_pause"
+  else echo "::notice title=Native pending pause::$pending_pause"; fi
+fi
+
 echo "smoke: run sandbox"
 set +e
 "${godot[@]}" --headless --audio-driver Dummy --path . res://demo/sandbox/sandbox.tscn -- --smoke 2>&1 | tee "$log_dir/sandbox.log"

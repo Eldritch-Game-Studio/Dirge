@@ -15,6 +15,7 @@ All notable changes to Dirge. The format follows [Keep a Changelog](https://keep
 
 ### Fixed
 - Retain commanded pause on a driver slot across region migration and sync-layer splitting, independently of native playback-registration timing; clear it on release/reuse. Native smoke assertions now also require pause and playback position to survive a deferred physics startup. Engines that drop `AudioStreamPlayer3D.StreamPaused` before registering playback require a native persistence fix; no managed getter echo or delayed retry substitutes for this.
+- The demo smoke probes whether the engine persists a spatial pause requested before physics registration. Where it does, the five native-pause assertions are mandatory; where it does not, as on stock Godot 4.7.2, they are skipped and `scripts/smoke.sh` reports `engine lacks pending-pause persistence: 5 native-pause assertions skipped` as a CI warning and in the job summary. Stock engines still do not support paused migration. Model coverage adds per-region nearest-listener selection and the unchanged default-region (single-world) behaviour.
 
 ## 1.0.4 — 2026-11-15
 

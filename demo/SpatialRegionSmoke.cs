@@ -20,6 +20,9 @@ internal sealed class SpatialRegionSmoke
     private readonly VoiceId _voiceB;
     private readonly VoiceId _oneShot;
     private readonly VoiceId _pausedDuringStartup;
+    private readonly AudioStreamPlayer3D _pendingPauseProbe;
+    private bool _enginePersistsPendingPause;
+    private int _nativePauseChecks;
     private int _next = 1000;
 
     private sealed record Region(SpatialRegionId Id, SubViewport Viewport, Node3D Host, AudioListener3D Listener);
@@ -37,6 +40,12 @@ internal sealed class SpatialRegionSmoke
         Require(Player(_voiceA).GetWorld3D() == _a.Host.GetWorld3D(), "A player not in A world");
         Require(Player(_voiceB).GetWorld3D() == _b.Host.GetWorld3D(), "B player not in B world");
         Require(Player(_voiceA).GetWorld3D() != Player(_voiceB).GetWorld3D(), "same-coordinate voices share a world");
+        // Engine capability, measured without Dirge: does a pause requested before the deferred physics
+        // registration survive it? Native-pause assertions below are mandatory exactly when it does.
+        _pendingPauseProbe = new AudioStreamPlayer3D { Stream = GD.Load<AudioStream>(DemoProject.WindAsset), VolumeDb = -80 };
+        _parent.AddChild(_pendingPauseProbe);
+        _pendingPauseProbe.Play(0.25f);
+        _pendingPauseProbe.StreamPaused = true;
         _pausedDuringStartup = Next();
         _driver.Apply(Command(_pausedDuringStartup, _a.Id) with { StartSeconds = 0.25 });
         _driver.Apply(new VoiceSetPaused(_pausedDuringStartup, true));
@@ -95,10 +104,15 @@ internal sealed class SpatialRegionSmoke
     {
         try
         {
+            _enginePersistsPendingPause = _pendingPauseProbe.StreamPaused;
+            _pendingPauseProbe.QueueFree();
+            GD.Print(_enginePersistsPendingPause
+                ? "DIRGE_NATIVE_PENDING_PAUSE probe: engine persists pending pause; native-pause assertions are mandatory"
+                : "DIRGE_NATIVE_PENDING_PAUSE probe: engine lacks pending-pause persistence; native-pause assertions will be skipped");
             Require(_finished.Contains(_oneShot) && _driver.PlayerOf(_oneShot) is null, "natural spatial finish did not release the voice");
-            Require(Player(_pausedDuringStartup).GetWorld3D() == _b.Host.GetWorld3D() &&
-                Player(_pausedDuringStartup).StreamPaused, "pending-start migration lost native pause after physics registration");
-            Require(Math.Abs(Player(_pausedDuringStartup).GetPlaybackPosition() - 0.25) < 0.01,
+            Require(Player(_pausedDuringStartup).GetWorld3D() == _b.Host.GetWorld3D(), "pending-start migration has wrong world");
+            RequireNativePause(Player(_pausedDuringStartup).StreamPaused, "pending-start migration lost native pause after physics registration");
+            RequireNativePause(Math.Abs(Player(_pausedDuringStartup).GetPlaybackPosition() - 0.25) < 0.01,
                 "paused startup advanced the native playback clock");
             _driver.Apply(new VoiceSetPaused(_pausedDuringStartup, false));
             Require(!Player(_pausedDuringStartup).StreamPaused, "migrated voice did not resume");
@@ -118,7 +132,8 @@ internal sealed class SpatialRegionSmoke
             VoiceId migrating = Play(_a.Id);
             _driver.Apply(new VoiceSetPaused(migrating, true));
             _driver.Apply(new VoiceSet3D(migrating, Attributes(_b.Id)));
-            Require(Player(migrating).GetWorld3D() == _b.Host.GetWorld3D() && Player(migrating).StreamPaused, "migration lost world/pause state");
+            Require(Player(migrating).GetWorld3D() == _b.Host.GetWorld3D(), "migration lost world");
+            RequireNativePause(Player(migrating).StreamPaused, "migration lost pause state");
             _driver.Apply(new VoiceSet3D(migrating, Attributes(default)));
             Require(Player(migrating).GetParent() == _driver.Host, "legacy route not restored");
             _driver.Apply(new VoiceStop(migrating));
@@ -149,9 +164,10 @@ internal sealed class SpatialRegionSmoke
             _driver.Apply(new VoiceSet3D(layerA, Attributes(_b.Id)));
             Require(Player(layerA).GetWorld3D() == _b.Host.GetWorld3D(), "migrating sync layer not moved");
             Require(Player(layerB).GetWorld3D() == _a.Host.GetWorld3D(), "sync sibling dragged into unrelated world");
-            Require(Player(layerA).StreamPaused && Player(layerB).StreamPaused, "sync split lost native pause state");
+            RequireNativePause(Player(layerA).StreamPaused && Player(layerB).StreamPaused, "sync split lost native pause state");
             _driver.Apply(new VoiceSetPaused(layerA, false));
-            Require(!Player(layerA).StreamPaused && Player(layerB).StreamPaused, "split layer resume affected its sibling");
+            Require(!Player(layerA).StreamPaused, "split layer did not resume");
+            RequireNativePause(Player(layerB).StreamPaused, "split layer resume affected its sibling");
 
             // A listener can exit while its host/viewport is traversing children. Such native slots must be retired,
             // not illegally reparented and later reused after their Godot objects have been freed.
@@ -175,6 +191,9 @@ internal sealed class SpatialRegionSmoke
             _driver.Apply(Command(shared, new SpatialRegionId(-99), spatial: false));
             Require(_driver.PlayerOf(shared) is AudioStreamPlayer && _driver.PlayerOf(shared)!.GetParent() == _driver.Host,
                 "nonspatial shared audio depends on region registration");
+            GD.Print(_enginePersistsPendingPause
+                ? $"DIRGE_NATIVE_PENDING_PAUSE engine persists pending pause: {_nativePauseChecks} native-pause assertions enforced"
+                : $"DIRGE_NATIVE_PENDING_PAUSE engine lacks pending-pause persistence: {_nativePauseChecks} native-pause assertions skipped");
             GD.Print("DIRGE_SPATIAL_REGION_SMOKE PASS (native world/lifecycle assertions; not audible-output proof)");
         }
         finally
@@ -184,8 +203,17 @@ internal sealed class SpatialRegionSmoke
             _driver.UnregisterSpatialRegion(_b.Id);
             _driver.VoiceFinished -= Finished;
             if (GodotObject.IsInstanceValid(_a.Viewport)) _a.Viewport.QueueFree();
+            if (GodotObject.IsInstanceValid(_pendingPauseProbe)) _pendingPauseProbe.QueueFree();
             _b.Viewport.QueueFree();
         }
+    }
+
+    // Requires a pause issued before deferred physics registration to reach the native playback. Stock engines that
+    // forward pause only to already-registered playbacks cannot qualify paused migration; such runs count the skip.
+    private void RequireNativePause(bool condition, string message)
+    {
+        _nativePauseChecks++;
+        if (_enginePersistsPendingPause) Require(condition, message);
     }
 
     private static void Require(bool condition, string message)

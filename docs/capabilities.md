@@ -162,10 +162,16 @@ live region registrations supplied by the application. Audible-event/rewind dedu
 **Native pause prerequisite:** the engine must persist a spatial player's pause request until its deferred physics
 playback registration and start that playback paused. A native backend that only forwards pause to already-registered
 playbacks loses same-frame play/pause and restart/pause requests. Dirge retains command intent across migration and
-sync splitting, but cannot repair missing native persistence through the public managed audio API. Such a backend
-fails the native smoke contract and is not qualified for paused migration; do not replace native pause checks with
-managed state echoes or defer retries that could emit an unintended audio block. The smoke also checks the paused
-playback clock after multiple physics ticks, resume, and independent pause state after a sync split.
+sync splitting, but cannot repair missing native persistence through the public managed audio API. Stock Godot 4.7.2
+is such a backend: **stock engines do not support paused migration**, and Dirge does not claim it there. Do not replace
+native pause checks with managed state echoes or defer retries that could emit an unintended audio block.
+
+The demo smoke first probes the engine with a plain `AudioStreamPlayer3D` (play, then pause before physics registration).
+On an engine that persists the pause, the five native-pause assertions are mandatory: paused pending-start migration
+and its playback clock after multiple physics ticks, paused ordinary migration, and the pause state of both layers
+after a sync split and independent resume. A regression in any of them fails the smoke. On an engine that lacks it,
+those five are skipped and `scripts/smoke.sh` reports `engine lacks pending-pause persistence: 5 native-pause assertions
+skipped` in its log, as a CI warning and in the job summary; every world, lifecycle and resume assertion still runs.
 
 Coverage to run: `SpatialRegionTests`, `RecordingTests`, and the demo `--smoke` path, which includes real native world
 membership, finish, withdrawal, migration, sync isolation and pool-reuse assertions. These are not evidence of audible

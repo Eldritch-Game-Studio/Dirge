@@ -17,7 +17,10 @@ class SmokeBuildTests(unittest.TestCase):
                 root = Path(directory)
                 (root / "scripts").mkdir()
                 shutil.copy2(ROOT / "scripts/smoke.sh", root / "scripts/smoke.sh")
-                (root / "addons/necronomidom").mkdir(parents=True)
+                # The dependency installer has its own tests; here it only has to run before the build.
+                fetch = root / "scripts/fetch-deps.sh"
+                fetch.write_text("#!/usr/bin/env bash\ntouch fetched\n")
+                fetch.chmod(0o755)
                 for asset in ("demo/audio/wind.wav", "demo/audio/click.wav",
                               "demo/sandbox/audio/calm_pad.wav", "demo/sandbox/audio/line_de.wav"):
                     path = root / asset
@@ -40,6 +43,7 @@ class SmokeBuildTests(unittest.TestCase):
                 result = subprocess.run(["bash", "scripts/smoke.sh"], cwd=root,
                                         env=environment, capture_output=True, text=True)
                 self.assertEqual(result.returncode, 23, result.stdout + result.stderr)
+                self.assertTrue((root / "fetched").is_file(), "Smoke must verify the locked dependency before building.")
                 args = json.loads(arguments.read_text())
                 for flag in ("--disable-build-servers", "-m:1", "-nr:false", "-p:UseSharedCompilation=false"):
                     self.assertIn(flag, args)

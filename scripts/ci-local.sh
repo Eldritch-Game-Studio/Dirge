@@ -11,6 +11,7 @@ scripts/validate.sh
 native/build.sh
 scripts/fetch-deps.sh
 scripts/smoke.sh
+scripts/ui-proof.sh
 godot="${GODOT:-$(command -v godot)}"
 log_dir="${DIRGE_SMOKE_LOG_DIR:-${TMPDIR:-/tmp}/dirge-smoke}"
 "$godot" --headless --audio-driver Dummy --path . res://native/tests/sendreturn.tscn 2>&1 | tee "$log_dir/native.log"

@@ -145,6 +145,8 @@ jobs:
       - run: scripts/install-godot.sh
       - run: scripts/fetch-deps.sh
       - run: scripts/smoke.sh
+      - name: Tool UI documents and overlay in DocumentHost (PaintRun-JSON goldens)
+        run: scripts/ui-proof.sh
       - name: Native runtime smoke
         run: |
           "$GODOT" --headless --audio-driver Dummy --path . res://native/tests/sendreturn.tscn 2>&1 | tee "$DIRGE_SMOKE_LOG_DIR/native.log"
@@ -304,8 +306,54 @@ jobs:
           path: ${{ steps.zip.outputs.path }}
           if-no-files-found: error
 
+  managed-package:
+    # The managed-host source ZIP .NET hosts (Kraken's Keg, God Complex) install; built here, never by hand.
+    # Every run proves it builds against the locked NecronomiDOM; only managed/1.0.x and v* pushes publish it.
+    needs: trust
+    runs-on: [self-hosted, Linux, X64, eldritch-linux]
+    outputs:
+      publish: ${{ steps.provenance.outputs.publish }}
+    env:
+      # Shared producer host: never attach to reusable MSBuild/Roslyn servers owned by other work.
+      DOTNET_CLI_USE_MSBUILD_SERVER: '0'
+      MSBUILDDISABLENODEREUSE: '1'
+      UseSharedCompilation: 'false'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ needs.trust.outputs.repository }}
+          ref: ${{ needs.trust.outputs.revision }}
+          fetch-depth: 0
+          persist-credentials: false
+      - run: scripts/fetch-deps.sh
+      - name: Build the commit-pinned managed-host ZIP
+        run: python3 scripts/package-managed.py
+      - name: Record provenance (managed/1.0.x commits only)
+        id: provenance
+        env:
+          PUBLISH: ${{ github.event_name == 'push' && needs.trust.outputs.partial != 'true' && needs.trust.outputs.repository == 'Eldritch-Game-Studio/Dirge' && (github.ref == 'refs/heads/managed/1.0.x' || startsWith(github.ref, 'refs/tags/v')) }}
+        run: |
+          sha="$(git rev-parse HEAD)"
+          if [[ "$PUBLISH" != true ]]; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! git merge-base --is-ancestor "$sha" origin/managed/1.0.x; then
+            echo "::error::$sha is not on managed/1.0.x; managed-host releases publish only that line."
+            exit 1
+          fi
+          python3 scripts/managed-provenance.py "dist/dirge-managed-$sha.zip" --output dist/provenance.json
+          echo "publish=true" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dirge-managed
+          path: |
+            dist/dirge-managed-*.zip
+            dist/provenance.json
+          if-no-files-found: error
+
   qualification:
-    needs: [trust, test, validate, smoke, native-linux, native-windows, native-macos, package]
+    needs: [trust, test, validate, smoke, native-linux, native-windows, native-macos, package, managed-package]
     if: always()
     runs-on: [self-hosted, Linux, X64, eldritch-linux]
     steps:
@@ -313,13 +361,14 @@ jobs:
           RESULTS: ${{ toJSON(needs) }}
           TRUST: ${{ needs.trust.result }}
           PACKAGE: ${{ needs.package.result }}
+          MANAGED_PACKAGE: ${{ needs.managed-package.result }}
         run: |
           printf '%s\n' "$RESULTS"
           if [[ "$TRUST" != success ]]; then
             echo '::error::Local qualification withheld: source requires an internal collaborator or explicit reviewed-head manual approval. No untrusted source was executed.'
             exit 1
           fi
-          [[ "$PACKAGE" = success ]]
+          [[ "$PACKAGE" = success && "$MANAGED_PACKAGE" = success ]]
 
   release:
     needs: [trust, package, qualification]
@@ -339,3 +388,65 @@ jobs:
           files: ${{ runner.temp }}/dirge-release-${{ github.run_id }}-${{ github.run_attempt }}/${{ needs.package.outputs.name }}.zip
           fail_on_unmatched_files: true
           generate_release_notes: true
+
+  managed-release:
+    # Publishes managed-<sha12> (a prerelease unless built from a v* tag) with provenance.json, then notifies the games.
+    needs: [trust, managed-package, qualification]
+    if: ${{ needs.managed-package.outputs.publish == 'true' && needs.qualification.result == 'success' }}
+    # Dirge's own Crucible runner: its host gh login sends the cross-repository dispatches.
+    runs-on: [self-hosted, Linux, X64, crucible, dirge]
+    concurrency:
+      group: managed-release-${{ needs.trust.outputs.revision }}
+      cancel-in-progress: false
+    permissions:
+      contents: write
+    steps:
+      # No checkout or build: publication credentials never enter build steps.
+      - uses: actions/download-artifact@v4
+        with:
+          name: dirge-managed
+          path: ${{ runner.temp }}/dirge-managed-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Publish the managed-<sha12> release
+        id: release
+        env:
+          ARTIFACT: ${{ runner.temp }}/dirge-managed-${{ github.run_id }}-${{ github.run_attempt }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          REVISION: ${{ needs.trust.outputs.revision }}
+          TAGGED: ${{ startsWith(github.ref, 'refs/tags/v') }}
+        run: |
+          provenance="$ARTIFACT/provenance.json"
+          sha="$(jq -r .sha "$provenance")"; tag="$(jq -r .release_tag "$provenance")"
+          zip="$(jq -r .zip "$provenance")"; digest="$(jq -r .zip_sha256 "$provenance")"
+          [[ "$sha" = "$REVISION" && "$tag" = "managed-${sha:0:12}" && "$zip" = "dirge-managed-$sha.zip" ]]
+          echo "$digest  $ARTIFACT/$zip" | sha256sum -c -
+          if gh api "repos/$GH_REPO/releases/tags/$tag" > "$ARTIFACT/existing.json" 2>/dev/null; then
+            # Same commit from a branch push and its tag push: the package is deterministic, so it must match.
+            existing="$(jq -r --arg zip "$zip" '.assets[] | select(.name == $zip) | .digest // ""' "$ARTIFACT/existing.json")"
+            if [[ -n "$existing" && "$existing" != "sha256:$digest" ]]; then
+              echo "::error::$tag already publishes $zip with $existing, not sha256:$digest"
+              exit 1
+            fi
+            [[ -n "$existing" ]] || gh release upload "$tag" "$ARTIFACT/$zip" "$provenance" --clobber
+            if [[ "$TAGGED" = true ]]; then gh release edit "$tag" --prerelease=false; fi
+          else
+            prerelease=(--prerelease)
+            [[ "$TAGGED" = true ]] && prerelease=()
+            gh release create "$tag" "$ARTIFACT/$zip" "$provenance" "${prerelease[@]}" --target "$sha" \
+              --title "Dirge managed-host ${sha:0:12}" \
+              --notes "CI-built managed-host package of Dirge managed/1.0.x@$sha (run $GITHUB_SERVER_URL/$GH_REPO/actions/runs/$GITHUB_RUN_ID), qualified against NecronomiDOM $(jq -r .upstream.necronomidom.sha "$provenance"). Install with the consumer's addons-update; verify with provenance.json."
+          fi
+          {
+            echo "sha=$sha"; echo "tag=$tag"; echo "digest=$digest"
+          } >> "$GITHUB_OUTPUT"
+      - name: Notify consumers (upstream-package-published)
+        env:
+          SHA: ${{ steps.release.outputs.sha }}
+          TAG: ${{ steps.release.outputs.tag }}
+          DIGEST: ${{ steps.release.outputs.digest }}
+        run: |
+          payload="$(jq -n --arg sha "$SHA" --arg tag "$TAG" --arg digest "$DIGEST" \
+            '{event_type: "upstream-package-published", client_payload: {package: "dirge", sha: $sha, release_tag: $tag, zip_sha256: $digest}}')"
+          # Kraken's Keg is the only CD consumer; other hosts install published releases themselves.
+          env -u GH_TOKEN -u GITHUB_TOKEN gh api repos/Eldritch-Game-Studio/Krakens-Keg-Godot/dispatches --input - <<< "$payload"
+          echo "dispatched $TAG to Krakens-Keg-Godot"

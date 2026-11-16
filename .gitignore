@@ -8,7 +8,7 @@ TestResults/
 __pycache__/
 /dist/
 
-# Dependency installed by scripts/fetch-deps.sh (NecronomiDOM release ZIP); not vendored.
+# Dependency installed by scripts/fetch-deps.sh (the NecronomiDOM ZIP locked in dependency-lock.json); not vendored.
 /addons/necronomidom/
 
 # Native GDExtension binaries built by native/build.sh.

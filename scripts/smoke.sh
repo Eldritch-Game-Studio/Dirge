@@ -18,9 +18,8 @@ fi
 log_dir="${DIRGE_SMOKE_LOG_DIR:-${TMPDIR:-/tmp}/dirge-smoke}"
 mkdir -p "$log_dir"
 
-if [[ ! -d addons/necronomidom ]]; then
-  scripts/fetch-deps.sh
-fi
+# Idempotent: keeps a verified install of the locked (or explicitly supplied candidate) NecronomiDOM, replaces anything else.
+scripts/fetch-deps.sh
 
 if [[ ! -f demo/audio/wind.wav || ! -f demo/audio/click.wav ]]; then
   python3 scripts/gen-demo-audio.py

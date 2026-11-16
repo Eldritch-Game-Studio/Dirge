@@ -1,0 +1,545 @@
+{
+  "document": "shell-status.html",
+  "width": 1280,
+  "height": 720,
+  "runs": [
+    {
+      "Bounds": {
+        "X": 0,
+        "Y": 0,
+        "Width": 1280,
+        "Height": 720
+      },
+      "Style": {
+        "Background": {
+          "R": 0.105882354,
+          "G": 0.11372549,
+          "B": 0.12941177,
+          "A": 1
+        },
+        "Border": {
+          "R": 0,
+          "G": 0,
+          "B": 0,
+          "A": 0
+        },
+        "BorderWidth": 0,
+        "Radius": 0
+      }
+    },
+    {
+      "Bounds": {
+        "X": 0,
+        "Y": 0,
+        "Width": 1280,
+        "Height": 720
+      },
+      "Style": {
+        "Background": {
+          "R": 0.105882354,
+          "G": 0.11372549,
+          "B": 0.12941177,
+          "A": 1
+        },
+        "Border": {
+          "R": 0.84705883,
+          "G": 0.85882354,
+          "B": 0.8784314,
+          "A": 1
+        },
+        "BorderWidth": 0,
+        "Radius": 0
+      }
+    },
+    {
+      "Bounds": {
+        "X": 0,
+        "Y": 0,
+        "Width": 1280,
+        "Height": 720
+      },
+      "Style": {
+        "Background": {
+          "R": 0.105882354,
+          "G": 0.11372549,
+          "B": 0.12941177,
+          "A": 1
+        },
+        "Border": {
+          "R": 0.84705883,
+          "G": 0.85882354,
+          "B": 0.8784314,
+          "A": 1
+        },
+        "BorderWidth": 0,
+        "Radius": 0
+      }
+    },
+    {
+      "Bounds": {
+        "X": 0,
+        "Y": 0,
+        "Width": 1280,
+        "Height": 720
+      }
+    },
+    {
+      "Bounds": {
+        "X": 0,
+        "Y": 0,
+        "Width": 1280,
+        "Height": 720
+      },
+      "Background": {
+        "R": 0.14117648,
+        "G": 0.15294118,
+        "B": 0.17254902,
+        "A": 1
+      },
+      "Borders": {
+        "Top": {
+          "Width": 1,
+          "Color": {
+            "R": 0.22745098,
+            "G": 0.24705882,
+            "B": 0.2784314,
+            "A": 1
+          },
+          "Style": "solid"
+        },
+        "Right": {
+          "Width": 0,
+          "Color": {
+            "R": 0.84705883,
+            "G": 0.85882354,
+            "B": 0.8784314,
+            "A": 1
+          },
+          "Style": "none"
+        },
+        "Bottom": {
+          "Width": 0,
+          "Color": {
+            "R": 0.84705883,
+            "G": 0.85882354,
+            "B": 0.8784314,
+            "A": 1
+          },
+          "Style": "none"
+        },
+        "Left": {
+          "Width": 0,
+          "Color": {
+            "R": 0.84705883,
+            "G": 0.85882354,
+            "B": 0.8784314,
+            "A": 1
+          },
+          "Style": "none"
+        }
+      },
+      "Radii": {
+        "TopLeft": {
+          "X": 0,
+          "Y": 0
+        },
+        "TopRight": {
+          "X": 0,
+          "Y": 0
+        },
+        "BottomRight": {
+          "X": 0,
+          "Y": 0
+        },
+        "BottomLeft": {
+          "X": 0,
+          "Y": 0
+        }
+      }
+    },
+    {
+      "Bounds": {
+        "X": 8,
+        "Y": 353.5,
+        "Width": 41.4375,
+        "Height": 14
+      }
+    },
+    {
+      "Text": "Untitled",
+      "X": 8,
+      "Baseline": 364,
+      "FontSize": 11,
+      "Color": {
+        "R": 0.5411765,
+        "G": 0.5647059,
+        "B": 0.6,
+        "A": 1
+      },
+      "Owner": "status-path",
+      "FontWeight": 400,
+      "FontItalic": false,
+      "LetterSpacing": 0,
+      "FontFamily": "Noto Sans",
+      "TextControl": null,
+      "TextOffset": 0,
+      "ControlLine": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "TextControlLineEnd": true,
+      "TextControlViewport": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "ShapingText": null,
+      "InlineFragment": null
+    },
+    {},
+    {
+      "Text": "0 errors",
+      "X": 61.4375,
+      "Baseline": 364,
+      "FontSize": 11,
+      "Color": {
+        "R": 0.8784314,
+        "G": 0.34509805,
+        "B": 0.30980393,
+        "A": 1
+      },
+      "Owner": "status-errors",
+      "FontWeight": 400,
+      "FontItalic": false,
+      "LetterSpacing": 0,
+      "FontFamily": "Noto Sans",
+      "TextControl": null,
+      "TextOffset": 0,
+      "ControlLine": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "TextControlLineEnd": true,
+      "TextControlViewport": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "ShapingText": null,
+      "InlineFragment": null
+    },
+    {
+      "Text": "0 warnings",
+      "X": 106.140625,
+      "Baseline": 364,
+      "FontSize": 11,
+      "Color": {
+        "R": 0.8901961,
+        "G": 0.7019608,
+        "B": 0.25490198,
+        "A": 1
+      },
+      "Owner": "status-warnings",
+      "FontWeight": 400,
+      "FontItalic": false,
+      "LetterSpacing": 0,
+      "FontFamily": "Noto Sans",
+      "TextControl": null,
+      "TextOffset": 0,
+      "ControlLine": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "TextControlLineEnd": true,
+      "TextControlViewport": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "ShapingText": null,
+      "InlineFragment": null
+    },
+    {
+      "Text": "inst",
+      "X": 175.125,
+      "Baseline": 364,
+      "FontSize": 11,
+      "Color": {
+        "R": 0.5411765,
+        "G": 0.5647059,
+        "B": 0.6,
+        "A": 1
+      },
+      "Owner": "",
+      "FontWeight": 400,
+      "FontItalic": false,
+      "LetterSpacing": 0,
+      "FontFamily": "Noto Sans",
+      "TextControl": null,
+      "TextOffset": 0,
+      "ControlLine": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "TextControlLineEnd": true,
+      "TextControlViewport": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "ShapingText": null,
+      "InlineFragment": null
+    },
+    {
+      "Text": "0",
+      "X": 198,
+      "Baseline": 364,
+      "FontSize": 11,
+      "Color": {
+        "R": 0.84705883,
+        "G": 0.85882354,
+        "B": 0.8784314,
+        "A": 1
+      },
+      "Owner": "status-instances",
+      "FontWeight": 400,
+      "FontItalic": false,
+      "LetterSpacing": 0,
+      "FontFamily": "Noto Sans",
+      "TextControl": null,
+      "TextOffset": 0,
+      "ControlLine": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "TextControlLineEnd": true,
+      "TextControlViewport": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "ShapingText": null,
+      "InlineFragment": null
+    },
+    {
+      "Text": "voices",
+      "X": 216.296875,
+      "Baseline": 364,
+      "FontSize": 11,
+      "Color": {
+        "R": 0.5411765,
+        "G": 0.5647059,
+        "B": 0.6,
+        "A": 1
+      },
+      "Owner": "",
+      "FontWeight": 400,
+      "FontItalic": false,
+      "LetterSpacing": 0,
+      "FontFamily": "Noto Sans",
+      "TextControl": null,
+      "TextOffset": 0,
+      "ControlLine": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "TextControlLineEnd": true,
+      "TextControlViewport": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "ShapingText": null,
+      "InlineFragment": null
+    },
+    {
+      "Text": "0",
+      "X": 252.140625,
+      "Baseline": 364,
+      "FontSize": 11,
+      "Color": {
+        "R": 0.84705883,
+        "G": 0.85882354,
+        "B": 0.8784314,
+        "A": 1
+      },
+      "Owner": "status-voices",
+      "FontWeight": 400,
+      "FontItalic": false,
+      "LetterSpacing": 0,
+      "FontFamily": "Noto Sans",
+      "TextControl": null,
+      "TextOffset": 0,
+      "ControlLine": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "TextControlLineEnd": true,
+      "TextControlViewport": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "ShapingText": null,
+      "InlineFragment": null
+    },
+    {
+      "Text": "update",
+      "X": 270.4375,
+      "Baseline": 364,
+      "FontSize": 11,
+      "Color": {
+        "R": 0.5411765,
+        "G": 0.5647059,
+        "B": 0.6,
+        "A": 1
+      },
+      "Owner": "",
+      "FontWeight": 400,
+      "FontItalic": false,
+      "LetterSpacing": 0,
+      "FontFamily": "Noto Sans",
+      "TextControl": null,
+      "TextOffset": 0,
+      "ControlLine": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "TextControlLineEnd": true,
+      "TextControlViewport": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "ShapingText": null,
+      "InlineFragment": null
+    },
+    {
+      "Text": "0.00 ms",
+      "X": 311.109375,
+      "Baseline": 364,
+      "FontSize": 11,
+      "Color": {
+        "R": 0.84705883,
+        "G": 0.85882354,
+        "B": 0.8784314,
+        "A": 1
+      },
+      "Owner": "status-ms",
+      "FontWeight": 400,
+      "FontItalic": false,
+      "LetterSpacing": 0,
+      "FontFamily": "Noto Sans",
+      "TextControl": null,
+      "TextOffset": 0,
+      "ControlLine": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "TextControlLineEnd": true,
+      "TextControlViewport": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "ShapingText": null,
+      "InlineFragment": null
+    },
+    {
+      "Text": "buses",
+      "X": 363.359375,
+      "Baseline": 364,
+      "FontSize": 11,
+      "Color": {
+        "R": 0.5411765,
+        "G": 0.5647059,
+        "B": 0.6,
+        "A": 1
+      },
+      "Owner": "",
+      "FontWeight": 400,
+      "FontItalic": false,
+      "LetterSpacing": 0,
+      "FontFamily": "Noto Sans",
+      "TextControl": null,
+      "TextOffset": 0,
+      "ControlLine": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "TextControlLineEnd": true,
+      "TextControlViewport": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "ShapingText": null,
+      "InlineFragment": null
+    },
+    {
+      "Text": "1",
+      "X": 397.65625,
+      "Baseline": 364,
+      "FontSize": 11,
+      "Color": {
+        "R": 0.84705883,
+        "G": 0.85882354,
+        "B": 0.8784314,
+        "A": 1
+      },
+      "Owner": "status-buses",
+      "FontWeight": 400,
+      "FontItalic": false,
+      "LetterSpacing": 0,
+      "FontFamily": "Noto Sans",
+      "TextControl": null,
+      "TextOffset": 0,
+      "ControlLine": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "TextControlLineEnd": true,
+      "TextControlViewport": {
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0
+      },
+      "ShapingText": null,
+      "InlineFragment": null
+    },
+    {}
+  ]
+}

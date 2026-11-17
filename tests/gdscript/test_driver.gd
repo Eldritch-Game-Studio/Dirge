@@ -110,9 +110,13 @@ func _bus_and_voices(test: Object, driver) -> void:
 	driver.apply([{"type": "VoiceSetVolume", "voice": 1, "volumeDb": -9.0}, {"type": "VoiceSetPitch", "voice": 1, "pitch": 1.25}, {"type": "VoiceSetPaused", "voice": 1, "paused": true}])
 	test.check(player.volume_db == -9.0 and player.pitch_scale == 1.25 and player.stream_paused, "Voice controls update real playback")
 	driver.apply({"type": "VoiceSetPaused", "voice": 1, "paused": false})
+	# Hold the mixer between the seek and the read: at pitch 1.25 the 1 s loop wraps to its start after 0.56 s
+	# of mixing, which a starved main thread used to allow before a timed read.
+	AudioServer.lock()
 	driver.apply({"type": "VoiceSeek", "voice": 1, "seconds": 0.3})
-	await _tree.create_timer(0.04).timeout
-	test.check(player.get_playback_position() >= 0.29, "Voice seek moves native playback cursor")
+	var cursor = player.get_playback_position()
+	AudioServer.unlock()
+	test.near(cursor, 0.3, 0.01, "Voice seek moves native playback cursor")
 	driver.apply({"type": "VoiceStop", "voice": 1})
 	test.check(driver.player_of(1) == null and not player.playing and feedback.is_empty(), "Explicit stop releases player without finished feedback")
 	driver.apply(_play(2))
@@ -146,8 +150,8 @@ func _bus_and_voices(test: Object, driver) -> void:
 	a.loop = false
 	b.loop = false
 	driver.apply([a, b])
-	await _tree.create_timer(0.3).timeout
-	test.check(feedback.has({"type": "VoiceFinished", "voice": 5}) and feedback.has({"type": "VoiceFinished", "voice": 6}), "Natural synchronized completion feeds back every live member")
+	var finished = await test.until(func(): return feedback.has({"type": "VoiceFinished", "voice": 5}) and feedback.has({"type": "VoiceFinished", "voice": 6}))
+	test.check(finished, "Natural synchronized completion feeds back every live member")
 	driver.assets.register("memory://missing", null)
 	driver.apply(_play(9, "memory://missing"))
 	test.check(feedback.has({"type": "VoiceFinished", "voice": 9}) and driver.player_of(9) == null, "Known-missing stream immediately retires model voice")
@@ -175,21 +179,16 @@ func _native_audio(test: Object, driver) -> void:
 	play.bus = "DriverSender"
 	play.volumeDb = 0.0
 	driver.apply(play)
-	await _tree.create_timer(0.2).timeout
-	var pre = _rms(capture)
+	# The return bus is live once its keep-alive player exists; it is created deferred on the main thread.
+	await test.until(func(): return _tree.root.has_node("DirgeReturnKeepAlive_DriverReturn"))
+	var pre = await _measure(test, capture, 0.0, 0.2)
 	test.check(pre > 0.02, "Native pre-fader send routes nonzero PCM despite attenuated source bus")
 	driver.set_effect_parameter("DriverSender", 0, "pre_fader", false)
-	await _tree.create_timer(0.1).timeout
-	capture.clear_buffer()
-	await _tree.create_timer(0.15).timeout
-	var post = _rms(capture)
+	var post = await _measure(test, capture, 0.1, 0.15)
 	test.check(post < pre * 0.02, "Native post-fader send includes source bus attenuation")
 	driver.set_effect_parameter("DriverSender", 0, "pre_fader", true)
 	driver.set_effect_parameter("DriverSender", 0, "level_db", -12.0)
-	await _tree.create_timer(0.1).timeout
-	capture.clear_buffer()
-	await _tree.create_timer(0.15).timeout
-	var attenuated = _rms(capture)
+	var attenuated = await _measure(test, capture, 0.1, 0.15)
 	test.check(attenuated > pre * 0.15 and attenuated < pre * 0.4, "Native send level changes measured PCM gain")
 	driver.stop_all()
 	project = _project()
@@ -203,17 +202,18 @@ func _native_audio(test: Object, driver) -> void:
 	var loudness = Capture.new()
 	driver.capture = loudness
 	driver.apply(_play(201))
-	for tick in range(12):
-		await _tree.create_timer(0.1).timeout
+	# Meter every frame until 1.2 s of convolved audio is captured, however long the mixer takes to render it.
+	var metered = func():
 		loudness.poll()
+		return convolution_capture.get_frames_available() >= _frames(1.2)
+	await test.until(metered)
+	loudness.poll()
 	var wet = _rms(convolution_capture)
 	test.check(wet > 0.01, "Native wet-only convolution produces real audio through impulse kernel")
 	test.check(is_finite(loudness.momentary_lufs) and is_finite(loudness.integrated_lufs) and is_finite(loudness.true_peak_dbtp), "Master PCM capture feeds BS1770 loudness and true peak")
 	driver.set_effect_parameter("DriverMusic", 0, "wet_db", -80.0)
-	await _tree.create_timer(0.1).timeout
-	convolution_capture.clear_buffer()
-	await _tree.create_timer(0.15).timeout
-	test.check(_rms(convolution_capture) < wet * 0.001, "Native wet and dry silence parameters mute actual convolution output")
+	var muted = await _measure(test, convolution_capture, 0.1, 0.15)
+	test.check(muted < wet * 0.001, "Native wet and dry silence parameters mute actual convolution output")
 	loudness.reset()
 	test.check(loudness.momentary_lufs == -INF and loudness.integrated_lufs == -INF, "Loudness reset flushes gating history")
 	driver.stop_all()
@@ -221,6 +221,20 @@ func _native_audio(test: Object, driver) -> void:
 	test.check(loudness.is_installed and AudioServer.get_bus_effect(0, AudioServer.get_bus_effect_count(0) - 1) == loudness.effect, "Loudness capture survives mixer rebuild appended after authored chain")
 	driver.capture = null
 	test.check(not loudness.is_installed, "Removing capture uninstalls engine effect")
+
+static func _frames(seconds: float) -> int:
+	return roundi(seconds * AudioServer.get_mix_rate())
+
+## RMS of `seconds` of audio the mixer renders once `settle` more seconds have passed through `capture`, however
+## long a starved host takes. NAN if it never arrives, so no comparison passes on missing audio.
+func _measure(test: Object, capture: AudioEffectCapture, settle: float, seconds: float) -> float:
+	var start = capture.get_pushed_frames() + capture.get_discarded_frames()
+	if not await test.until(func(): return capture.get_pushed_frames() + capture.get_discarded_frames() - start >= _frames(settle)):
+		return NAN
+	capture.clear_buffer()
+	if not await test.until(func(): return capture.get_frames_available() >= _frames(seconds)):
+		return NAN
+	return _rms(capture)
 
 static func _rms(capture: AudioEffectCapture) -> float:
 	var frames = capture.get_buffer(capture.get_frames_available())

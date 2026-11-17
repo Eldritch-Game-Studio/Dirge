@@ -4,6 +4,8 @@ var assertions: int = 0
 var failures: Array[String] = []
 var current_suite: String = ""
 var suites: Array[Dictionary] = []
+## Ceiling for waits on audio-thread progress: a starved host only delays the verdict.
+const WAIT_TIMEOUT_MSEC = 30000
 
 func _initialize() -> void:
 	_run.call_deferred()
@@ -17,6 +19,15 @@ func check(condition: bool, message: String) -> void:
 
 func near(actual: float, expected: float, tolerance: float, message: String) -> void:
 	check(absf(actual - expected) <= tolerance, "%s (actual=%s expected=%s tolerance=%s)" % [message, actual, expected, tolerance])
+
+## Await frames until `condition` holds; false once WAIT_TIMEOUT_MSEC has passed without it.
+func until(condition: Callable) -> bool:
+	var deadline = Time.get_ticks_msec() + WAIT_TIMEOUT_MSEC
+	while not condition.call():
+		if Time.get_ticks_msec() >= deadline:
+			return false
+		await process_frame
+	return true
 
 func _run() -> void:
 	check(not OS.has_feature("mono"), "qualification requires standard non-.NET Godot")

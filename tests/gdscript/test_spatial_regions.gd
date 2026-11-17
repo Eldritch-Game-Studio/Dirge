@@ -252,6 +252,8 @@ func _driver_lifecycle(test: Object) -> void:
 		if persists:
 			test.check(condition, message)
 
+	# The 0.05 s voice finishes once the mixer has rendered it, which a starved host can delay past any fixed wait.
+	await test.until(func(): return finished.has(1002))
 	test.check(finished.has(1002) and driver.player_of(1002) == null, "natural spatial finish releases the voice")
 	test.check(driver.player_of(1003).get_world_3d() == b.host.get_world_3d(), "pending-start migration reaches the new world")
 	native_pause.call(driver.player_of(1003).stream_paused, "pending-start migration keeps native pause after physics registration")

@@ -4,7 +4,7 @@ var assertions: int = 0
 var failures: Array[String] = []
 var current_suite: String = ""
 var suites: Array[Dictionary] = []
-## Ceiling for waits on audio-thread progress: a starved host only delays the verdict.
+## Ceiling for waits on audio-thread or resource-loader progress: a starved host only delays the verdict.
 const WAIT_TIMEOUT_MSEC = 30000
 
 func _initialize() -> void:

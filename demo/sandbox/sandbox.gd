@@ -24,6 +24,8 @@ var _screenshot_frame = 0
 var _screenshot_taken = false
 var _smoke = false
 var _smoke_step = 0
+var _smoke_start_msec = 0
+const SmokeTimeoutMsec = 30000
 var _recorder
 var _counts: Dictionary = {}
 var _combat_plays = 0
@@ -64,6 +66,7 @@ func _ready() -> void:
 	if _smoke:
 		Engine.max_fps = 60
 		_recorder = Recorder.new(_server.System)
+		_smoke_start_msec = Time.get_ticks_msec()
 		print("SANDBOX_SMOKE start")
 	else:
 		print("Dirge sandbox: 1 Threat 0/1 · 2 stinger · 3 dialogue · L locale en/de · Space click · F9 HUD · click to capture mouse, Esc to release.")
@@ -191,10 +194,25 @@ func _smoke_tick() -> void:
 				_server.StartEvent(Project.DialogueEvent)
 				_smoke_step += 1
 		5:
-			if time >= 6.0:
+			# The scripted actions run on model time; judging waits for what they must produce, so a starved host only
+			# delays the verdict. A timeout still fails, naming what never happened.
+			var missing = _missing_conditions() if time >= 6.0 else PackedStringArray(["scripted schedule"])
+			if missing.is_empty() or Time.get_ticks_msec() - _smoke_start_msec >= SmokeTimeoutMsec:
 				_smoke_step += 1
 				_smoke = false
-				_evaluate()
+				if missing.is_empty():
+					_evaluate()
+				else:
+					_fail("timed out after %d ms waiting for: %s" % [SmokeTimeoutMsec, ", ".join(missing)])
+
+func _missing_conditions() -> PackedStringArray:
+	var missing = PackedStringArray()
+	if _combat_plays < 2: missing.append("both Combat layers")
+	if _stinger_plays < 1: missing.append("stinger")
+	if _line_en_plays < 1 or _line_de_plays < 1: missing.append("en and de dialogue lines")
+	if not _music_min_db <= -10.0: missing.append("Music dip during dialogue")
+	if _bird_plays < 1: missing.append("spatial bird voice")
+	return missing
 
 func _on_commands(commands: Array) -> void:
 	var phase = fmod(_music.timeline_position, Project.BeatSeconds) if _music != null else 0.0

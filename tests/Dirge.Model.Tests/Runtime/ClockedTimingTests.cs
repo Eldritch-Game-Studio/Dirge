@@ -112,6 +112,36 @@ public sealed class ClockedTimingTests
     }
 
     [Test]
+    public void ShortCue_StartedBeforeAFrameHitch_PlaysLateFromItsStart()
+    {
+        // Issue #19: the stall falls between Start and the next tick and outlasts the whole cue.
+        var project = ProjectBuilder.Minimal("SFX/Click", assetLength: 0.05).Build();
+        var system = new DirgeSystem(project, elapsedSinceLastUpdate: () => 0);
+        var cue = system.GetEvent("SFX/Click").CreateInstance();
+        cue.Start();
+        cue.Release();
+        system.Update(0.2);
+        VoicePlay play = system.Commands.Commands.OfType<VoicePlay>().Single();
+        Assert.That(play.StartSeconds, Is.Zero);
+
+        system.Commands.Clear();
+        system.Update(0.1);
+        Assert.That(system.Commands.Commands.OfType<VoiceStop>().Single().Voice, Is.EqualTo(play.Voice));
+        Assert.That(cue.State, Is.EqualTo(PlaybackState.Stopped));
+        Assert.That(system.InstanceCount, Is.Zero);
+    }
+
+    [Test]
+    public void LongVoice_StillCatchesUpToTheClockAfterAFrameHitch()
+    {
+        var project = ProjectBuilder.Minimal("Music/Long", assetLength: 10).Build();
+        var system = new DirgeSystem(project, elapsedSinceLastUpdate: () => 0);
+        system.GetEvent("Music/Long").CreateInstance().Start();
+        system.Update(0.2);
+        Assert.That(system.Commands.Commands.OfType<VoicePlay>().Single().StartSeconds, Is.EqualTo(0.2).Within(1e-9));
+    }
+
+    [Test]
     public void RecorderReplaysMutationOffsetsWithoutLiveClock()
     {
         double elapsed = 0;

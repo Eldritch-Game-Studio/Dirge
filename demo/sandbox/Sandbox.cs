@@ -26,6 +26,7 @@ public partial class Sandbox : Node3D
     private const float BirdOrbitHeight = 2.5f;
     private const float BirdOrbitSpeed = 0.35f;
     private const double SmokeSeconds = 6.0;
+    private const ulong SmokeTimeoutMsec = 30000;
     /// <summary>Tolerance for native sample alignment with a beat: one 60 fps frame plus slack.</summary>
     private const double BeatPhaseTolerance = 0.02;
 
@@ -51,6 +52,7 @@ public partial class Sandbox : Node3D
     // ---- smoke ----
     private bool _smoke;
     private int _smokeStep;
+    private ulong _smokeStartMsec;
     private Recorder? _recorder;
     private readonly Dictionary<Type, int> _commandCounts = new();
     private int _combatPlays;
@@ -151,6 +153,7 @@ public partial class Sandbox : Node3D
         {
             Engine.MaxFps = 60;
             _recorder = new Recorder(_server.System);
+            _smokeStartMsec = Time.GetTicksMsec();
             GD.Print("SANDBOX_SMOKE start");
         }
         else
@@ -367,9 +370,16 @@ public partial class Sandbox : Node3D
                     _smokeStep++;
                     break;
                 case 5 when t >= SmokeSeconds:
-                    _smokeStep++;
-                    _smoke = false;
-                    Evaluate();
+                    // Actions run on model time; the verdict waits for what they must produce, so a starved host only
+                    // delays it. A timeout still fails, naming what never happened.
+                    List<string> missing = MissingConditions();
+                    if (missing.Count == 0 || Time.GetTicksMsec() - _smokeStartMsec >= SmokeTimeoutMsec)
+                    {
+                        _smokeStep++;
+                        _smoke = false;
+                        if (missing.Count == 0) Evaluate();
+                        else Fail($"timed out after {SmokeTimeoutMsec} ms waiting for: {string.Join(", ", missing)}");
+                    }
                     break;
             }
         }
@@ -378,6 +388,17 @@ public partial class Sandbox : Node3D
             _smoke = false;
             Fail($"exception at t={t:F3}: {e}");
         }
+    }
+
+    private List<string> MissingConditions()
+    {
+        var missing = new List<string>();
+        if (_combatPlays < 2) missing.Add("both Combat layers");
+        if (_stingerPlays < 1) missing.Add("stinger");
+        if (_lineEnPlays < 1 || _lineDePlays < 1) missing.Add("en and de dialogue lines");
+        if (!(_musicMinDbDuringDialogue <= -10f)) missing.Add("Music dip during dialogue");
+        if (_birdPlays < 1) missing.Add("spatial bird voice");
+        return missing;
     }
 
     private void OnCommands(IReadOnlyList<Command> commands)

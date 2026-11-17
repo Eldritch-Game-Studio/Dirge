@@ -20,6 +20,8 @@ internal sealed class SpatialRegionSmoke
     private readonly VoiceId _voiceB;
     private readonly VoiceId _oneShot;
     private readonly VoiceId _pausedDuringStartup;
+    /// <summary>True once the spatial one-shot has finished naturally, so <see cref="Finish"/> judges a settled state.</summary>
+    public bool OneShotFinished => _finished.Contains(_oneShot);
     private readonly AudioStreamPlayer3D _pendingPauseProbe;
     private bool _enginePersistsPendingPause;
     private int _nativePauseChecks;

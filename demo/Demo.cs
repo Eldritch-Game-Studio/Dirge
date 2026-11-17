@@ -9,8 +9,9 @@ namespace DirgeDemo;
 
 /// <summary>
 /// Demo scene root. Interactive: wind loops, any key clicks, Enter toggles the Muffled snapshot.
-/// With <c>-- --smoke</c> it runs the M1 T1 harness: scripted starts over 90 frames, then asserts on applied commands and
-/// <see cref="AudioServer"/> state and exits 0/1 with a <c>DIRGE_SMOKE</c> line.
+/// With <c>-- --smoke</c> it runs the M1 T1 harness: scripted starts, then once the checked behaviour has happened (or a
+/// 30 s timeout naming what is missing) asserts on applied commands and <see cref="AudioServer"/> state and exits 0/1
+/// with a <c>DIRGE_SMOKE</c> line.
 /// </summary>
 public partial class Demo : Node
 {
@@ -20,6 +21,7 @@ public partial class Demo : Node
     private bool _smoke;
     private int _frame;
     private ulong _startMsec;
+    private const ulong SmokeTimeoutMsec = 30000;
     private SnapshotInstance? _muffled;
 
     private SpatialRegionSmoke? _spatialRegions;
@@ -92,12 +94,39 @@ public partial class Demo : Node
             return;
         }
 
-        // 90 frames at the 60 fps cap ≈ 1.5 s; also wait for real time so the mixer thread has actually consumed the click.
-        if (_frame >= 90 && Time.GetTicksMsec() - _startMsec >= 1500)
+        // Judge the behaviour once it has happened, not after a frame or wall-clock budget a starved host can outrun.
+        List<string> missing = MissingConditions();
+        if (missing.Count == 0)
         {
             _smoke = false;
             Evaluate();
         }
+        else if (Time.GetTicksMsec() - _startMsec >= SmokeTimeoutMsec)
+        {
+            _smoke = false;
+            PrintCounts();
+            Fail($"timed out after {SmokeTimeoutMsec} ms waiting for: {string.Join(", ", missing)}");
+        }
+    }
+
+    private List<string> MissingConditions()
+    {
+        var missing = new List<string>();
+        if (_frame <= 20) missing.Add("scripted starts");
+        if (_windVoice is not { } wind || !_server.Driver.IsVoicePlaying(wind)) missing.Add("wind voice playing");
+        if (_clickVoice is null) missing.Add("click VoicePlay");
+        else if (!_clickFinishedFed && !_clickStopApplied) missing.Add("click finished or stopped");
+        int ambience = AudioServer.GetBusIndex(DemoProject.AmbienceBus);
+        if (ambience < 0 || !(AudioServer.GetBusVolumeDb(ambience) <= DemoProject.MuffledAmbienceDb + 1f))
+            missing.Add("Ambience muffled");
+        if (_spatialRegions is not { OneShotFinished: true }) missing.Add("spatial one-shot finished");
+        return missing;
+    }
+
+    private void PrintCounts()
+    {
+        foreach (KeyValuePair<Type, int> pair in _commandCounts)
+            GD.Print($"DIRGE_SMOKE {pair.Key.Name} x{pair.Value}");
     }
 
     public override void _UnhandledKeyInput(InputEvent @event)
@@ -160,10 +189,7 @@ public partial class Demo : Node
 
     private void Evaluate()
     {
-        foreach (KeyValuePair<Type, int> pair in _commandCounts)
-        {
-            GD.Print($"DIRGE_SMOKE {pair.Key.Name} x{pair.Value}");
-        }
+        PrintCounts();
 
         int ambience = AudioServer.GetBusIndex(DemoProject.AmbienceBus);
         int master = AudioServer.GetBusIndex("Master");

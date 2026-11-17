@@ -823,6 +823,9 @@ internal sealed class InstrumentState
                 voiceDt = v.InitialAdvance;
                 v.InitialAdvance = 0;
                 v.Fresh = false;
+                // Catch-up keeps longer voices aligned with the clock, but must never finish a one-shot that was never
+                // sent: a click started just before a frame hitch plays late from its start instead of not at all.
+                if (!v.Loop && v.LengthKnown && v.Position + voiceDt * v.Pitch >= v.Length) advanceVoice = false;
             }
             if (!paused && advanceVoice)
             {

@@ -85,5 +85,7 @@ godot --headless --audio-driver Dummy --path . res://native/tests/sendreturn.tsc
 volume −80 dB), Conv (ConvolutionReverb)` and checks: pre-fader send reaches `Ret` and
 `Master` (> −40 dB) while `A` itself is silent (< −60 dB) and the keep-alive node exists;
 post-fader send is silenced by `A`'s fader; a unit impulse and a unit impulse delayed by
-100 000 frames (≈ 390 partitions) both reproduce the input level within 0.5 dB. Prints
-`NATIVE_TEST PASS` and exits 0.
+100 000 frames (≈ 390 partitions) both reproduce the input level within 0.5 dB. Each phase
+is judged after audio the mixer has actually rendered (a frame-counting `AudioEffectCapture`
+on `Master`; looping WAV sines need no main-thread feeding), so a starved host only delays the
+verdict; a phase still waiting after 30 s fails. Prints `NATIVE_TEST PASS` and exits 0.

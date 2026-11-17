@@ -251,11 +251,11 @@ func _banks(test: Object, assets) -> void:
 	project.banks = [{"name": "A", "events": [_id(30)]}, {"name": "B", "events": [_id(31)]}]
 	var banks = Banks.new(assets)
 	test.check(banks.load_bank(project, "A") and banks.load_bank(project, "B"), "Banks preload nested, multi and scatterer assets with cycle guard")
-	for tick in range(120):
+	# Threaded loads finish on a worker a starved host can delay past any frame budget.
+	var both_loaded = func():
 		banks.poll()
-		if banks.is_loaded("A") and banks.is_loaded("B"):
-			break
-		await _tree.process_frame
+		return banks.is_loaded("A") and banks.is_loaded("B")
+	await test.until(both_loaded)
 	test.check(banks.is_loaded("A") and banks.is_loaded("B") and assets.get_stream(path) is AudioStream, "Threaded engine resource loads complete shared banks")
 	test.check(banks.banks.A.paths.size() == 1, "Bank paths are deduplicated across instrument forms")
 	banks.unload("A")
@@ -264,11 +264,11 @@ func _banks(test: Object, assets) -> void:
 	test.check(not assets.is_cached(path) and banks.pending_count("B") == -1, "Last bank evicts catalog caches")
 	banks.load_bank(project, "A")
 	banks.unload("A")
-	for tick in range(120):
+	var drain = func():
 		banks.poll()
-		if banks._inflight.is_empty(): break
-		await _tree.process_frame
-	test.check(not assets.is_cached(path), "Late threaded completion after unload does not resurrect cache")
+		return banks._inflight.is_empty()
+	var drained = await test.until(drain)
+	test.check(drained and not assets.is_cached(path), "Late threaded completion after unload does not resurrect cache")
 	DirAccess.remove_absolute(path)
 
 func _protocol(test: Object) -> void:

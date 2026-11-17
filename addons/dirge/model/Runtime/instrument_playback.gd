@@ -332,6 +332,10 @@ func update(dt: float, paused: bool, bpm: float) -> void:
 			voice_dt = voice.initial_advance
 			voice.initial_advance = 0
 			voice.fresh = false
+			# A start's catch-up keeps longer voices aligned with the clock, but it must never finish a one-shot that
+			# was never sent: a click started just before a frame hitch plays late from its start instead of not at all.
+			if not voice.loop and voice.length_known and voice.position + voice_dt * voice.pitch >= voice.length:
+				advance_voice = false
 		if not paused and advance_voice:
 			voice.age += voice_dt
 			voice.position += voice_dt * voice.pitch

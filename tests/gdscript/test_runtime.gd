@@ -425,6 +425,23 @@ func _clocked_timing(test) -> void:
 		test.check(cue.state == "Playing" and cue.timeline_position == 0 and _first(cue_system, "VoicePlay").get("startSeconds", -1) == 0, "short cue survives entirely pre-start frame stall")
 		cue_system.update(1.05)
 		test.check(cue.state == "Stopped" and cue_system.instance_count == 0, "short clocked cue still completes and releases")
+	# Issue #19: the stall falls between the start and the next tick, longer than the whole cue.
+	var hitch_clock = {"elapsed": 0.0}
+	var hitch_system = System.new(_minimal(0.05), 0, null, "", func(): return hitch_clock.elapsed)
+	var hitch_cue = hitch_system.get_event("Test/Event").create_instance()
+	hitch_cue.start()
+	hitch_cue.release()
+	hitch_system.update(0.2)
+	test.check(_first(hitch_system, "VoicePlay").get("startSeconds", -1) == 0, "short cue started before a frame hitch still plays from its start")
+	var hitch_voice = _first(hitch_system, "VoicePlay").get("voice", -1)
+	hitch_system.commands.clear()
+	hitch_system.update(0.1)
+	test.check(_first(hitch_system, "VoiceStop").get("voice", -2) == hitch_voice and hitch_cue.state == "Stopped" and hitch_system.instance_count == 0, "late short cue then completes and releases")
+	var long_clock = {"elapsed": 0.0}
+	var long_system = System.new(_minimal(10), 0, null, "", func(): return long_clock.elapsed)
+	long_system.get_event("Test/Event").create_instance().start()
+	long_system.update(0.2)
+	test.check(_near(_first(long_system, "VoicePlay").get("startSeconds", -1), 0.2, 1e-9), "longer voices still catch up to the clock after a hitch")
 	var unclocked = System.new(_minimal(180))
 	var deterministic = unclocked.get_event("Test/Event").create_instance()
 	deterministic.start()

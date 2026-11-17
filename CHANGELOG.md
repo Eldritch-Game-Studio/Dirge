@@ -11,6 +11,7 @@ All notable changes to Dirge. The format follows [Keep a Changelog](https://keep
 ### Fixed
 - State one Godot requirement in the addon and repository READMEs: stock Godot 4.7.2, standard or .NET edition, with .NET not required. The addon README's compatibility line no longer reads as excluding the .NET edition.
 - `scripts/windows-proton.py` removes its private Proton workspace from `RUNNER_TEMP` after every run, success or failure, once logs are copied to the evidence directory. It unlinks the prefix's `dosdevices` links (`z: -> /`) without following them. Previously the retained prefix made the Actions runner's next temp cleanup abort with "Directory not empty" and leave file-less directory skeletons that broke other repositories' jobs.
+- A non-looping voice started shortly before a frame hitch longer than the sound is no longer dropped (#19). Start catch-up advanced it past its end in its first tick, so it finished without a `VoicePlay`: a 0.1 s UI click was silently lost whenever the next model tick came more than 0.1 s after the start. Such a voice now plays late from its start; longer and looping voices still catch up to the clock. The demo and sandbox smokes now judge once the behaviour they check has happened, with a 30 s timeout naming anything still missing, instead of after a fixed frame/time budget.
 
 ## 1.1.0 — 2026-11-13
 

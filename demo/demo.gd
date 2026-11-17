@@ -7,6 +7,7 @@ var _server
 var _smoke = false
 var _frame = 0
 var _start_msec = 0
+const SmokeTimeoutMsec = 30000
 var _muffled
 var _counts: Dictionary = {}
 var _wind_voice = -1
@@ -43,9 +44,30 @@ func _process(_delta: float) -> void:
 		10: _server.StartEvent(Project.ClickEvent)
 		20: _server.StartSnapshot(Project.MuffledSnapshot)
 	_frame += 1
-	if _frame >= 90 and Time.get_ticks_msec() - _start_msec >= 1500:
+	# Judge the behaviour once it has happened, not after a frame or wall-clock budget a starved host can outrun.
+	var missing = _missing_conditions()
+	if missing.is_empty():
 		_smoke = false
 		_evaluate()
+	elif Time.get_ticks_msec() - _start_msec >= SmokeTimeoutMsec:
+		_smoke = false
+		_print_counts()
+		_fail("timed out after %d ms waiting for: %s" % [SmokeTimeoutMsec, ", ".join(missing)])
+
+func _missing_conditions() -> PackedStringArray:
+	var missing = PackedStringArray()
+	if _frame <= 20:
+		missing.append("scripted starts")
+	if _wind_voice < 0 or not _server.Driver.is_voice_playing(_wind_voice):
+		missing.append("wind voice playing")
+	if _click_voice < 0:
+		missing.append("click VoicePlay")
+	elif not _click_finished and not _click_stopped:
+		missing.append("click finished or stopped")
+	var ambience = AudioServer.get_bus_index("Ambience")
+	if ambience < 0 or not AudioServer.get_bus_volume_db(ambience) <= Project.MuffledAmbienceDb + 1.0:
+		missing.append("Ambience muffled to <= -17 dB")
+	return missing
 
 func _unhandled_key_input(event: InputEvent) -> void:
 	if _smoke or not event is InputEventKey or not event.pressed or event.echo:
@@ -77,9 +99,12 @@ func _on_feedback(feedback: Dictionary) -> void:
 	if feedback.type == "VoiceFinished" and feedback.voice == _click_voice:
 		_click_finished = true
 
-func _evaluate() -> void:
+func _print_counts() -> void:
 	for kind in _counts:
 		print("DIRGE_SMOKE %s x%d" % [kind, _counts[kind]])
+
+func _evaluate() -> void:
+	_print_counts()
 	var ambience = AudioServer.get_bus_index("Ambience")
 	if AudioServer.get_bus_index("Master") != 0:
 		_fail("Master bus is not index 0")

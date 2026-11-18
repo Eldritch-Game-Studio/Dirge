@@ -2,7 +2,9 @@ import copy
 import importlib.util
 import io
 import json
+import os
 import re
+import shutil
 from pathlib import Path
 import subprocess
 import tarfile
@@ -19,6 +21,16 @@ SHA = "a" * 40
 RUN = 123
 PRODUCER = 456
 PREFIX = "repos/" + requalification.REPOSITORY
+
+
+def node_binary():
+    installed = shutil.which("node")
+    if installed:
+        return installed
+    # Self-hosted runners already carry this runtime for JavaScript actions.
+    # Do not install another runtime or skip the publisher's execution tests.
+    runner = Path(os.environ["RUNNER_WORKSPACE"]).parents[1]
+    return str(runner / "externals/node24/bin/node")
 
 
 def bundle(files):
@@ -95,6 +107,11 @@ class RequalificationTests(unittest.TestCase):
         command.assert_called_once_with(
             ["git", "merge-base", "--is-ancestor", SHA, "origin/managed/1.0.x"], cwd=ROOT, check=True)
         return result
+
+    def test_uses_runner_javascript_runtime_when_node_is_not_on_path(self):
+        with patch.object(shutil, "which", return_value=None), patch.dict(
+                os.environ, {"RUNNER_WORKSPACE": "/runner/_work/Dirge"}):
+            self.assertEqual(node_binary(), "/runner/externals/node24/bin/node")
 
     def test_binary_endpoints_use_their_own_media_negotiation(self):
         with patch.object(requalification.subprocess, "check_output", return_value=b"PK") as request:
@@ -225,7 +242,7 @@ const env = {EVIDENCE: '/unused', GITHUB_RUN_ATTEMPT: '1', QUALIFIED_RUN: '123'}
   }
 })();
 '''
-        result = subprocess.run(["node", "-e", harness], input=json.dumps({"data": data, "script": script}),
+        result = subprocess.run([node_binary(), "-e", harness], input=json.dumps({"data": data, "script": script}),
                                 text=True, capture_output=True, check=True)
         return json.loads(result.stdout)
 

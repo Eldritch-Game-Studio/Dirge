@@ -29,8 +29,12 @@ def node_binary():
         return installed
     # Self-hosted runners already carry this runtime for JavaScript actions.
     # Do not install another runtime or skip the publisher's execution tests.
-    runner = Path(os.environ["RUNNER_WORKSPACE"]).parents[1]
-    return str(runner / "externals/node24/bin/node")
+    workspace = os.environ.get("RUNNER_WORKSPACE")
+    if workspace:
+        runtime = Path(workspace).parents[1] / "externals/node24/bin/node"
+        if runtime.is_file() and os.access(runtime, os.X_OK):
+            return str(runtime)
+    raise RuntimeError("Publisher execution tests require executable Node.js on PATH or the runner-bundled Node24")
 
 
 def bundle(files):
@@ -110,8 +114,23 @@ class RequalificationTests(unittest.TestCase):
 
     def test_uses_runner_javascript_runtime_when_node_is_not_on_path(self):
         with patch.object(shutil, "which", return_value=None), patch.dict(
-                os.environ, {"RUNNER_WORKSPACE": "/runner/_work/Dirge"}):
+                os.environ, {"RUNNER_WORKSPACE": "/runner/_work/Dirge"}), patch.object(
+                Path, "is_file", return_value=True), patch.object(os, "access", return_value=True):
             self.assertEqual(node_binary(), "/runner/externals/node24/bin/node")
+
+    def test_missing_runtime_is_a_clear_failure_not_a_skip(self):
+        with patch.object(shutil, "which", return_value=None), patch.dict(os.environ, {}, clear=True):
+            with self.assertRaisesRegex(RuntimeError, "require executable Node.js"):
+                node_binary()
+
+    def test_runner_runtime_must_be_an_executable_file(self):
+        for exists, executable in ((False, True), (True, False)):
+            with self.subTest(exists=exists, executable=executable), patch.object(
+                    shutil, "which", return_value=None), patch.dict(
+                    os.environ, {"RUNNER_WORKSPACE": "/runner/_work/Dirge"}), patch.object(
+                    Path, "is_file", return_value=exists), patch.object(os, "access", return_value=executable):
+                with self.assertRaisesRegex(RuntimeError, "require executable Node.js"):
+                    node_binary()
 
     def test_binary_endpoints_use_their_own_media_negotiation(self):
         with patch.object(requalification.subprocess, "check_output", return_value=b"PK") as request:

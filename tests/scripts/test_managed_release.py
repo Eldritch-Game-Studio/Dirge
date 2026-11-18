@@ -3,6 +3,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import tempfile
 import textwrap
@@ -32,9 +33,15 @@ elif args[:2] not in (['release', 'create'], ['release', 'edit']):
 """
 
 
+def managed_release_job(workflow):
+    # Subsequent same-indent jobs have separate credentials and checkout policies.
+    body = workflow.split("\n  managed-release:\n", 1)[1]
+    return re.split(r"(?m)^  [A-Za-z_][A-Za-z0-9_-]*:[ \t]*(?:#.*)?$", body, maxsplit=1)[0]
+
+
 def publisher_shell():
     workflow = (ROOT / ".github/workflows/ci-local.yml").read_text()
-    step = workflow.split("      - name: Publish the managed-<sha12> release\n", 1)[1]
+    step = managed_release_job(workflow).split("      - name: Publish the managed-<sha12> release\n", 1)[1]
     return textwrap.dedent(step.split("        run: |\n", 1)[1].split("      - name: Notify consumers", 1)[0])
 
 
@@ -204,9 +211,8 @@ class ManagedReleaseTests(unittest.TestCase):
         self.assert_rejected()
         self.assertFalse(self.log.exists())
 
-    def test_publisher_keeps_credentials_out_of_source_checkout_and_blocks_failed_notify(self):
-        workflow = (ROOT / ".github/workflows/ci-local.yml").read_text()
-        release = workflow.split("\n  managed-release:\n", 1)[1]
+    def assert_publisher_security(self, workflow):
+        release = managed_release_job(workflow)
         self.assertNotIn("actions/checkout", release)
         self.assertNotIn("--clobber", release)
         notify = release.split("      - name: Notify consumers", 1)[1]
@@ -214,6 +220,22 @@ class ManagedReleaseTests(unittest.TestCase):
         self.assertNotIn("continue-on-error", release)
         self.assertIn("needs.qualification.result == 'success'", release)
         self.assertIn("QUALIFICATION: ${{ needs.qualification.result }}", release)
+
+    def test_publisher_keeps_credentials_out_of_source_checkout_and_blocks_failed_notify(self):
+        self.assert_publisher_security((ROOT / ".github/workflows/ci-local.yml").read_text())
+
+    def test_publisher_guard_excludes_checkout_in_following_cpu_only_job(self):
+        release = managed_release_job((ROOT / ".github/workflows/ci-local.yml").read_text())
+        workflow = ("jobs:\n  managed-release:\n" + release
+                    + "\n  cpu-only:\n    steps:\n      - uses: actions/checkout@v4\n")
+        self.assert_publisher_security(workflow)
+
+    def test_publisher_guard_still_rejects_checkout_inside_privileged_job(self):
+        release = managed_release_job((ROOT / ".github/workflows/ci-local.yml").read_text())
+        unsafe = release.replace("    steps:\n", "    steps:\n      - uses: actions/checkout@v4\n", 1)
+        self.assertNotEqual(release, unsafe)
+        with self.assertRaisesRegex(AssertionError, "actions/checkout"):
+            self.assert_publisher_security("jobs:\n  managed-release:\n" + unsafe)
 
 
 if __name__ == "__main__":

@@ -428,22 +428,54 @@ jobs:
           GH_REPO: ${{ github.repository }}
           REVISION: ${{ needs.trust.outputs.revision }}
           TAGGED: ${{ startsWith(github.ref, 'refs/tags/v') }}
+          QUALIFICATION: ${{ needs.qualification.result }}
         run: |
           provenance="$ARTIFACT/provenance.json"
           sha="$(jq -r .sha "$provenance")"; tag="$(jq -r .release_tag "$provenance")"
           zip="$(jq -r .zip "$provenance")"; digest="$(jq -r .zip_sha256 "$provenance")"
           [[ "$sha" = "$REVISION" && "$tag" = "managed-${sha:0:12}" && "$zip" = "dirge-managed-$sha.zip" ]]
           echo "$digest  $ARTIFACT/$zip" | sha256sum -c -
-          if gh api "repos/$GH_REPO/releases/tags/$tag" > "$ARTIFACT/existing.json" 2>/dev/null; then
-            # Same commit from a branch push and its tag push: the package is deterministic, so it must match.
-            existing="$(jq -r --arg zip "$zip" '.assets[] | select(.name == $zip) | .digest // ""' "$ARTIFACT/existing.json")"
-            if [[ -n "$existing" && "$existing" != "sha256:$digest" ]]; then
-              echo "::error::$tag already publishes $zip with $existing, not sha256:$digest"
-              exit 1
-            fi
-            [[ -n "$existing" ]] || gh release upload "$tag" "$ARTIFACT/$zip" "$provenance" --clobber
+          if gh api "repos/$GH_REPO/releases/tags/$tag" > "$ARTIFACT/existing.json" 2> "$ARTIFACT/release-error"; then
+            # Existing releases are immutable. Identical bytes alone do not prove their recorded CI still exists.
+            jq -e --arg zip "$zip" --arg digest "sha256:$digest" '
+              [.assets[] | select(.name == $zip)] as $packages |
+              [.assets[] | select(.name == "provenance.json")] as $proofs |
+              ($packages | length) == 1 and $packages[0].digest == $digest and
+              ($proofs | length) == 1 and ($proofs[0].id | type == "number")
+            ' "$ARTIFACT/existing.json"
+            asset="$(jq -r '.assets[] | select(.name == "provenance.json") | .id' "$ARTIFACT/existing.json")"
+            published="$ARTIFACT/published-provenance.json"
+            gh api "repos/$GH_REPO/releases/assets/$asset" -H 'Accept: application/octet-stream' > "$published"
+            jq -e --slurpfile candidate "$provenance" '
+              . as $published |
+              all(["schema", "package", "repository", "branch", "sha", "release_tag", "zip", "zip_sha256", "upstream"][];
+                . as $key | $published[$key] == $candidate[0][$key]) and
+              (.ref == "refs/heads/managed/1.0.x" or (.ref | startswith("refs/tags/v"))) and
+              (.run_id | type == "number" and . > 0 and floor == .) and
+              (.qualified_run_id | type == "number" and . > 0 and floor == .) and
+              (.run_attempt | type == "number" and . > 0 and floor == .) and
+              .qualified_run_id == .run_id
+            ' "$published"
+            run_id="$(jq -r .run_id "$published")"
+            gh api "repos/$GH_REPO/actions/runs/$run_id" > "$ARTIFACT/published-run.json"
+            # Dirge has no backfill policy: publication and complete qualification belong to the same push.
+            # A notification-only rerun is still in progress after its own mandatory qualification passed.
+            jq -e --arg sha "$sha" --arg repository "$GH_REPO" --slurpfile proof "$published" \
+              --argjson current "$GITHUB_RUN_ID" --arg qualification "$QUALIFICATION" '
+              .id == $proof[0].run_id and .head_sha == $sha and .repository.full_name == $repository and
+              .path == ".github/workflows/ci.yml" and .event == "push" and
+              .head_branch == ($proof[0].ref | sub("^refs/(heads|tags)/"; "")) and
+              ((.status == "completed" and .conclusion == "success") or
+               (.id == $current and $qualification == "success" and .status == "in_progress" and .conclusion == null)) and
+              (.run_attempt | type == "number" and floor == .) and .run_attempt >= $proof[0].run_attempt
+            ' "$ARTIFACT/published-run.json"
             if [[ "$TAGGED" = true ]]; then gh release edit "$tag" --prerelease=false; fi
           else
+            # A transport/permission failure is not evidence that a release is absent.
+            if ! grep -q '(HTTP 404)' "$ARTIFACT/release-error"; then
+              cat "$ARTIFACT/release-error" >&2
+              exit 1
+            fi
             prerelease=(--prerelease)
             [[ "$TAGGED" = true ]] && prerelease=()
             gh release create "$tag" "$ARTIFACT/$zip" "$provenance" "${prerelease[@]}" --target "$sha" \

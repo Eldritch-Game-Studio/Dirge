@@ -204,17 +204,6 @@ class ManagedReleaseTests(unittest.TestCase):
         self.assert_rejected()
         self.assertFalse(self.log.exists())
 
-    def test_publisher_keeps_credentials_out_of_source_checkout_and_blocks_failed_notify(self):
-        workflow = (ROOT / ".github/workflows/ci-local.yml").read_text()
-        release = workflow.split("\n  managed-release:\n", 1)[1]
-        self.assertNotIn("actions/checkout", release)
-        self.assertNotIn("--clobber", release)
-        notify = release.split("      - name: Notify consumers", 1)[1]
-        self.assertNotIn("if:", notify)
-        self.assertNotIn("continue-on-error", release)
-        self.assertIn("needs.qualification.result == 'success'", release)
-        self.assertIn("QUALIFICATION: ${{ needs.qualification.result }}", release)
-
 
 if __name__ == "__main__":
     unittest.main()

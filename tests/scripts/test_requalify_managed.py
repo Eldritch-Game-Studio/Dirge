@@ -257,6 +257,9 @@ const env = {EVIDENCE: '/unused', GITHUB_RUN_ATTEMPT: '1', QUALIFIED_RUN: '123'}
 
     def test_recovery_dispatch_does_not_schedule_native_or_managed_rebuilds(self):
         workflow = (ROOT / ".github/workflows/ci-local.yml").read_text()
+        caller = (ROOT / ".github/workflows/ci.yml").read_text()
+        self.assertIn("github.event.inputs.requalification_run", workflow)
+        self.assertNotIn("      requalification_run:", caller.split("    with:\n", 1)[1])
         for job in ("test", "validate", "native-linux", "native-windows", "native-macos", "managed-package"):
             section = re.split(r"\n  [a-z][a-z-]*:\n", workflow.split(f"\n  {job}:\n", 1)[1], maxsplit=1)[0]
             self.assertIn("needs.trust.outputs.requalification_run == ''", section)

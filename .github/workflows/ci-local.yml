@@ -13,9 +13,6 @@ on:
       approved_head:
         type: string
         default: ''
-      requalification_run:
-        type: string
-        default: ''
 
 permissions:
   contents: read
@@ -54,7 +51,8 @@ jobs:
           APPROVED_PR: ${{ inputs.approved_pr }}
           APPROVED_HEAD: ${{ inputs.approved_head }}
           PARTIAL: ${{ inputs.partial }}
-          REQUALIFICATION_RUN: ${{ inputs.requalification_run }}
+          # Read the dispatch event directly so PR callers remain compatible with the maintained reusable API.
+          REQUALIFICATION_RUN: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.requalification_run || '' }}
         with:
           script: |
             const expected = 'Eldritch-Game-Studio/Dirge';

@@ -38,4 +38,3 @@ jobs:
       partial: ${{ inputs.partial == true }}
       approved_pr: ${{ inputs.approved_pr || '' }}
       approved_head: ${{ inputs.approved_head || '' }}
-      requalification_run: ${{ inputs.requalification_run || '' }}

@@ -76,7 +76,8 @@ class ManagedReleaseTests(unittest.TestCase):
         self.environment = dict(os.environ, PATH=f"{binary}{os.pathsep}{os.environ['PATH']}",
                                 GH_LOG=str(self.log), GH_RESPONSES=str(self.root / "responses.json"),
                                 ARTIFACT=str(self.root), GH_REPO=REPOSITORY, REVISION=SHA, TAGGED="false",
-                                GITHUB_OUTPUT=str(self.output), GITHUB_RUN_ID="20", GITHUB_SERVER_URL="https://github.com")
+                                GITHUB_OUTPUT=str(self.output), GITHUB_RUN_ID="20", QUALIFICATION="success",
+                                GITHUB_SERVER_URL="https://github.com")
 
     def publish(self, tagged=False):
         (self.root / "responses.json").write_text(json.dumps(self.responses))
@@ -100,6 +101,37 @@ class ManagedReleaseTests(unittest.TestCase):
                                  ["api", self.proof_path, "-H", "Accept: application/octet-stream"],
                                  ["api", self.run_path]])
         self.assertEqual(self.output.read_text(), f"sha={SHA}\ntag={TAG}\ndigest={self.digest}\n")
+
+    def test_own_running_rerun_reuses_proof_only_after_qualification(self):
+        self.environment["GITHUB_RUN_ID"] = "10"
+        self.run.update(status="in_progress", conclusion=None, run_attempt=2)
+        result, calls = self.publish()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue(self.output.exists())
+        self.assertFalse(any(call[0] == "release" for call in calls))
+
+    def test_other_running_run_is_rejected_even_after_current_qualification(self):
+        self.run.update(status="in_progress", conclusion=None)
+        self.assert_rejected()
+
+    def test_own_running_run_without_successful_qualification_is_rejected(self):
+        self.environment["GITHUB_RUN_ID"] = "10"
+        self.run.update(status="in_progress", conclusion=None)
+        for qualification in ("failure", "cancelled", "skipped", ""):
+            with self.subTest(qualification=qualification):
+                self.environment["QUALIFICATION"] = qualification
+                self.assert_rejected()
+
+    def test_same_run_exception_preserves_all_source_and_workflow_identity_checks(self):
+        self.environment["GITHUB_RUN_ID"] = "10"
+        original = dict(self.run, status="in_progress", conclusion=None)
+        changes = {"head_sha": "c" * 40, "repository": {"full_name": "other/repo"},
+                   "path": ".github/workflows/other.yml", "event": "workflow_dispatch",
+                   "head_branch": "feature", "conclusion": "failure", "status": "queued"}
+        for key, value in changes.items():
+            with self.subTest(field=key):
+                self.responses[self.run_path] = {**original, key: value}
+                self.assert_rejected()
 
     def test_deleted_run_fails_before_promotion_or_notification(self):
         self.responses[self.run_path] = 404
@@ -181,6 +213,7 @@ class ManagedReleaseTests(unittest.TestCase):
         self.assertNotIn("if:", notify)
         self.assertNotIn("continue-on-error", release)
         self.assertIn("needs.qualification.result == 'success'", release)
+        self.assertIn("QUALIFICATION: ${{ needs.qualification.result }}", release)
 
 
 if __name__ == "__main__":

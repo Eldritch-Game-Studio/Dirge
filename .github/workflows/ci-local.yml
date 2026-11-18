@@ -414,6 +414,7 @@ jobs:
           GH_REPO: ${{ github.repository }}
           REVISION: ${{ needs.trust.outputs.revision }}
           TAGGED: ${{ startsWith(github.ref, 'refs/tags/v') }}
+          QUALIFICATION: ${{ needs.qualification.result }}
         run: |
           provenance="$ARTIFACT/provenance.json"
           sha="$(jq -r .sha "$provenance")"; tag="$(jq -r .release_tag "$provenance")"
@@ -444,11 +445,14 @@ jobs:
             run_id="$(jq -r .run_id "$published")"
             gh api "repos/$GH_REPO/actions/runs/$run_id" > "$ARTIFACT/published-run.json"
             # Dirge has no backfill policy: publication and complete qualification belong to the same push.
-            jq -e --arg sha "$sha" --arg repository "$GH_REPO" --slurpfile proof "$published" '
+            # A notification-only rerun is still in progress after its own mandatory qualification passed.
+            jq -e --arg sha "$sha" --arg repository "$GH_REPO" --slurpfile proof "$published" \
+              --argjson current "$GITHUB_RUN_ID" --arg qualification "$QUALIFICATION" '
               .id == $proof[0].run_id and .head_sha == $sha and .repository.full_name == $repository and
               .path == ".github/workflows/ci.yml" and .event == "push" and
               .head_branch == ($proof[0].ref | sub("^refs/(heads|tags)/"; "")) and
-              .status == "completed" and .conclusion == "success" and
+              ((.status == "completed" and .conclusion == "success") or
+               (.id == $current and $qualification == "success" and .status == "in_progress" and .conclusion == null)) and
               (.run_attempt | type == "number" and floor == .) and .run_attempt >= $proof[0].run_attempt
             ' "$ARTIFACT/published-run.json"
             if [[ "$TAGGED" = true ]]; then gh release edit "$tag" --prerelease=false; fi

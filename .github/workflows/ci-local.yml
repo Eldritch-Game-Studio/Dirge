@@ -13,10 +13,14 @@ on:
       approved_head:
         type: string
         default: ''
+      requalification_run:
+        type: string
+        default: ''
 
 permissions:
   contents: read
   pull-requests: read
+  actions: read
 
 concurrency:
   # Reviewed manual dispatches and PR events must share one producer admission group.
@@ -42,6 +46,7 @@ jobs:
       revision: ${{ steps.source.outputs.revision }}
       runner: ${{ steps.source.outputs.runner }}
       partial: ${{ steps.source.outputs.partial }}
+      requalification_run: ${{ steps.source.outputs.requalification_run }}
     steps:
       - id: source
         uses: actions/github-script@v7
@@ -49,6 +54,7 @@ jobs:
           APPROVED_PR: ${{ inputs.approved_pr }}
           APPROVED_HEAD: ${{ inputs.approved_head }}
           PARTIAL: ${{ inputs.partial }}
+          REQUALIFICATION_RUN: ${{ inputs.requalification_run }}
         with:
           script: |
             const expected = 'Eldritch-Game-Studio/Dirge';
@@ -62,6 +68,11 @@ jobs:
             let repository = expected;
             let revision = context.sha;
             let partial = false;
+            const recovery = process.env.REQUALIFICATION_RUN;
+            if (recovery && (context.eventName !== 'workflow_dispatch' ||
+                context.ref !== 'refs/heads/managed/1.0.x' || process.env.PARTIAL === 'true' ||
+                process.env.APPROVED_PR || process.env.APPROVED_HEAD || !/^[1-9][0-9]*$/.test(recovery)))
+              throw new Error('Requalification requires a managed-line manual dispatch, a run ID, no partial or PR approval.');
             if (context.eventName === 'pull_request') {
               const number = context.payload.pull_request.number;
               const {data: pr} = await github.rest.pulls.get({...context.repo, pull_number: number});
@@ -94,12 +105,14 @@ jobs:
             core.setOutput('repository', repository);
             core.setOutput('revision', revision);
             core.setOutput('partial', String(partial));
+            core.setOutput('requalification_run', recovery);
             core.setOutput('runner', JSON.stringify(partial
               ? ['self-hosted', 'Linux', 'X64', 'eldritch-linux']
               : ['self-hosted', 'macOS', 'ARM64', 'eldritch-apple']));
 
   test:
     needs: trust
+    if: needs.trust.outputs.requalification_run == ''
     runs-on: ${{ fromJSON(needs.trust.outputs.runner) }}
     steps:
       - uses: actions/checkout@v4
@@ -112,6 +125,7 @@ jobs:
 
   validate:
     needs: trust
+    if: needs.trust.outputs.requalification_run == ''
     runs-on: ${{ fromJSON(needs.trust.outputs.runner) }}
     steps:
       - uses: actions/checkout@v4
@@ -160,6 +174,7 @@ jobs:
 
   native-linux:
     needs: trust
+    if: needs.trust.outputs.requalification_run == ''
     runs-on: [self-hosted, Linux, X64, eldritch-linux]
     steps:
       - uses: actions/checkout@v4
@@ -188,7 +203,7 @@ jobs:
   native-windows:
     name: Windows x64 cross-build + Proton compatibility
     needs: trust
-    if: needs.trust.outputs.partial != 'true'
+    if: needs.trust.outputs.partial != 'true' && needs.trust.outputs.requalification_run == ''
     runs-on: [self-hosted, Linux, X64, eldritch-linux]
     timeout-minutes: 60
     steps:
@@ -228,7 +243,7 @@ jobs:
 
   native-macos:
     needs: trust
-    if: needs.trust.outputs.partial != 'true'
+    if: needs.trust.outputs.partial != 'true' && needs.trust.outputs.requalification_run == ''
     runs-on: [self-hosted, macOS, ARM64, eldritch-apple]
     timeout-minutes: 120
     steps:
@@ -310,6 +325,7 @@ jobs:
     # The managed-host source ZIP .NET hosts (Kraken's Keg, God Complex) install; built here, never by hand.
     # Every run proves it builds against the locked NecronomiDOM; only managed/1.0.x and v* pushes publish it.
     needs: trust
+    if: needs.trust.outputs.requalification_run == ''
     runs-on: [self-hosted, Linux, X64, eldritch-linux]
     outputs:
       publish: ${{ steps.provenance.outputs.publish }}
@@ -354,7 +370,7 @@ jobs:
 
   qualification:
     needs: [trust, test, validate, smoke, native-linux, native-windows, native-macos, package, managed-package]
-    if: always()
+    if: always() && needs.trust.outputs.requalification_run == ''
     runs-on: [self-hosted, Linux, X64, eldritch-linux]
     steps:
       - env:
@@ -450,3 +466,141 @@ jobs:
           # Kraken's Keg is the only CD consumer; other hosts install published releases themselves.
           env -u GH_TOKEN -u GITHUB_TOKEN gh api repos/Eldritch-Game-Studio/Krakens-Keg-Godot/dispatches --input - <<< "$payload"
           echo "dispatched $TAG to Krakens-Keg-Godot"
+
+  managed-requalification:
+    # Read-only recovery: no build and no execution of the earlier revision's code.
+    needs: trust
+    if: needs.trust.outputs.requalification_run != ''
+    runs-on: [self-hosted, Linux, X64, eldritch-linux]
+    timeout-minutes: 10
+    outputs:
+      revision: ${{ steps.evidence.outputs.revision }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.trust.outputs.revision }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Authenticate exact-source FULL qualification and identical released ZIP
+        id: evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          QUALIFIED_RUN: ${{ needs.trust.outputs.requalification_run }}
+          EVIDENCE: ${{ runner.temp }}/dirge-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          python3 scripts/requalify-managed.py --qualified-run-id "$QUALIFIED_RUN" --output "$EVIDENCE"
+          echo "revision=$(jq -r .sha "$EVIDENCE"/provenance-*.json)" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: managed-requalification
+          path: ${{ runner.temp }}/dirge-evidence-${{ github.run_id }}-${{ github.run_attempt }}/provenance-*.json
+          if-no-files-found: error
+
+  managed-requalification-release:
+    needs: [trust, managed-requalification]
+    runs-on: [self-hosted, Linux, X64, crucible, dirge]
+    timeout-minutes: 10
+    concurrency:
+      group: managed-release-${{ needs.managed-requalification.outputs.revision }}
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      # No checkout or build with publication credentials. Never overwrite or notify consumers.
+      - uses: actions/download-artifact@v4
+        with:
+          name: managed-requalification
+          path: ${{ runner.temp }}/dirge-evidence-publish-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Recheck live evidence and append one immutable recovery asset
+        uses: actions/github-script@v7
+        env:
+          EVIDENCE: ${{ runner.temp }}/dirge-evidence-publish-${{ github.run_id }}-${{ github.run_attempt }}
+          QUALIFIED_RUN: ${{ needs.trust.outputs.requalification_run }}
+        with:
+          script: |
+            const fs = require('fs');
+            const crypto = require('crypto');
+            const {isDeepStrictEqual} = require('util');
+            const hash = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
+            const ensure = (ok, message) => { if (!ok) throw new Error(message); };
+            const name = `provenance-${context.runId}-${process.env.GITHUB_RUN_ATTEMPT}.json`;
+            ensure(fs.readdirSync(process.env.EVIDENCE).join() === name, 'Expected exactly one recovery receipt');
+            const bytes = fs.readFileSync(`${process.env.EVIDENCE}/${name}`);
+            const proof = JSON.parse(bytes);
+            ensure(proof.schema === 'eldritch.managed-requalification/1' && proof.package === 'dirge' &&
+              proof.repository === 'Eldritch-Game-Studio/Dirge' && proof.branch === 'managed/1.0.x' &&
+              proof.ref === context.ref && proof.run_id === context.runId &&
+              proof.run_attempt === Number(process.env.GITHUB_RUN_ATTEMPT) &&
+              proof.qualified_run_id === Number(process.env.QUALIFIED_RUN) &&
+              proof.evidence_kind === 'independent-full-qualification-and-identical-managed-zip' &&
+              /^[0-9a-f]{40}$/.test(proof.sha) && /^[0-9a-f]{64}$/.test(proof.zip_sha256) &&
+              proof.release_tag === `managed-${proof.sha.slice(0, 12)}` &&
+              proof.zip === `dirge-managed-${proof.sha}.zip`, 'Recovery identity differs');
+            const {data: run} = await github.rest.actions.getWorkflowRun({
+              ...context.repo, run_id: proof.qualified_run_id
+            });
+            ensure(run.repository.full_name === proof.repository && run.path === '.github/workflows/ci.yml' &&
+              run.head_branch === proof.branch && run.head_sha === proof.sha &&
+              ['push', 'workflow_dispatch'].includes(run.event) && run.status === 'completed' &&
+              run.conclusion === 'success' && run.run_attempt === proof.qualified_run_attempt,
+              'Independent exact-source qualification is not live and successful');
+            const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRunAttempt, {
+              ...context.repo, run_id: run.id, attempt_number: run.run_attempt, per_page: 100
+            });
+            for (const required of ['trust', 'test', 'validate', 'smoke', 'native-linux',
+              'Windows x64 cross-build + Proton compatibility', 'native-macos', 'package',
+              'managed-package', 'qualification']) {
+              const found = jobs.filter(job => job.name === `local / ${required}`);
+              ensure(found.length === 1 && found[0].status === 'completed' &&
+                found[0].conclusion === 'success' && found[0].run_attempt === run.run_attempt,
+                `Missing FULL qualification: ${required}`);
+            }
+            const {data: compare} = await github.rest.repos.compareCommitsWithBasehead({
+              ...context.repo, basehead: `${proof.sha}...managed/1.0.x`
+            });
+            ensure(['ahead', 'identical'].includes(compare.status), 'Source left maintained branch');
+            const {data: release} = await github.rest.repos.getReleaseByTag({
+              ...context.repo, tag: proof.release_tag
+            });
+            const assets = await github.paginate(github.rest.repos.listReleaseAssets, {
+              ...context.repo, release_id: release.id, per_page: 100
+            });
+            const one = assetName => {
+              const found = assets.filter(asset => asset.name === assetName);
+              ensure(found.length === 1, `Missing or ambiguous original asset: ${assetName}`);
+              return found[0];
+            };
+            const originalAsset = one('provenance.json');
+            const packageAsset = one(proof.zip);
+            ensure(!release.draft && proof.original_provenance.asset === 'provenance.json' &&
+              originalAsset.id === proof.original_provenance.asset_id &&
+              originalAsset.digest === `sha256:${proof.original_provenance.sha256}` &&
+              packageAsset.digest === `sha256:${proof.zip_sha256}`, 'Original release assets changed');
+            const {data: originalData} = await github.rest.repos.getReleaseAsset({
+              ...context.repo, asset_id: originalAsset.id, headers: {accept: 'application/octet-stream'}
+            });
+            const originalBytes = Buffer.from(originalData);
+            ensure(hash(originalBytes) === proof.original_provenance.sha256, 'Original provenance SHA256 differs');
+            const original = JSON.parse(originalBytes);
+            ensure(original.schema === 'eldritch.managed-provenance/1' &&
+              ['package', 'repository', 'branch', 'sha', 'release_tag', 'zip', 'zip_sha256', 'upstream']
+                .every(key => isDeepStrictEqual(original[key], proof[key])),
+              'Recovery changed original identity, ZIP, or locked NecronomiDOM');
+            const {data: artifact} = await github.rest.actions.getArtifact({
+              ...context.repo, artifact_id: proof.qualified_artifact.id
+            });
+            ensure(!artifact.expired && artifact.name === 'dirge-managed' &&
+              proof.qualified_artifact.name === artifact.name &&
+              artifact.digest === `sha256:${proof.qualified_artifact.sha256}` &&
+              artifact.workflow_run.id === run.id && artifact.workflow_run.head_sha === proof.sha,
+              'Exact-source managed artifact is no longer available');
+            ensure(!assets.some(asset => asset.name === name), 'Recovery asset already exists; refusing replacement');
+            await github.rest.repos.uploadReleaseAsset({
+              ...context.repo, release_id: release.id, name, data: bytes,
+              headers: {'content-type': 'application/json', 'content-length': bytes.length}
+            });
+            await core.summary.addHeading('Append-only managed requalification')
+              .addRaw(`Asset: ${name}\n\nSHA256: ${hash(bytes)}\n\nIndependent qualification: ${run.html_url}\n\n` +
+                'Original provenance.json and managed ZIP were not replaced. No consumer notification was sent.')
+              .write();

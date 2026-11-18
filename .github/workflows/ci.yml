@@ -19,11 +19,16 @@ on:
         description: Exact reviewed fork PR head SHA (required with approved_pr)
         type: string
         default: ''
+      requalification_run:
+        description: Append evidence for an existing release from this successful FULL exact-source CI run (no rebuild)
+        type: string
+        default: ''
 
 # The reusable definition reduces build permissions and isolates release writes.
 permissions:
   contents: write
   pull-requests: read
+  actions: read
 
 jobs:
   local:
@@ -33,3 +38,4 @@ jobs:
       partial: ${{ inputs.partial == true }}
       approved_pr: ${{ inputs.approved_pr || '' }}
       approved_head: ${{ inputs.approved_head || '' }}
+      requalification_run: ${{ inputs.requalification_run || '' }}
